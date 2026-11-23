@@ -19,7 +19,7 @@ tasks.register("checkModuleDependencies") {
         project(":$module").configurations
             .flatMap { configuration ->
                 configuration.dependencies.mapNotNull { dependency ->
-                    if (dependency is org.gradle.api.artifacts.ProjectDependency) {
+                    if (dependency is ProjectDependency) {
                         dependency.path.removePrefix(":")
                     } else {
                         null
