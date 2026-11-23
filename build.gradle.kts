@@ -1,0 +1,47 @@
+val allowedProjectDependencies = mapOf(
+    "mockey-core" to emptySet(),
+    "mockey-api" to emptySet(),
+    "mockey-legacy" to setOf("mockey-core"),
+    "mockey-server" to setOf("mockey-core", "mockey-api", "mockey-legacy"),
+    "mockey-ui" to setOf("mockey-api"),
+    "mockey-parity-tests" to setOf("mockey-server"),
+)
+
+subprojects {
+    group = rootProject.group
+    version = rootProject.version
+}
+
+tasks.register("checkModuleDependencies") {
+    group = "verification"
+    description = "Checks that project dependencies follow the modular architecture."
+    notCompatibleWithConfigurationCache("The dependency graph is inspected from project configuration.")
+    val actualProjectDependencies = allowedProjectDependencies.keys.associateWith { module ->
+        project(":$module").configurations
+            .flatMap { configuration ->
+                configuration.dependencies.mapNotNull { dependency ->
+                    if (dependency is org.gradle.api.artifacts.ProjectDependency) {
+                        dependency.path.removePrefix(":")
+                    } else {
+                        null
+                    }
+                }
+            }
+            .toSet()
+    }
+    doLast {
+        allowedProjectDependencies.forEach { (module, allowed) ->
+            val actual = actualProjectDependencies.getValue(module)
+            val forbidden = actual - allowed
+            check(forbidden.isEmpty()) {
+                "$module has forbidden project dependencies: ${forbidden.sorted().joinToString()}. " +
+                    "Allowed dependencies: ${allowed.sorted().joinToString().ifEmpty { "none" }}"
+            }
+        }
+    }
+}
+
+tasks.register("check") {
+    dependsOn("checkModuleDependencies")
+    dependsOn(subprojects.map { "${it.path}:check" })
+}

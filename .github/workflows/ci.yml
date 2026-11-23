@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lmigtech/internal-actions/actions/setup-java@v0
+        with:
+          java-version: "21"
+      - name: Check
+        run: ./gradlew check --no-daemon
