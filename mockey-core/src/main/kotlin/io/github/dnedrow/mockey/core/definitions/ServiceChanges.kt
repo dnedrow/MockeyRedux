@@ -5,6 +5,7 @@ import io.github.dnedrow.mockey.core.engine.ChangeResult
 import io.github.dnedrow.mockey.core.engine.FieldError
 import io.github.dnedrow.mockey.core.engine.ValidationFailure
 import io.github.dnedrow.mockey.core.model.Definitions
+import io.github.dnedrow.mockey.core.model.ScenarioId
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.ServiceId
 
@@ -20,6 +21,10 @@ import io.github.dnedrow.mockey.core.model.ServiceId
  * service has its mock URL pattern, or when another service lists one of its real URLs. Mock URL patterns and
  * real URLs are compared without regard to letter case. The whole service is checked each time, also the
  * attributes that an update leaves as they are.
+ *
+ * An update can designate the default scenario and the error scenario of the service. A scenario that is
+ * newly designated must be one of the scenarios of the service. The scenarios themselves are changed with
+ * [ScenarioChanges].
  */
 internal object ServiceChanges {
     const val MAX_NAME_LENGTH = 250
@@ -33,8 +38,9 @@ internal object ServiceChanges {
     fun create(define: (Service) -> Service): Change<Service> =
         { definitions ->
             val blank = Service(id = ServiceId.generate(), name = "", mockUrl = "")
-            val service = normalized(attributesChanged(blank, define)).named()
-            saved(definitions, service) { services -> services + service }
+            val defined = attributesChanged(blank, define)
+            val service = normalized(defined).named()
+            saved(definitions, service, designationErrors(blank, defined)) { services -> services + service }
         }
 
     /** Updates the service [id]. [change] gets the service as it is and returns it with its new attributes. */
@@ -43,12 +49,15 @@ internal object ServiceChanges {
         change: (Service) -> Service,
     ): Change<Service> =
         { definitions ->
-            val current = definitions.services.firstOrNull { it.id == id }
+            val current = definitions.service(id)
             if (current == null) {
-                notFound(id)
+                serviceNotFound(id)
             } else {
-                val service = normalized(attributesChanged(current, change))
-                saved(definitions, service) { services -> services.map { if (it.id == id) service else it } }
+                val changed = attributesChanged(current, change)
+                val service = normalized(changed).withValidDesignations()
+                saved(definitions, service, designationErrors(current, changed)) { services ->
+                    services.map { if (it.id == id) service else it }
+                }
             }
         }
 
@@ -58,9 +67,9 @@ internal object ServiceChanges {
      */
     fun delete(id: ServiceId): Change<Service> =
         { definitions ->
-            val service = definitions.services.firstOrNull { it.id == id }
+            val service = definitions.service(id)
             if (service == null) {
-                notFound(id)
+                serviceNotFound(id)
             } else {
                 val settings = definitions.settings
                 val universalErrorScenario = settings.universalErrorScenario?.takeUnless { it.serviceId == id }
@@ -88,8 +97,6 @@ internal object ServiceChanges {
         return (lastPart.trim() + DERIVED_NAME_SUFFIX).trim()
     }
 
-    private fun notFound(id: ServiceId) = ChangeResult.NotFound("No service has the identifier ${id.value}.")
-
     /** Applies [change], which may set the attributes of the service but not its identifier or its scenarios. */
     private fun attributesChanged(
         before: Service,
@@ -97,13 +104,30 @@ internal object ServiceChanges {
     ): Service {
         val after = change(before)
         require(after.id == before.id) { "The identifier of a service cannot be changed." }
-        require(
-            after.scenarios == before.scenarios &&
-                after.defaultScenarioId == before.defaultScenarioId &&
-                after.errorScenarioId == before.errorScenarioId,
-        ) { "The scenarios of a service and their designations cannot be changed together with its attributes." }
+        require(after.scenarios == before.scenarios) { "The scenarios of a service cannot be changed together with its attributes." }
         return after
     }
+
+    /** Reports a scenario that [after] newly designates and that is not one of its scenarios. */
+    private fun designationErrors(
+        before: Service,
+        after: Service,
+    ): List<FieldError> =
+        listOfNotNull(
+            after.defaultScenarioId.takeIf { it != before.defaultScenarioId }?.let { missingScenario("defaultScenarioId", after, it) },
+            after.errorScenarioId.takeIf { it != before.errorScenarioId }?.let { missingScenario("errorScenarioId", after, it) },
+        )
+
+    private fun missingScenario(
+        field: String,
+        service: Service,
+        id: ScenarioId,
+    ): FieldError? =
+        if (service.scenarios.any { it.id == id }) {
+            null
+        } else {
+            FieldError(field, "The service has no scenario with the identifier ${id.value}.")
+        }
 
     private fun normalized(service: Service): Service {
         val realUrls =
@@ -130,9 +154,10 @@ internal object ServiceChanges {
     private fun saved(
         definitions: Definitions,
         service: Service,
+        designationErrors: List<FieldError>,
         replace: (List<Service>) -> List<Service>,
     ): ChangeResult<Service> {
-        val errors = errors(service, others = definitions.services.filter { it.id != service.id })
+        val errors = errors(service, others = definitions.services.filter { it.id != service.id }) + designationErrors
         return if (errors.isEmpty()) {
             ChangeResult.Changed(definitions.copy(services = replace(definitions.services)), service)
         } else {
@@ -173,3 +198,22 @@ internal object ServiceChanges {
 
     private fun Service.lists(realUrl: String): Boolean = realUrls.any { it.trim().equals(realUrl, ignoreCase = true) }
 }
+
+internal fun Definitions.service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
+
+/** Returns the definitions with [service] in the place of the service that has its identifier. */
+internal fun Definitions.withService(service: Service): Definitions =
+    copy(
+        services =
+            services.map {
+                if (it.id ==
+                    service.id
+                ) {
+                    service
+                } else {
+                    it
+                }
+            },
+    )
+
+internal fun serviceNotFound(id: ServiceId): ChangeResult.NotFound = ChangeResult.NotFound("No service has the identifier ${id.value}.")

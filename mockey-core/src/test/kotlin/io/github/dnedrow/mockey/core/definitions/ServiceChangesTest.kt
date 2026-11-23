@@ -27,18 +27,6 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class ServiceChangesTest {
-    private fun <T> Definitions.changed(change: Change<T>): ChangeResult.Changed<T> =
-        when (val result = change(this)) {
-            is ChangeResult.Changed -> result
-            else -> fail("The change was not made: $result")
-        }
-
-    private fun <T> Definitions.rejected(change: Change<T>): List<FieldError> =
-        when (val result = change(this)) {
-            is ChangeResult.Rejected -> result.failure.errors
-            else -> fail("The change was not rejected: $result")
-        }
-
     private fun service(
         name: String,
         mockUrl: String,
@@ -471,11 +459,8 @@ class ServiceChangesTest {
     fun aServiceThatDoesNotExistIsNeitherUpdatedNorDeleted() {
         val unknown = ServiceId.generate()
 
-        val updated = ServiceChanges.update(unknown) { it.copy(name = "Clients") }(definitions)
-        val deleted = ServiceChanges.delete(unknown)(definitions)
-
-        assertContains(assertIs<ChangeResult.NotFound>(updated).message, unknown.value)
-        assertContains(assertIs<ChangeResult.NotFound>(deleted).message, unknown.value)
+        assertContains(definitions.notFound(ServiceChanges.update(unknown) { it.copy(name = "Clients") }), unknown.value)
+        assertContains(definitions.notFound(ServiceChanges.delete(unknown)), unknown.value)
     }
 
     @Test
@@ -496,13 +481,26 @@ class ServiceChangesTest {
             ServiceChanges.update(customers.value.id) { it.copy(scenarios = listOf(scenario)) }(definitions)
         }
         assertFailsWith<IllegalArgumentException> {
-            ServiceChanges.update(customers.value.id) { it.copy(defaultScenarioId = scenario.id) }(definitions)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            ServiceChanges.update(customers.value.id) { it.copy(errorScenarioId = scenario.id) }(definitions)
-        }
-        assertFailsWith<IllegalArgumentException> {
             ServiceChanges.create { it.copy(name = "Billing", mockUrl = "billing", scenarios = listOf(scenario)) }(definitions)
         }
+    }
+
+    @Test
+    fun aNewServiceHasNoScenarioToDesignate() {
+        val scenario = ScenarioId.generate()
+
+        val errors =
+            definitions.rejected(
+                ServiceChanges.create {
+                    it.copy(
+                        name = "Billing",
+                        mockUrl = "billing",
+                        defaultScenarioId = scenario,
+                        errorScenarioId = scenario,
+                    )
+                },
+            )
+
+        assertEquals(listOf("defaultScenarioId", "errorScenarioId"), errors.map { it.field })
     }
 }

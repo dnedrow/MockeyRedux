@@ -2,7 +2,8 @@
 
 This table maps the HTTP surface of legacy Mockey (commit `88e31ed`) to the new system. It covers every
 servlet mapping of the legacy `web/WEB-INF/web.xml`, the other entries of that file, every parameter that
-the legacy API documentation (`/service_api`) describes, and the startup options.
+the legacy API documentation (`/service_api`) describes, and the startup options. "Legacy tests" maps the
+test classes of legacy Mockey to their ports.
 
 Each row ends in one of three places:
 
@@ -161,6 +162,28 @@ Legacy reads three more parameters that its documentation does not describe:
 | `-H`, `--headless` | Whether to leave the browser closed. | `server-runtime`: No other programs are started (DEV-25). The option goes away. |
 | `-v`, `--version` | Prints the version. | `server-runtime`: Help and version output. |
 | `--help` | Prints the options. | `server-runtime`: Help and version output. |
+
+## Legacy tests
+
+The 13 test classes under `src/test` of legacy Mockey are ported with the code that takes the place of what
+they test (design decision 16). A ported case keeps the name of its legacy test method. A row names the test
+class that holds the port, or the task that ports the class.
+
+| Legacy test class | Port | Notes |
+|---|---|---|
+| `com.mockey.model.ScenarioTest` | `mockey-core`: `LegacyScenarioTest` | All five cases pass. `testdHeaderValue` reads a header of the typed list. Splitting the legacy header text is the importer's work (`legacy-compatibility`: Legacy response header text is split). |
+| `com.mockey.model.ConflictInfoTest` | Task 3.6 | |
+| `com.mockey.SearchResultBuilderTest` | Task 3.6 | |
+| `com.mockey.model.ServiceTest` | Task 3.8 | |
+| `com.mockey.MockServiceBeanTest` | Task 3.8 | |
+| `com.mockey.storage.TestInMemoryMockeyStorage` | Task 3.8 | |
+| `com.mockey.util.UrlTest` | Task 4.1 | |
+| `com.mockey.model.UriTemplateTest` | Task 4.2 | |
+| `com.mockey.plugin.TestPluginStore` | Task 5.4 | |
+| `com.mockey.plugin.TestPackageInfoPeerClassFinder` | Task 5.4 | Its subject, the scan of the class path for annotated packages, no longer exists. |
+| `com.mockey.model.ProxyServerModelTest` | Task 7.5 | |
+| `com.mockey.util.ServiceStatHelperTest` | Task 8.6 | |
+| `com.mockey.storage.xml.MockeyXmlFileManagerTest` | Task 10.2 | |
 
 ## Open points
 
