@@ -17,6 +17,12 @@ import kotlinx.serialization.encoding.Encoder
 public class Tags private constructor(
     private val values: Set<String>,
 ) : Set<String> by values {
+    /** Returns these tags together with the [other] ones. */
+    public operator fun plus(other: Tags): Tags = of(values + other.values)
+
+    /** Returns these tags without the [other] ones. */
+    public operator fun minus(other: Tags): Tags = of(values - other.values)
+
     override fun equals(other: Any?): Boolean = values == other
 
     override fun hashCode(): Int = values.hashCode()

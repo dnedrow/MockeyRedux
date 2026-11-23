@@ -172,8 +172,8 @@ class that holds the port, or the task that ports the class.
 | Legacy test class | Port | Notes |
 |---|---|---|
 | `com.mockey.model.ScenarioTest` | `mockey-core`: `LegacyScenarioTest` | All five cases pass. `testdHeaderValue` reads a header of the typed list. Splitting the legacy header text is the importer's work (`legacy-compatibility`: Legacy response header text is split). |
-| `com.mockey.model.ConflictInfoTest` | Task 3.6 | |
-| `com.mockey.SearchResultBuilderTest` | Task 3.6 | |
+| `com.mockey.model.ConflictInfoTest` | `mockey-core`: `LegacyConflictInfoTest` | Both cases pass. The definition diagnostics find the conflicts that the legacy class was given. Legacy also reported services with the same name, because their files collided; the new storage has no such collision (DEV-21), so equal names are not a diagnostic. |
+| `com.mockey.SearchResultBuilderTest` | `mockey-core`: `LegacySearchResultBuilderTest` | All four cases pass. |
 | `com.mockey.model.ServiceTest` | Task 3.8 | |
 | `com.mockey.MockServiceBeanTest` | Task 3.8 | |
 | `com.mockey.storage.TestInMemoryMockeyStorage` | Task 3.8 | |

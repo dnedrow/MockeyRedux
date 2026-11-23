@@ -60,6 +60,16 @@ class TagsTest {
     }
 
     @Test
+    fun tagsAreAddedAndTakenAway() {
+        val tags = Tags.of("smoke regression")
+
+        assertEquals(Tags.of("crm regression smoke"), tags + Tags.of("CRM smoke"))
+        assertEquals(Tags.of("regression"), tags - Tags.of("smoke crm"))
+        assertSame(Tags.EMPTY, tags - tags)
+        assertEquals(tags, tags + Tags.EMPTY)
+    }
+
+    @Test
     fun theTextFormIsReadBack() {
         val tags = Tags.of("smoke", "Regression")
 
