@@ -19,3 +19,7 @@ server from `docs/parity/running-legacy.md`:
 ./gradlew :mockey-parity-tests:test \
   -Dmockey.parity.legacy.baseUrl=http://127.0.0.1:18080
 ```
+
+## Stub upstream and outbound proxy
+
+`StubHttpServer.upstream()` and `StubHttpServer.outboundProxy()` (in `mockey-parity-tests`) are loopback stubs that record every request received (`requests`) and return a fixed response. Point a legacy or new Mockey proxy case at their `port`.
