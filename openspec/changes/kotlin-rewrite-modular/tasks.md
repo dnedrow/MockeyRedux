@@ -8,7 +8,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 1.2 Initialize OpenSpec in the new repository and move the `kotlin-rewrite-modular` change directory into it. Verify that `openspec validate kotlin-rewrite-modular --strict` passes there and that `openspec status` shows proposal, design, specs, and tasks as done.
 - [x] 1.3 Add the modules `mockey-core`, `mockey-api`, `mockey-legacy`, `mockey-server`, `mockey-ui`, and `mockey-parity-tests` with the dependency rules of design decision 1, and a build check that enforces them. Verify that `./gradlew build` passes and that the check fails when `mockey-ui` is given a dependency on `mockey-core`.
 - [x] 1.4 Enable explicit API mode in `mockey-core` and `mockey-api`, and add the formatter and linter plus the JUnit 5 and kotlin.test conventions. Verify that `./gradlew check` runs the linter and one placeholder test in every module.
-- [ ] 1.5 Add a CI workflow that runs `./gradlew check` on every push. Verify with one green pipeline run.
+- [x] 1.5 Add a CI workflow that runs `./gradlew check` on every push. Verify with one green pipeline run.
 - [x] 1.6 Add the GPL-2.0-or-later license file, a README that states the project's origin and status, and `docs/deviations.md` seeded with DEV-01 to DEV-30 from design.md. Verify that the three files exist and that the register lists all thirty entries.
 
 ## 2. Legacy baseline and parity recordings

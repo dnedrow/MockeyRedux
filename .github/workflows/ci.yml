@@ -5,13 +5,14 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: lmigtech/internal-actions/actions/setup-java@v0
         with:
           java-version: "21"
           distribution: 'corretto'

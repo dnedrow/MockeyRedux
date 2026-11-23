@@ -17,5 +17,5 @@ tasks.withType<Test>().configureEach {
 }
 
 ktlint {
-    version.set("1.6.0")
+    version.set("1.8.0")
 }
