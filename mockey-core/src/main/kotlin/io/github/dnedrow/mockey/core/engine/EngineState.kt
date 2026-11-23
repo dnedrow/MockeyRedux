@@ -7,6 +7,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
+ * A change to the definitions: a function from the current definitions to the changed ones, or to the reason
+ * why they stay as they are. It depends on nothing but the definitions that it gets.
+ */
+internal typealias Change<T> = (Definitions) -> ChangeResult<T>
+
+/**
  * Holds the definitions of one engine. The definitions are one value that never changes: a change puts a new
  * value in its place. A reader therefore never sees a change that is half done, and it needs no lock.
  *
@@ -29,19 +35,18 @@ internal class EngineState(
         private set
 
     /**
-     * Applies [change] to the current definitions and returns its result. The function gets the current
-     * definitions and returns either the changed definitions or a rejection. It must depend on nothing else
-     * and must not use this state, because it runs while other changes wait.
+     * Applies [change] to the current definitions and returns its result. The change must not use this
+     * state, because it runs while other changes wait.
      *
-     * When the function returns definitions that differ from the current ones, the observers are told, in
+     * When the change returns definitions that differ from the current ones, the observers are told, in
      * their order, and then the changed definitions become the current ones. All of this is done when this
      * function returns. Once the observers have been told of a change, the change is completed even when the
      * caller is canceled.
      *
-     * Nothing changes when the function rejects the change, when it fails, or when an observer fails. A failure
-     * is thrown to the caller, and the observers after a failed one are not told.
+     * Nothing changes when the change returns another result, when it fails, or when an observer fails. A
+     * failure is thrown to the caller, and the observers after a failed one are not told.
      */
-    suspend fun <T> change(change: (Definitions) -> ChangeResult<T>): ChangeResult<T> =
+    suspend fun <T> change(change: Change<T>): ChangeResult<T> =
         writer.withLock {
             val before = current
             val result = change(before)

@@ -2,7 +2,7 @@ package io.github.dnedrow.mockey.core.engine
 
 import io.github.dnedrow.mockey.core.model.Definitions
 
-/** The outcome of a change to the definitions: the definitions after the change, or the reason for a rejection. */
+/** The outcome of a change to the definitions: the definitions after the change, or why nothing changed. */
 public sealed interface ChangeResult<out T> {
     /** The change is valid. [definitions] are the definitions after it, and [value] is what the change yields. */
     public data class Changed<out T>(
@@ -13,6 +13,11 @@ public sealed interface ChangeResult<out T> {
     /** The change would break a rule for definitions, so the definitions stay as they are. */
     public data class Rejected(
         public val failure: ValidationFailure,
+    ) : ChangeResult<Nothing>
+
+    /** The change concerns a definition that does not exist, so the definitions stay as they are. */
+    public data class NotFound(
+        public val message: String,
     ) : ChangeResult<Nothing>
 }
 
