@@ -22,7 +22,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 2.7 Write and record cases for request rules and inspection, reading inspection results where legacy exposes them as JSON, including absent keys, wildcard keys, and form parameters. Verify that a recording is stored for every case.
 - [x] 2.8 Write and record cases for the legacy automation endpoints `/config/service`, `/plan/setup`, `/definitions`, `/home`, and `/status`, covering parameters and result shapes. Verify that a recording is stored for every case.
 - [x] 2.9 Review every recorded case and label it `same` or with a deviation ID, adding the expected new response to each deviation case. Update `docs/deviations.md`: confirm or correct each entry marked "read", and add entries for differences found. Verify that the harness check that rejects unlabeled cases passes.
-- [ ] 2.10 Create `docs/parity/traceability.md`, which maps every legacy servlet mapping and documented parameter to a spec requirement, a parity case, or a non-goal. Verify with a script that every servlet mapping in the legacy `web.xml` appears in the table.
+- [x] 2.10 Create `docs/parity/traceability.md`, which maps every legacy servlet mapping and documented parameter to a spec requirement, a parity case, or a non-goal. Verify with a script that every servlet mapping in the legacy `web.xml` appears in the table.
 
 ## 3. Core: definitions (spec: service-definitions)
 
