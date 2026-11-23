@@ -167,16 +167,17 @@ Legacy reads three more parameters that its documentation does not describe:
 
 The 13 test classes under `src/test` of legacy Mockey are ported with the code that takes the place of what
 they test (design decision 16). A ported case keeps the name of its legacy test method. A row names the test
-class that holds the port, or the task that ports the class.
+class that holds the port, or the task that ports the class. `None` stands for a legacy class without a
+test.
 
 | Legacy test class | Port | Notes |
 |---|---|---|
 | `com.mockey.model.ScenarioTest` | `mockey-core`: `LegacyScenarioTest` | All five cases pass. `testdHeaderValue` reads a header of the typed list. Splitting the legacy header text is the importer's work (`legacy-compatibility`: Legacy response header text is split). |
 | `com.mockey.model.ConflictInfoTest` | `mockey-core`: `LegacyConflictInfoTest` | Both cases pass. The definition diagnostics find the conflicts that the legacy class was given. Legacy also reported services with the same name, because their files collided; the new storage has no such collision (DEV-21), so equal names are not a diagnostic. |
 | `com.mockey.SearchResultBuilderTest` | `mockey-core`: `LegacySearchResultBuilderTest` | All four cases pass. |
-| `com.mockey.model.ServiceTest` | Task 3.8 | |
-| `com.mockey.MockServiceBeanTest` | Task 3.8 | |
-| `com.mockey.storage.TestInMemoryMockeyStorage` | Task 3.8 | |
+| `com.mockey.model.ServiceTest` | `mockey-core`: `LegacyServiceTest` | All five cases pass. Tags are added and taken away as sets, so `removeTagsFromService` takes away no tags where legacy took away `null`. `addRealUrlsToService` adds the real URLs with one update each. |
+| `com.mockey.MockServiceBeanTest` | Task 4.1 | Both cases test the legacy `Url` class, as `UrlTest` does, and the code that takes its place is the target normalization. `parsesRealServiceUrlIntoHostAndPath` and the `wired.com` check of `parsesSchemeFromRealServiceUrl` read a text without a scheme as a host. They cannot pass: such a text is a relative target (DEV-03). |
+| `com.mockey.storage.TestInMemoryMockeyStorage` | None | The class holds no test. The engine state holder takes the place of the legacy storage singleton, and `EngineStateTest` covers it. |
 | `com.mockey.util.UrlTest` | Task 4.1 | |
 | `com.mockey.model.UriTemplateTest` | Task 4.2 | |
 | `com.mockey.plugin.TestPluginStore` | Task 5.4 | |

@@ -33,11 +33,11 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 3.5 Implement service duplication (DEV-19), service merge (DEV-29), and bulk derivation of real URLs. Verify with unit tests for each scenario of those requirements.
 - [x] 3.6 Implement tag listing and removal across definitions, definition diagnostics, and search over services, scenarios, and plans. Verify with unit tests, including the ported legacy `ConflictInfoTest` and `SearchResultBuilderTest` cases.
 - [x] 3.7 Spike a JSON Schema validator against the draft-04 floor of DEV-23, record the choice in `docs/decisions/json-schema.md`, and implement the response schema report. Verify with unit tests for a conforming body, a non-conforming body, and an unsupported dialect.
-- [ ] 3.8 Port the remaining legacy model tests (`ServiceTest`, `MockServiceBeanTest`, `TestInMemoryMockeyStorage`) to the new model. Verify that each passes or is linked to a deviation ID in the traceability table.
+- [x] 3.8 Port the remaining legacy model tests (`ServiceTest`, `TestInMemoryMockeyStorage`) to the new model. Verify that each passes or is linked to a deviation ID in the traceability table.
 
 ## 4. Core: routing (spec: request-routing)
 
-- [ ] 4.1 Implement target extraction and normalization: absolute and relative targets, query separation, percent-decoding, slashes, letter case, and default ports. Verify with unit tests, including the ported legacy `UrlTest` cases.
+- [ ] 4.1 Implement target extraction and normalization: absolute and relative targets, query separation, percent-decoding, slashes, letter case, and default ports. Verify with unit tests, including the ported legacy `UrlTest` and `MockServiceBeanTest` cases, which both test the legacy `Url` class. The checks of `MockServiceBeanTest` that read a text without a scheme as a host are linked to DEV-03.
 - [ ] 4.2 Implement the URL pattern compiler and matcher with single-segment variables, whole-target matching, and captured values in request case (DEV-01). Verify with unit tests, including the ported legacy `UriTemplateTest` cases.
 - [ ] 4.3 Implement candidate lookup through mock URL patterns and real URLs, and selection of the most specific service (DEV-02). Verify with unit tests, including the services from upstream issue 109.
 - [ ] 4.4 Implement the tag filter and the handling of unknown targets: forwarding and registration for absolute targets, refusal for relative targets, and the setting that disables handling (DEV-03, DEV-04). Verify with unit tests for each scenario of those requirements.
