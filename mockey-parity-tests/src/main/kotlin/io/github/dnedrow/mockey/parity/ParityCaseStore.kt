@@ -17,6 +17,7 @@ class ParityCaseStore {
         Files.writeString(directory.resolve("fixture.xml"), case.fixtureXml, StandardCharsets.UTF_8)
         writeRequest(case.request, directory.resolve("request.properties"))
         writeResponse(case.expectedResponse, directory.resolve("expected-response.properties"))
+        writeTiming(case.timing, directory.resolve("timing.properties"))
     }
 
     fun read(directory: Path): ParityCase {
@@ -24,7 +25,8 @@ class ParityCaseStore {
         val fixture = Files.readString(directory.resolve("fixture.xml"), StandardCharsets.UTF_8)
         val request = readRequest(directory.resolve("request.properties"))
         val response = readResponse(directory.resolve("expected-response.properties"))
-        return ParityCase(label, fixture, request, response)
+        val timing = readTiming(directory.resolve("timing.properties"))
+        return ParityCase(label, fixture, request, response, timing)
     }
 
     private fun writeRequest(
@@ -36,7 +38,7 @@ class ParityCaseStore {
         properties["target"] = request.target
         properties["body"] = encode(request.body)
         writeHeaders(request.headers, properties)
-        properties.store(Files.newBufferedWriter(path, StandardCharsets.UTF_8), "Mockey parity request")
+        store(properties, path, "Mockey parity request")
     }
 
     private fun readRequest(path: Path): ParityRequest {
@@ -57,7 +59,7 @@ class ParityCaseStore {
         properties["status"] = response.status.toString()
         properties["body"] = encode(response.body)
         writeHeaders(response.headers, properties)
-        properties.store(Files.newBufferedWriter(path, StandardCharsets.UTF_8), "Mockey parity response")
+        store(properties, path, "Mockey parity response")
     }
 
     private fun readResponse(path: Path): ParityResponse {
@@ -66,6 +68,31 @@ class ParityCaseStore {
             status = properties.required("status").toInt(),
             headers = readHeaders(properties),
             body = decode(properties.required("body")),
+        )
+    }
+
+    private fun writeTiming(
+        timing: ParityTiming?,
+        path: Path,
+    ) {
+        if (timing == null) {
+            Files.deleteIfExists(path)
+            return
+        }
+        val properties = Properties()
+        properties["atLeastMillis"] = timing.atLeastMillis.toString()
+        timing.lessThanMillis?.let { properties["lessThanMillis"] = it.toString() }
+        timing.recordedMillis?.let { properties["recordedMillis"] = it.toString() }
+        store(properties, path, "Mockey parity timing")
+    }
+
+    private fun readTiming(path: Path): ParityTiming? {
+        if (!Files.exists(path)) return null
+        val properties = load(path)
+        return ParityTiming(
+            atLeastMillis = properties.required("atLeastMillis").toLong(),
+            lessThanMillis = properties.getProperty("lessThanMillis")?.toLong(),
+            recordedMillis = properties.getProperty("recordedMillis")?.toLong(),
         )
     }
 
@@ -91,6 +118,14 @@ class ParityCaseStore {
             index++
         }
         return headers
+    }
+
+    private fun store(
+        properties: Properties,
+        path: Path,
+        comment: String,
+    ) {
+        Files.newBufferedWriter(path, StandardCharsets.UTF_8).use { properties.store(it, comment) }
     }
 
     private fun load(path: Path): Properties =

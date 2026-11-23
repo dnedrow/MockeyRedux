@@ -2,8 +2,6 @@ package io.github.dnedrow.mockey.parity
 
 import java.net.URI
 import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.Path
 
 class ParityReplayer(
@@ -16,21 +14,9 @@ class ParityReplayer(
     ): ReplayResult {
         val case = store.read(recording)
         val expected = requireNotNull(case.expectedResponse)
-        val actual = execute(case.request, baseUrl)
-        return ReplayResult(recording.fileName.toString(), compare(expected, actual))
-    }
-
-    private fun execute(
-        request: ParityRequest,
-        baseUrl: URI,
-    ): ParityResponse {
-        val builder =
-            HttpRequest
-                .newBuilder(baseUrl.resolve(request.target))
-                .method(request.method, HttpRequest.BodyPublishers.ofByteArray(request.body))
-        request.headers.forEach { (name, values) -> values.forEach { value -> builder.header(name, value) } }
-        val response = client.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
-        return ParityResponse(response.statusCode(), response.headers().map(), response.body())
+        val exchange = client.exchange(case.request, baseUrl)
+        val differences = compare(expected, exchange.response) + compareTiming(case.timing, exchange.elapsedMillis)
+        return ReplayResult(recording.fileName.toString(), differences)
     }
 
     private fun compare(
@@ -43,6 +29,16 @@ class ParityReplayer(
             val actualHeaders = normalizeHeaders(actual.headers)
             if (expectedHeaders != actualHeaders) add("headers: expected $expectedHeaders, got $actualHeaders")
             if (!expected.body.contentEquals(actual.body)) add("body bytes differ")
+        }
+
+    private fun compareTiming(
+        expected: ParityTiming?,
+        elapsedMillis: Long,
+    ): List<String> =
+        if (expected == null || expected.allows(elapsedMillis)) {
+            emptyList()
+        } else {
+            listOf("elapsed time: expected ${expected.describe()}, got $elapsedMillis ms")
         }
 
     private fun normalizeHeaders(headers: Map<String, List<String>>): Map<String, List<String>> =

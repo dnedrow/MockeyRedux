@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set with one parameter rule." error_scenario_id="2" hang_time="0" name="rules parameter" request_inspector_name="null" service_response_type="2" tag="" url="rules/parameter">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="ticker contains g" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain the letter g.", "value_rule_arg": "g", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[parameter rule satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set with one header rule." error_scenario_id="2" hang_time="0" name="rules header" request_inspector_name="null" service_response_type="2" tag="" url="rules/header">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="gold tier header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "X-Tier", "desc": "The X-Tier header must contain gold.", "value_rule_arg": "gold", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[header rule satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set with one body rule." error_scenario_id="2" hang_time="0" name="rules body" request_inspector_name="null" service_response_type="2" tag="" url="rules/body">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="body has username" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"body": [{"desc": "The body must contain username.", "value_rule_arg": "username", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[body rule satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set with one url rule." error_scenario_id="2" hang_time="0" name="rules url" request_inspector_name="null" service_response_type="2" tag="" url="rules-url/{region}">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="emea url" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"url": [{"desc": "The URL must name the emea region.", "value_rule_arg": "rules-url/.*emea", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[url rule satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Two rule sets that score one and two satisfied rules." error_scenario_id="3" hang_time="0" name="rules score" request_inspector_name="null" service_response_type="2" tag="" url="rules/score">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="one rule" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain goog.", "value_rule_arg": "goog", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[one rule satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="two rules" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain goog.", "value_rule_arg": "goog", "value_rule_type": "string_required"}, {"key": "exchange", "desc": "The exchange must contain nasdaq.", "value_rule_arg": "nasdaq", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[two rules satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set with a parameter group and a body group." error_scenario_id="2" hang_time="0" name="rules groups" request_inspector_name="null" service_response_type="2" tag="" url="rules/groups">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="either group" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain goog.", "value_rule_arg": "goog", "value_rule_type": "string_required"}], "body": [{"desc": "The body must contain username.", "value_rule_arg": "username", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[one rule group satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set that is not well-formed JSON." error_scenario_id="2" hang_time="0" name="rules malformed" request_inspector_name="null" service_response_type="2" tag="" url="rules/malformed">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="broken rules" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker"]]></scenario_match>
+			<scenario_response><![CDATA[malformed rules matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no rule set satisfied]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>

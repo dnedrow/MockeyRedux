@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="A service delay of 300 ms and no scenario delay." error_scenario_id="0" hang_time="300" name="delay service" request_inspector_name="null" service_response_type="1" tag="" url="delay/service">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="no scenario delay" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[service delay]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A service delay of 100 ms and a scenario delay of 500 ms." error_scenario_id="0" hang_time="100" name="delay scenario longer" request_inspector_name="null" service_response_type="1" tag="" url="delay/scenario-longer">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="500" http_method_type="" http_resp_status_code="200" id="1" name="longer scenario delay" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[scenario delay overrides a shorter service delay]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A service delay of 1500 ms and a scenario delay of 200 ms." error_scenario_id="0" hang_time="1500" name="delay scenario shorter" request_inspector_name="null" service_response_type="1" tag="" url="delay/scenario-shorter">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="200" http_method_type="" http_resp_status_code="200" id="1" name="shorter scenario delay" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[scenario delay overrides a longer service delay]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="No service delay, a matching scenario with 400 ms, and an error scenario with 1500 ms." error_scenario_id="2" hang_time="0" name="delay dynamic" request_inspector_name="null" service_response_type="2" tag="" url="delay/dynamic">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="400" http_method_type="" http_resp_status_code="200" id="1" name="slow" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[slow]]></scenario_match>
+			<scenario_response><![CDATA[slow scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="1500" http_method_type="" http_resp_status_code="500" id="2" name="delayed error" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[error scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A service delay of 300 ms and an error scenario without a delay." error_scenario_id="2" hang_time="300" name="delay fallback" request_inspector_name="null" service_response_type="2" tag="" url="delay/fallback">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="known" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[known]]></scenario_match>
+			<scenario_response><![CDATA[matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="500" id="2" name="service error" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[error scenario after the service delay]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>

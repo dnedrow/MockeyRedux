@@ -2,8 +2,6 @@ package io.github.dnedrow.mockey.parity
 
 import java.net.URI
 import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.Path
 
 class ParityRecorder(
@@ -15,22 +13,16 @@ class ParityRecorder(
         baseUrl: URI,
         destination: Path,
     ): ParityCase {
-        val response = execute(case.request, baseUrl)
-        val recorded = case.copy(expectedResponse = response)
+        val exchange = client.exchange(case.request, baseUrl)
+        val timing =
+            case.timing?.let { expected ->
+                check(expected.allows(exchange.elapsedMillis)) {
+                    "${destination.fileName} was answered in ${exchange.elapsedMillis} ms, expected ${expected.describe()}"
+                }
+                expected.copy(recordedMillis = exchange.elapsedMillis)
+            }
+        val recorded = case.copy(expectedResponse = exchange.response, timing = timing)
         store.write(recorded, destination)
         return recorded
-    }
-
-    private fun execute(
-        request: ParityRequest,
-        baseUrl: URI,
-    ): ParityResponse {
-        val builder =
-            HttpRequest
-                .newBuilder(baseUrl.resolve(request.target))
-                .method(request.method, HttpRequest.BodyPublishers.ofByteArray(request.body))
-        request.headers.forEach { (name, values) -> values.forEach { value -> builder.header(name, value) } }
-        val response = client.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
-        return ParityResponse(response.statusCode(), response.headers().map(), response.body())
     }
 }

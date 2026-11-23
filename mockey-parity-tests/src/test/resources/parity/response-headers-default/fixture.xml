@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="Status 201 with two headers." error_scenario_id="0" hang_time="0" name="status created" request_inspector_name="null" service_response_type="1" tag="" url="status/created">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="201" id="1" name="created" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[{"id":9}]]></scenario_response>
+			<scenario_response_header><![CDATA[Location: /orders/9 | X-Trace: a]]></scenario_response_header>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Status 302 with a Location header." error_scenario_id="0" hang_time="0" name="status found" request_inspector_name="null" service_response_type="1" tag="" url="status/found">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="302" id="1" name="found" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[moved]]></scenario_response>
+			<scenario_response_header><![CDATA[Location: /service/status/created]]></scenario_response_header>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Status 503 with a Retry-After header." error_scenario_id="0" hang_time="0" name="status unavailable" request_inspector_name="null" service_response_type="1" tag="" url="status/unavailable">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="503" id="1" name="unavailable" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[try again later]]></scenario_response>
+			<scenario_response_header><![CDATA[Retry-After: 120]]></scenario_response_header>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Several headers, a value that contains colons, and padding around a name and a value." error_scenario_id="0" hang_time="0" name="headers multiple" request_inspector_name="null" service_response_type="1" tag="" url="headers/multiple">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="multiple" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[{"headers":3}]]></scenario_response>
+			<scenario_response_header><![CDATA[Content-Type: application/json | X-Time: 12:30:45 |  X-Padded :   spaced value]]></scenario_response_header>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Header names that occur twice." error_scenario_id="0" hang_time="0" name="headers repeated" request_inspector_name="null" service_response_type="1" tag="" url="headers/repeated">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="repeated" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[repeated header names]]></scenario_response>
+			<scenario_response_header><![CDATA[Set-Cookie: a=1 | Set-Cookie: b=2 | X-Multi: one | X-Multi: two]]></scenario_response_header>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A scenario without a scenario_response_header element." error_scenario_id="0" hang_time="0" name="headers default" request_inspector_name="null" service_response_type="1" tag="" url="headers/default">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="default" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no header element]]></scenario_response>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Header text with an entry that has no colon." error_scenario_id="0" hang_time="0" name="headers malformed" request_inspector_name="null" service_response_type="1" tag="" url="headers/malformed">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="malformed" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[malformed header text]]></scenario_response>
+			<scenario_response_header><![CDATA[no-colon-here | X-After: kept]]></scenario_response_header>
+		</scenario>
+	</service>
+</mockservice>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="2" description="Static mode serves the default scenario, here the second one." error_scenario_id="0" hang_time="0" name="static plan" request_inspector_name="null" service_response_type="1" tag="" url="static/plan">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="silver" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[{"plan":"silver"}]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="gold" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[{"plan":"gold"}]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Static mode ignores match criteria and method restrictions." error_scenario_id="0" hang_time="0" name="static criteria" request_inspector_name="null" service_response_type="1" tag="" url="static/criteria">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="POST" http_resp_status_code="200" id="1" name="restricted default" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[never-sent]]></scenario_match>
+			<scenario_response><![CDATA[default despite criteria]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="GET" http_resp_status_code="200" id="2" name="matching" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[ticker]]></scenario_match>
+			<scenario_response><![CDATA[matching scenario is ignored in static mode]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="99" description="The default scenario ID refers to no scenario." error_scenario_id="0" hang_time="0" name="static dangling" request_inspector_name="null" service_response_type="1" tag="" url="static/dangling">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="only" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[only scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>

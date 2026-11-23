@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="Text criteria evaluated against query parameters and the request body." error_scenario_id="9" hang_time="0" name="text quotes" request_inspector_name="null" service_response_type="2" tag="" url="text/quotes">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="goog" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[GOOG]]></scenario_match>
+			<scenario_response><![CDATA[quote for GOOG]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="jane" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[name=jane doe]]></scenario_match>
+			<scenario_response><![CDATA[hello jane doe]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="3" name="gold" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[<tier>gold</tier>]]></scenario_match>
+			<scenario_response><![CDATA[gold tier]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="4" name="joined" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[a=1&b=2]]></scenario_match>
+			<scenario_response><![CDATA[parameters joined]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="5" name="plus" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[first last]]></scenario_match>
+			<scenario_response><![CDATA[plus sign decoded as a space]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="9" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A text criterion that occurs only in the literal request path." error_scenario_id="2" hang_time="0" name="text literal path" request_inspector_name="null" service_response_type="2" tag="" url="text/orders/list">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="orders" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[orders]]></scenario_match>
+			<scenario_response><![CDATA[literal path text matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[literal path text is not evaluated]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A text criterion that occurs only in the value of a template variable." error_scenario_id="2" hang_time="0" name="text template" request_inspector_name="null" service_response_type="2" tag="" url="text-customer/{id}">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="customer 123" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[123]]></scenario_match>
+			<scenario_response><![CDATA[customer 123]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no customer matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>

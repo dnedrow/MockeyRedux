@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="The longer text criterion belongs to the scenario whose name sorts last." error_scenario_id="3" hang_time="0" name="score longer" request_inspector_name="null" service_response_type="2" tag="" url="ties/longer">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="a short" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[123]]></scenario_match>
+			<scenario_response><![CDATA[short criterion]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="b long" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[ABC123]]></scenario_match>
+			<scenario_response><![CDATA[long criterion]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Two text criteria of equal length. The scenario with the higher ID sorts first by name." error_scenario_id="3" hang_time="0" name="tie name" request_inspector_name="null" service_response_type="2" tag="" url="ties/name">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="beta" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[red]]></scenario_match>
+			<scenario_response><![CDATA[beta scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="Alpha" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[box]]></scenario_match>
+			<scenario_response><![CDATA[Alpha scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Two text criteria of equal length on scenarios with equal names." error_scenario_id="3" hang_time="0" name="tie created" request_inspector_name="null" service_response_type="2" tag="" url="ties/created">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="twin" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[red]]></scenario_match>
+			<scenario_response><![CDATA[first twin]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="twin" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[box]]></scenario_match>
+			<scenario_response><![CDATA[second twin]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="As tie created, with the scenario that has the higher ID first in the document." error_scenario_id="3" hang_time="0" name="tie id order" request_inspector_name="null" service_response_type="2" tag="" url="ties/id-order">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="twin" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[red]]></scenario_match>
+			<scenario_response><![CDATA[twin with ID 2]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="twin" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[box]]></scenario_match>
+			<scenario_response><![CDATA[twin with ID 1]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A one-character text criterion and a rule set with one rule." error_scenario_id="3" hang_time="0" name="tie text and rule" request_inspector_name="null" service_response_type="2" tag="" url="ties/text-and-rule">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="b text" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[r]]></scenario_match>
+			<scenario_response><![CDATA[text scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="a rule" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "q", "desc": "The q parameter must contain red.", "value_rule_arg": "red", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[rule scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set with one rule and a three-character text criterion." error_scenario_id="3" hang_time="0" name="score text over rule" request_inspector_name="null" service_response_type="2" tag="" url="ties/text-over-rule">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="a rule" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "q", "desc": "The q parameter must contain red.", "value_rule_arg": "red", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[rule scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="b text" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[red]]></scenario_match>
+			<scenario_response><![CDATA[text scenario]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>
