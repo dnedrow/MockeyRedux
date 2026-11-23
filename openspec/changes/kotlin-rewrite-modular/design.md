@@ -303,6 +303,27 @@ Initial defaults, all configurable:
 | Forward and register unknown absolute targets | on | always |
 | Legacy shim | off | not applicable |
 
+### 19. HTTP stack: both applications are built on Ktor
+
+`mockey-server` and `mockey-ui` are Ktor 3.x server applications, as the proposal states. `mockey-core` gains no Ktor dependency, and decision 8 is unchanged.
+
+- The mock listener and the admin listener of decision 10 are separate Ktor servers in one process that share one `mockey-core` engine instance. The mock server installs no routing and no plugins. The admin server uses routing and plugins.
+- The mock endpoint is one handler that reads the raw request URI and passes it to the core. It does not use Ktor routing, which drops empty path segments and answers 400 to a malformed percent escape before a handler runs.
+- Listeners are told apart by socket, never by header. Ktor's `port` route selector matches the `Host` header and must not guard admin routes. Where one server has several connectors, `localPort` is the selector to use.
+- The HTTP engine is chosen by the spike in task 11.0. Netty is the default candidate, and CIO is the lighter one.
+
+**Why.** The request pipeline is suspending (decision 4), and Ktor handlers are suspending functions, so no bridge between callbacks and coroutines has to be written. Ktor has first-party modules for choices this design already made: kotlinx.serialization, kotlinx.html, htmx request headers, error mapping for problem documents, bearer tokens, and a request body limit. On Netty and CIO the request target reaches the application as the client sent it. Two servers keep admin plugins away from mock traffic and work with ephemeral ports in tests.
+
+The routing, `port`, and URI behaviors named here were read in the Ktor and Jetty sources. Task 11.0 confirms them over real HTTP.
+
+**Cost.** Ktor brings more dependencies than Jetty alone and has had three major versions since 2018. Both applications are thin edges over `mockey-core` and `mockey-api`, which limits the work of an upgrade.
+
+**Alternatives considered.**
+
+- *Jetty 12.1 without a framework.* It has the smallest dependency footprint and a very stable API. Routing, JSON handling, error mapping, and form handling would be written by hand, and its callback API needs a bridge to coroutines. Its default URI compliance answers 400 to a path that contains `//`, which every absolute target has, until the server is configured to allow it.
+- *Ktor on its Jetty engine.* It keeps the Ktor API on Jetty 12.1 and inherits that URI default. It stays available if a Jetty runtime is ever required.
+- *One Ktor server with two connectors.* It shares one set of threads. Every admin route then depends on a correct `localPort` guard, application-wide plugins see mock traffic, and the guard needs the port number before an ephemeral port is assigned.
+
 ### Deviation register (initial)
 
 Evidence: **run** means verified by executing legacy code. **read** means taken from the source and still to be confirmed by a recorded parity case.
