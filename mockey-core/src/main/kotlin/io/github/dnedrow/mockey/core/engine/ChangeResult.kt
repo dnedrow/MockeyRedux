@@ -1,0 +1,32 @@
+package io.github.dnedrow.mockey.core.engine
+
+import io.github.dnedrow.mockey.core.model.Definitions
+
+/** The outcome of a change to the definitions: the definitions after the change, or the reason for a rejection. */
+public sealed interface ChangeResult<out T> {
+    /** The change is valid. [definitions] are the definitions after it, and [value] is what the change yields. */
+    public data class Changed<out T>(
+        public val definitions: Definitions,
+        public val value: T,
+    ) : ChangeResult<T>
+
+    /** The change would break a rule for definitions, so the definitions stay as they are. */
+    public data class Rejected(
+        public val failure: ValidationFailure,
+    ) : ChangeResult<Nothing>
+}
+
+/** Why a change was rejected: one error for each invalid field. */
+public data class ValidationFailure(
+    public val errors: List<FieldError>,
+) {
+    init {
+        require(errors.isNotEmpty()) { "A validation failure must name at least one invalid field." }
+    }
+}
+
+/** An invalid [field] of a definition, and a [message] that says what is wrong with it. */
+public data class FieldError(
+    public val field: String,
+    public val message: String,
+)

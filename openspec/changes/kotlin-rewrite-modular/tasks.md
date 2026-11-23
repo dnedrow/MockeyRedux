@@ -27,7 +27,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 ## 3. Core: definitions (spec: service-definitions)
 
 - [x] 3.1 Implement the model types for services, scenarios, plans, twist configurations, settings, identifiers, tags, headers, and match criteria, with serialization. Verify with unit tests for defaults, tag normalization, and identifier stability.
-- [ ] 3.2 Implement the engine state holder of design decision 3: an immutable snapshot, single-writer changes that return a new snapshot or a validation failure, and observers. Verify with tests that concurrent changes never break an invariant and that readers never see a partial change.
+- [x] 3.2 Implement the engine state holder of design decision 3: an immutable snapshot, single-writer changes that return a new snapshot or a validation failure, and observers. Verify with tests that concurrent changes never break an invariant and that readers never see a partial change.
 - [ ] 3.3 Implement service create, update, and delete with name validation, the derived name, mock URL uniqueness, real URL ownership, and clearing of the universal error designation on delete. Verify with unit tests for each scenario of those requirements.
 - [ ] 3.4 Implement scenario create, update, and delete with the generated name, name length validation, default scenario integrity, and error and universal error designation (DEV-18). Verify with unit tests for each scenario of those requirements, including the ported legacy `ScenarioTest` cases.
 - [ ] 3.5 Implement service duplication (DEV-19), service merge (DEV-29), and bulk derivation of real URLs. Verify with unit tests for each scenario of those requirements.
