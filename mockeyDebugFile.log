@@ -1,0 +1,55 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title>Log4J Log Messages</title>
+<style type="text/css">
+<!--
+body, table {font-family: arial,sans-serif; font-size: x-small;}
+th {background: #336699; color: #FFFFFF; text-align: left;}
+-->
+</style>
+</head>
+<body bgcolor="#FFFFFF" topmargin="6" leftmargin="6">
+<hr size="1" noshade>
+Log session start time Mon Nov 23 00:18:24 EST 2026<br>
+<br>
+<table cellspacing="0" cellpadding="4" border="1" bordercolor="#224466" width="100%">
+<tr>
+<th>Time</th>
+<th>Thread</th>
+<th>Level</th>
+<th>Category</th>
+<th>Message</th>
+</tr>
+
+<tr>
+<td>10</td>
+<td title="main thread">main</td>
+<td title="Level">INFO</td>
+<td title="org.eclipse.jetty.util.log category">org.eclipse.jetty.util.log</td>
+<td title="Message">Logging to org.slf4j.impl.Log4jLoggerAdapter(org.eclipse.jetty.util.log) via org.eclipse.jetty.util.log.Slf4jLog</td>
+</tr>
+
+<tr>
+<td>17</td>
+<td title="main thread">main</td>
+<td title="Level">INFO</td>
+<td title="org.eclipse.jetty.util.log category">org.eclipse.jetty.util.log</td>
+<td title="Message">jetty-2.0.102</td>
+</tr>
+
+<tr>
+<td>799</td>
+<td title="main thread">main</td>
+<td title="Level">INFO</td>
+<td title="org.eclipse.jetty.util.log category">org.eclipse.jetty.util.log</td>
+<td title="Message">Started SelectChannelConnector@0.0.0.0:18080</td>
+</tr>
+
+<tr>
+<td>954</td>
+<td title="qtp380242442-12 thread">qtp380242442-12</td>
+<td title="Level">INFO</td>
+<td title="com.mockey.ui.HomeServlet category">com.mockey.ui.HomeServlet</td>
+<td title="Message">Loaded definitions from /Volumes/Repos/IdeaProjects/mockey-kt/mockey-parity-tests/src/test/resources/parity-fixtures/routing-tagged.xml</td>
+</tr>

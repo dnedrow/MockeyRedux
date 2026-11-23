@@ -23,7 +23,7 @@ class StubServersTest {
                     HttpResponse.BodyHandlers.ofString(),
                 )
 
-            assertEquals("upstream", response.body())
+            assertEquals("upstream:/orders?id=7", response.body())
             val request = upstream.requests.single()
             assertEquals("POST", request.method)
             assertEquals("/orders?id=7", request.target)
@@ -45,7 +45,7 @@ class StubServersTest {
                     HttpResponse.BodyHandlers.ofString(),
                 )
 
-            assertEquals("outbound-proxy", response.body())
+            assertEquals("outbound-proxy:http://example.invalid/resource", response.body())
             val request = proxy.requests.single()
             assertEquals("GET", request.method)
             assertTrue(request.target.endsWith("example.invalid/resource"), request.target)
