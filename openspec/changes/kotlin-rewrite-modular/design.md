@@ -51,7 +51,7 @@ Motivation is in `proposal.md` (Why). This section records only what shapes the 
 
 ### 1. One new repository with six Gradle modules
 
-```
+``` text
 mockey-kt/                       this repository
   build-logic/                   convention plugins
   gradle/libs.versions.toml      version catalog
@@ -65,7 +65,7 @@ mockey-kt/                       this repository
 
 Dependency rules, enforced by the build:
 
-```
+``` text
 mockey-ui -----> mockey-api <----- mockey-server -----> mockey-core
                                         |                    ^
                                         +---> mockey-legacy -+
@@ -77,7 +77,7 @@ The repository is named `mockey-kt`. The Maven group is `io.github.dnedrow`, and
 
 Runtime view:
 
-```
+``` text
         mock clients                               browser
              |                                        |
              v                                        v
@@ -127,7 +127,7 @@ All definitions (services, scenarios, plans, twist configurations, settings) for
 
 ### 4. Request handling is a pipeline of small suspending steps
 
-```
+``` text
 request
   -> extract target    absolute URL or relative path after /service/
   -> twist             enabled twist configuration, if any
@@ -180,7 +180,7 @@ A request whose target is an absolute URL is forwarded to that URL, as in legacy
 
 ### 9. Storage is a tree of JSON files, written atomically
 
-```
+``` text
 <definitions-root>/
   mockey.json                 format version, plans, twists, enabled twist,
                               upstream proxy URL and flag, universal error
