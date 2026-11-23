@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Mockey Kotlin is a Kotlin rewrite of Mockey, organized as six Gradle modules:
+Mockey Redux is a Kotlin rewrite of Mockey, organized as six Gradle modules:
 
 - `mockey-core`: engine, domain model, routing, responses, and ports
 - `mockey-api`: admin API wire types
