@@ -7,7 +7,7 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
-    listOf("mockey.parity.legacy.baseUrl", "mockey.parity.recordGroup").forEach { name ->
+    listOf("mockey.parity.legacy.baseUrl", "mockey.parity.recordGroup", "mockey.parity.replayGroup").forEach { name ->
         System.getProperty(name)?.let { systemProperty(name, it) }
     }
 }

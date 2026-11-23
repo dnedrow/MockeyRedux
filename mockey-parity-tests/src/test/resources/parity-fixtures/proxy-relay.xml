@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream answers with status 404." error_scenario_id="0" hang_time="0" name="relay status 404" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/status/404">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/status/404"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream answers with status 500." error_scenario_id="0" hang_time="0" name="relay status 500" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/status/500">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/status/500"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream answers with status 201, a repeated header, a Cache-Control header, and a Location header." error_scenario_id="0" hang_time="0" name="relay headers" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/headers">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/headers"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream answers with the 256 bytes 00 to FF." error_scenario_id="0" hang_time="0" name="relay binary" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/binary">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/binary"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream answers with ISO-8859-1 text and declares that charset." error_scenario_id="0" hang_time="0" name="relay text latin1" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/text/latin1">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/text/latin1"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream answers with UTF-8 text and declares no charset." error_scenario_id="0" hang_time="0" name="relay text undeclared" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/text/undeclared">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/text/undeclared"/>
+	</service>
+</mockservice>

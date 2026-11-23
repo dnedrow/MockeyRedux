@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="A static service with three scenarios and two real URLs." error_scenario_id="0" hang_time="0" name="Customers" request_inspector_name="null" service_response_type="1" tag="" url="customers">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/customers/a"/>
+		<real_url url="http://127.0.0.1:18091/customers/b"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="silver" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[silver customer]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="gold" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[gold customer]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="3" name="missing" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no such customer]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A dynamic service with a delay of 100 ms." error_scenario_id="0" hang_time="100" name="Orders" request_inspector_name="null" service_response_type="2" tag="" url="orders">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="open" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[open]]></scenario_match>
+			<scenario_response><![CDATA[open orders]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="closed" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[closed]]></scenario_match>
+			<scenario_response><![CDATA[closed orders]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="A proxy service without scenarios." error_scenario_id="0" hang_time="0" name="Billing" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/billing">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/billing"/>
+	</service>
+	<service_plan description="" id="1" name="Gold path" tag="premium">
+		<plan_item hang_time="0" scenario_name="gold" service_name="Customers" service_response_type="1"/>
+		<plan_item hang_time="0" scenario_name="closed" service_name="Orders" service_response_type="1"/>
+	</service_plan>
+	<service_plan description="" id="2" name="Silver path" tag="">
+		<plan_item hang_time="50" scenario_name="silver" service_name="Customers" service_response_type="1"/>
+	</service_plan>
+</mockservice>

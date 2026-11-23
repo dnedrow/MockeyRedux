@@ -1,38 +1,24 @@
 package io.github.dnedrow.mockey.parity
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Path
+import kotlin.test.Test
 
 class RoutingCasesTest {
-    private val resources = Path.of("src/test/resources")
+    @Test
+    fun everyRoutingCaseHasARecordingOfItsCurrentFixtureAndRequests() = RecordedGroups.assertRecorded(RoutingCases.groups)
 
     @Test
-    fun everyRoutingCaseHasAFixtureAndARecording() {
-        RoutingCases.all.forEach { (name, case) ->
-            assertTrue(Files.exists(resources.resolve(case.fixtureXml)), "fixture for $name")
-            val recorded = ParityCaseStore().read(resources.resolve("parity/$name"))
-            assertEquals(case.request.target, recorded.request.target, name)
-            assertTrue(recorded.expectedResponse != null, "recorded response for $name")
-        }
-    }
+    fun everyRoutingRecordingBelongsToACase() = RecordedGroups.assertNoOtherRecordings(RoutingCases.groups, "routing-")
 
     /**
-     * Records every case in the fixture group named by mockey.parity.recordGroup against legacy Mockey at
-     * mockey.parity.legacy.baseUrl, which must already be running with that group's fixture loaded.
+     * Records the routing groups from legacy Mockey, see [RecordedGroups.recordFromLegacy]. "routing" selects every
+     * group. The stub upstream runs for the duration of the recording.
      */
     @Test
-    fun recordsGroupFromLegacy() {
-        val baseUrl = System.getProperty("mockey.parity.legacy.baseUrl") ?: return
-        val group = System.getProperty("mockey.parity.recordGroup") ?: return
-        StubHttpServer.upstream(RoutingCases.UPSTREAM_PORT).use {
-            RoutingCases.all.filterValues { it.fixtureXml.endsWith("/$group.xml") }.forEach { (name, case) ->
-                val fixture = Files.readString(resources.resolve(case.fixtureXml))
-                ParityRecorder().record(case.copy(fixtureXml = fixture), URI.create(baseUrl), resources.resolve("parity/$name"))
-            }
-        }
-    }
+    fun recordsGroupFromLegacy() = RecordedGroups.recordFromLegacy(RoutingCases.groups, ::withUpstream)
+
+    /** Replays the routing recordings against legacy Mockey, see [RecordedGroups.replayAgainstLegacy]. */
+    @Test
+    fun replaysGroupAgainstLegacy() = RecordedGroups.replayAgainstLegacy(RoutingCases.groups, ::withUpstream)
+
+    private fun withUpstream(action: () -> Unit) = StubHttpServer.upstream(RoutingCases.UPSTREAM_PORT).use { action() }
 }

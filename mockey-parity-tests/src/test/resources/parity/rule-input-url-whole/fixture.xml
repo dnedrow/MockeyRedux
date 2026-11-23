@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule with the key * for parameters, for a form body." error_scenario_id="2" hang_time="0" name="form parameter any" request_inspector_name="null" service_response_type="2" tag="" url="inputs/form-any">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="any parameter goog" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "*", "desc": "Some parameter must contain goog.", "value_rule_arg": "goog", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[any parameter goog]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule for the parameter ticker, for a form body." error_scenario_id="2" hang_time="0" name="form parameter keyed" request_inspector_name="null" service_response_type="2" tag="" url="inputs/form-keyed">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="ticker goog" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain goog.", "value_rule_arg": "goog", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[ticker goog]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Some header must contain the loopback address." error_scenario_id="2" hang_time="0" name="host header" request_inspector_name="null" service_response_type="2" tag="" url="inputs/header-host">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="host header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "*", "desc": "Some header must contain the loopback address.", "value_rule_arg": "127.0.0.1", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[host header]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Some header must contain session=." error_scenario_id="2" hang_time="0" name="cookie header" request_inspector_name="null" service_response_type="2" tag="" url="inputs/header-cookie">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="cookie header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "*", "desc": "Some header must contain session=.", "value_rule_arg": "session=", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[cookie header]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Some header must be exactly 7." error_scenario_id="2" hang_time="0" name="content length header" request_inspector_name="null" service_response_type="2" tag="" url="inputs/header-content-length">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="content length header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "*", "desc": "Some header must be exactly 7.", "value_rule_arg": "^7$", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[content length header]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Some header must contain gzip." error_scenario_id="2" hang_time="0" name="accept encoding header" request_inspector_name="null" service_response_type="2" tag="" url="inputs/header-accept-encoding">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="accept encoding header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "*", "desc": "Some header must contain gzip.", "value_rule_arg": "gzip", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[accept encoding header]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Some header must contain the entity tag v1." error_scenario_id="2" hang_time="0" name="if none match header" request_inspector_name="null" service_response_type="2" tag="" url="inputs/header-if-none-match">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="if none match header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "*", "desc": "Some header must contain the entity tag v1.", "value_rule_arg": "\"v1\"", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[if none match header]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Some header must contain Nov 2026." error_scenario_id="2" hang_time="0" name="if modified since header" request_inspector_name="null" service_response_type="2" tag="" url="inputs/header-if-modified-since">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="if modified since header" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "*", "desc": "Some header must contain Nov 2026.", "value_rule_arg": "Nov 2026", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[if modified since header]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A required rule for the body." error_scenario_id="2" hang_time="0" name="body required" request_inspector_name="null" service_response_type="2" tag="" url="inputs/body-required">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="body has digits" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"body": [{"desc": "The body must contain digits.", "value_rule_arg": "\\d+", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[body has digits]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="An optional rule for the body." error_scenario_id="2" hang_time="0" name="body optional" request_inspector_name="null" service_response_type="2" tag="" url="inputs/body-optional">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="body digits if any" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"body": [{"desc": "A body must contain digits.", "value_rule_arg": "\\d+", "value_rule_type": "regex_optional"}]}]]></scenario_match>
+			<scenario_response><![CDATA[body digits if any]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule for the whole URL that the client addressed." error_scenario_id="2" hang_time="0" name="url whole" request_inspector_name="null" service_response_type="2" tag="" url="inputs/url">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="whole url" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"url": [{"desc": "The URL must be the mock endpoint URL.", "value_rule_arg": "^http://127\\.0\\.0\\.1:\\d+/service/inputs/url$", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[whole url]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule that looks for the query string in the URL." error_scenario_id="2" hang_time="0" name="url query" request_inspector_name="null" service_response_type="2" tag="" url="inputs/url-query">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="url has query" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"url": [{"desc": "The URL must contain x=1.", "value_rule_arg": "x=1", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[url has query]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>

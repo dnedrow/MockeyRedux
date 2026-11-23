@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="0" description="Nothing listens on the upstream port. No error scenario." error_scenario_id="0" hang_time="0" name="refused" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:1/refused">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:1/refused"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Nothing listens on the upstream port. The service has an error scenario." error_scenario_id="2" hang_time="0" name="refused with error scenario" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:1/refused-with-error-scenario">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:1/refused-with-error-scenario"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="unused in proxy mode" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[unused in proxy mode]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="503" id="2" name="backend down" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[backend down]]></scenario_response>
+			<scenario_response_header><![CDATA[X-Error: yes]]></scenario_response_header>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="The upstream closes the connection without answering." error_scenario_id="0" hang_time="0" name="closed connection" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:18091/stub/close">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:18091/stub/close"/>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="0" description="Nothing listens on the upstream port. A service delay of 300 ms." error_scenario_id="0" hang_time="300" name="refused delayed" request_inspector_name="null" service_response_type="0" tag="" url="http://127.0.0.1:1/refused-delayed">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<real_url url="http://127.0.0.1:1/refused-delayed"/>
+	</service>
+</mockservice>

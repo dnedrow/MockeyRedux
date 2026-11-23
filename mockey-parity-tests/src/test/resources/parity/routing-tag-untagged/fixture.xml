@@ -1,30 +1,48 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <mockservice version="1.0" xml:lang="en-US">
 	<proxy_settings proxy_enabled="false" proxy_url=""/>
-	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="visible" request_inspector_name="null" service_response_type="1" tag="keep" url="visible">
+	<service default_real_url_index="0" default_scenario_id="1" description="Carries the tag of the filter." error_scenario_id="0" hang_time="0" name="visible" request_inspector_name="null" service_response_type="1" tag="keep" url="visible">
 		<request_inspector_json_rules enable_flag="false"/>
 		<response_schema enable_flag="false"/>
-		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="v" tag="">
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="answer" tag="">
 			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
 			<scenario_response><![CDATA[visible]]></scenario_response>
 			<scenario_response_header/>
 		</scenario>
 	</service>
-	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="hidden" request_inspector_name="null" service_response_type="1" tag="drop" url="hidden">
+	<service default_real_url_index="0" default_scenario_id="1" description="Only its scenario carries the tag of the filter." error_scenario_id="0" hang_time="0" name="scenario tagged" request_inspector_name="null" service_response_type="1" tag="" url="scenario-tagged">
 		<request_inspector_json_rules enable_flag="false"/>
 		<response_schema enable_flag="false"/>
-		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="h" tag="">
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="answer" tag="keep">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[scenario tagged]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Carries another tag." error_scenario_id="0" hang_time="0" name="hidden" request_inspector_name="null" service_response_type="1" tag="drop" url="hidden.invalid/tagged">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="answer" tag="">
 			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
 			<scenario_response><![CDATA[hidden]]></scenario_response>
 			<scenario_response_header/>
 		</scenario>
 	</service>
-	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="untagged" request_inspector_name="null" service_response_type="1" tag="" url="untagged">
+	<service default_real_url_index="0" default_scenario_id="1" description="Carries no tag." error_scenario_id="0" hang_time="0" name="untagged" request_inspector_name="null" service_response_type="1" tag="" url="untagged.invalid/plain">
 		<request_inspector_json_rules enable_flag="false"/>
 		<response_schema enable_flag="false"/>
-		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="u" tag="">
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="answer" tag="">
 			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
 			<scenario_response><![CDATA[untagged]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="Carries another tag and has an absolute mock URL." error_scenario_id="0" hang_time="0" name="hidden absolute" request_inspector_name="null" service_response_type="1" tag="drop" url="http://127.0.0.1:18091/tagged/hidden">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[hidden absolute]]></scenario_response>
 			<scenario_response_header/>
 		</scenario>
 	</service>

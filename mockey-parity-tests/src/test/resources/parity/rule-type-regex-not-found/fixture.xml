@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="A string_required rule with an empty argument." error_scenario_id="2" hang_time="0" name="string empty argument" request_inspector_name="null" service_response_type="2" tag="" url="types/string-empty">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="page_id present" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"key": "page_id", "desc": "page_id must be present", "value_rule_arg": "", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[page_id present]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A string_required argument in upper case with surrounding spaces." error_scenario_id="2" hang_time="0" name="string trimmed" request_inspector_name="null" service_response_type="2" tag="" url="types/string-trimmed">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="ticker goog trimmed" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain goog.", "value_rule_arg": " GOOG ", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[ticker goog trimmed]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A regex_required rule for three digits." error_scenario_id="2" hang_time="0" name="regex required" request_inspector_name="null" service_response_type="2" tag="" url="types/regex-required">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="three digits" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "id", "desc": "The id must be three digits.", "value_rule_arg": "^\\d{3}$", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[three digits]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule type written in upper case." error_scenario_id="2" hang_time="0" name="type letter case" request_inspector_name="null" service_response_type="2" tag="" url="types/letter-case">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="upper case type" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The ticker must contain goog.", "value_rule_arg": "goog", "value_rule_type": "STRING_REQUIRED"}]}]]></scenario_match>
+			<scenario_response><![CDATA[upper case type]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule type that does not exist." error_scenario_id="2" hang_time="0" name="unknown type" request_inspector_name="null" service_response_type="2" tag="" url="types/unknown">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="number required" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "count", "desc": "The count must be a number.", "value_rule_arg": "5", "value_rule_type": "number_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[number required]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A regex_required rule whose expression does not compile." error_scenario_id="2" hang_time="0" name="invalid regex" request_inspector_name="null" service_response_type="2" tag="" url="types/invalid-regex">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="broken expression" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "The expression is broken.", "value_rule_arg": "([a-z", "value_rule_type": "regex_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[broken expression]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A header rule without a key." error_scenario_id="2" hang_time="0" name="missing key" request_inspector_name="null" service_response_type="2" tag="" url="types/missing-key">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="no key" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"headers": [{"desc": "A header rule needs a key.", "value_rule_arg": "gold", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[no key]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule without value_rule_arg." error_scenario_id="2" hang_time="0" name="missing argument" request_inspector_name="null" service_response_type="2" tag="" url="types/missing-argument">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="no argument" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": [{"key": "ticker", "desc": "A rule needs an argument.", "value_rule_type": "string_required"}]}]]></scenario_match>
+			<scenario_response><![CDATA[no argument]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="A rule set whose only group has no rule." error_scenario_id="2" hang_time="0" name="empty rule set" request_inspector_name="null" service_response_type="2" tag="" url="types/empty">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="no rules" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{"parameters": []}]]></scenario_match>
+			<scenario_response><![CDATA[no rules]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="2" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no match]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>

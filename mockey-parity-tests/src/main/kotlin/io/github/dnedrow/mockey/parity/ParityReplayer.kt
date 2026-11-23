@@ -4,31 +4,52 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.nio.file.Path
 
+/** The server that a recording is replayed against, which decides what its response is compared with. */
+enum class ParityServer {
+    /** Legacy Mockey. Its response is compared with the recorded one. */
+    LEGACY,
+
+    /**
+     * The new server. Its response is compared with the recorded one when the recording is labeled `same`, and
+     * with the stated new response when the recording is labeled with deviations.
+     */
+    NEW,
+}
+
 class ParityReplayer(
-    private val client: HttpClient = HttpClient.newHttpClient(),
+    private val client: HttpClient = ParityHttp.newClient(),
     private val store: ParityCaseStore = ParityCaseStore(),
 ) {
+    /** Sends the requests of [recording] to [baseUrl] and compares the response as [ResponseComparison] describes. */
     fun replay(
         recording: Path,
         baseUrl: URI,
+        server: ParityServer = ParityServer.LEGACY,
     ): ReplayResult {
         val case = store.read(recording)
-        val expected = requireNotNull(case.expectedResponse)
+        val legacyResponse = requireNotNull(case.expectedResponse)
+        val newResponse = if (server == ParityServer.NEW) newResponseOf(case, recording) else null
+        case.before.forEach { client.exchange(it, baseUrl) }
         val exchange = client.exchange(case.request, baseUrl)
-        val differences = compare(expected, exchange.response) + compareTiming(case.timing, exchange.elapsedMillis)
-        return ReplayResult(recording.fileName.toString(), differences)
+        val differences =
+            if (newResponse == null) {
+                ResponseComparison.differences(case.request, legacyResponse, exchange.response, case.snapshot)
+            } else {
+                ResponseComparison.differences(case.request, newResponse, exchange.response)
+            }
+        val timing = newResponse?.timing ?: case.timing
+        return ReplayResult(recording.fileName.toString(), differences + compareTiming(timing, exchange.elapsedMillis))
     }
 
-    private fun compare(
-        expected: ParityResponse,
-        actual: ParityResponse,
-    ): List<String> =
-        buildList {
-            if (expected.status != actual.status) add("status: expected ${expected.status}, got ${actual.status}")
-            val expectedHeaders = normalizeHeaders(expected.headers)
-            val actualHeaders = normalizeHeaders(actual.headers)
-            if (expectedHeaders != actualHeaders) add("headers: expected $expectedHeaders, got $actualHeaders")
-            if (!expected.body.contentEquals(actual.body)) add("body bytes differ")
+    /** The response that is stated for the new server, or null when the new server answers as legacy does. */
+    private fun newResponseOf(
+        case: ParityCase,
+        recording: Path,
+    ): NewResponse? =
+        when (ParityLabel.parse(case.label)) {
+            ParityLabel.Same -> null
+            ParityLabel.Unreviewed -> error("$recording is not reviewed, so it says nothing about the new server.")
+            is ParityLabel.Deviations -> checkNotNull(case.newResponse) { "$recording deviates but states no new response." }
         }
 
     private fun compareTiming(
@@ -40,14 +61,4 @@ class ParityReplayer(
         } else {
             listOf("elapsed time: expected ${expected.describe()}, got $elapsedMillis ms")
         }
-
-    private fun normalizeHeaders(headers: Map<String, List<String>>): Map<String, List<String>> =
-        headers
-            .filterKeys { it.lowercase() !in ignoredHeaders }
-            .entries
-            .associate { (name, values) -> name.lowercase() to values }
-
-    private companion object {
-        val ignoredHeaders = setOf("content-length", "date", "last-modified", "set-cookie")
-    }
 }

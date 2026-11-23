@@ -1,42 +1,59 @@
 package io.github.dnedrow.mockey.parity
 
-/** Routing cases recorded from legacy Mockey. Fixtures live in src/test/resources/parity-fixtures. */
+/**
+ * Routing cases recorded from legacy Mockey: how a target is read and matched, which service answers, what the
+ * tag filter hides, what becomes of an unknown target, and how twisting rewrites a target. Fixtures live in
+ * src/test/resources/parity-fixtures. The stub routes are described in [StubRoutes].
+ */
 object RoutingCases {
     const val UPSTREAM_PORT = 18091
 
-    /** Fixture file name (without .xml) to the legacy startup arguments that go with it. */
-    val fixtureGroups: Map<String, List<String>> =
-        mapOf(
-            "routing" to emptyList(),
-            "routing-tagged" to listOf("-F", "keep"),
-        )
+    /** The stub upstream as a host and port, and as a mock endpoint target. */
+    private const val UPSTREAM_HOST = "127.0.0.1:$UPSTREAM_PORT"
+    private const val UPSTREAM = "/service/http://$UPSTREAM_HOST"
 
-    private fun case(
-        name: String,
-        fixture: String,
-        target: String,
-        method: String = "GET",
-    ) = name to
-        ParityCase(
-            label = "same",
-            fixtureXml = "parity-fixtures/$fixture.xml",
-            request = ParityRequest(method, target),
-        )
+    private const val DEFINITIONS = "/definitions"
 
-    val all: Map<String, ParityCase> =
+    val groups: List<ParityCaseGroup> =
         listOf(
-            case("routing-relative-target", "routing", "/service/hello"),
-            case("routing-absolute-target", "routing", "/service/http://127.0.0.1:18091/hello"),
-            case("routing-url-template-123", "routing", "/service/http://127.0.0.1:18091/customer/%7Bx%7D?id=123"),
-            case("routing-url-template-456", "routing", "/service/http://127.0.0.1:18091/customer/%7Bx%7D?id=456"),
-            case("routing-url-template-nomatch", "routing", "/service/http://127.0.0.1:18091/customer/789"),
-            case("routing-competing-services", "routing", "/service/dup"),
-            case("routing-nested-prefix", "routing", "/service/nest/deep"),
-            case("routing-real-url", "routing", "/service/http://127.0.0.1:18091/backend"),
-            case("routing-real-url-template", "routing", "/service/http://127.0.0.1:18091/tpl/%7Babc%7D"),
-            case("routing-unknown-target", "routing", "/service/http://127.0.0.1:18091/does/not/exist"),
-            case("routing-tag-visible", "routing-tagged", "/service/visible"),
-            case("routing-tag-hidden", "routing-tagged", "/service/hidden"),
-            case("routing-tag-untagged", "routing-tagged", "/service/untagged"),
-        ).toMap()
+            parityCaseGroup("routing") {
+                get("routing-relative-target", "/service/hello")
+                get("routing-absolute-target", "$UPSTREAM/hello")
+                get("routing-url-template-123", "$UPSTREAM/customer/%7Bx%7D?id=123")
+                get("routing-url-template-456", "$UPSTREAM/customer/%7Bx%7D?id=456")
+                get("routing-url-template-nomatch", "$UPSTREAM/customer/789")
+                get("routing-competing-services", "/service/dup")
+                get("routing-nested-prefix", "/service/nest/deep")
+                get("routing-real-url", "$UPSTREAM/backend")
+                get("routing-real-url-template", "$UPSTREAM/tpl/%7Babc%7D")
+                get("routing-real-url-of-relative-service", "$UPSTREAM/real/target")
+                get("routing-real-url-with-variable", "$UPSTREAM/real/%7B7%7D/item")
+                get("routing-unknown-target", "$UPSTREAM/does/not/exist")
+                get("routing-unknown-target-registered", DEFINITIONS, before = step("$UPSTREAM/does/not/exist?active=true"))
+                get("routing-unknown-relative-target", "/service/unknown-relative.invalid/bar")
+                get("routing-relative-target-as-host", "/service/$UPSTREAM_HOST/stub/echo")
+                get("routing-embedded-absolute-target", "/service/prefix/http://$UPSTREAM_HOST/stub/echo")
+            },
+            parityCaseGroup("routing-tagged", tagFilter = "keep") {
+                get("routing-tag-visible", "/service/visible")
+                get("routing-tag-scenario", "/service/scenario-tagged")
+                get("routing-tag-hidden", "/service/hidden.invalid/tagged")
+                get("routing-tag-untagged", "/service/untagged.invalid/plain")
+                get("routing-tag-hidden-absolute", "$UPSTREAM/tagged/hidden")
+                get("routing-tag-hidden-absolute-registered", DEFINITIONS, before = step("$UPSTREAM/tagged/hidden"))
+            },
+            parityCaseGroup("routing-twist", enabledTwist = EnabledTwist("to stub", legacyId = 1)) {
+                get("routing-twist-applied", "/service/twist/a.b")
+                get("routing-twist-regular-expression", "/service/twist/a.b/axb")
+                get("routing-twist-first-pair-only", "/service/twist/a.b/one")
+                get("routing-twist-second-pair", "/service/plain/one")
+                get("routing-twist-no-pair", "/service/plain/zero")
+                get("routing-twist-forwarded", "/service/http://qa1.invalid/stub/echo?x=1")
+            },
+            parityCaseGroup("routing-twist-document") {
+                get("routing-twist-document-enabled", "/service/twist/a.b")
+            },
+        )
+
+    val all: Map<String, ParityCase> = casesOf(groups)
 }

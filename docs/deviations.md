@@ -1,37 +1,71 @@
 # Deviation register
 
-The Kotlin rewrite fixes legacy defects and records intentional behavior
-differences here. Evidence is marked `read` until a parity case confirms it.
+The Kotlin rewrite fixes legacy defects. This register lists every intended difference in behavior between
+legacy Mockey at commit `88e31ed` and the new system. A behavior that is not listed here stays the same.
+
+The parity recordings in `mockey-parity-tests` use the IDs as labels: a recording that is labeled with an ID
+holds the legacy response and states the response of the new server (see `docs/parity/recordings.md`). The
+harness test `ParityReviewTest` fails when a label names an ID that is not in this register.
+
+Evidence:
+
+- **run** means that the legacy behavior was observed by running legacy. The entry names the parity recordings
+  that show it, or the probe: `scripts/probe-deviations.sh <legacy-checkout>` runs legacy and checks what the
+  entry says.
+- **read** means that the legacy behavior is taken from the source only.
+
+DEV-01 to DEV-30 come from the design of the rewrite. Task 2.9 confirmed them and corrected their wording where
+legacy behaved otherwise, and added DEV-31 to DEV-50 for the differences that the review of the recordings found.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
-| DEV-01 | Template variables match literal braces. | Variables match one path segment and the whole target. | run |
-| DEV-02 | First matching service in ID order wins. | Most specific pattern wins. | read |
-| DEV-03 | Unknown relative targets become proxy services. | Unknown relative targets return 404. | read |
-| DEV-04 | Missing tag filter can register a duplicate service. | No duplicate is registered. | read |
-| DEV-05 | Twist replacement uses regular expressions. | Twist replacement is literal. | read |
-| DEV-06 | Response bodies receive a platform line separator. | Bodies are sent exactly as stored. | read |
-| DEV-07 | No scenario can produce an invalid status. | Fallback responses use 404. | read |
-| DEV-08 | Encoding depends on any header containing `utf-8`. | Content-Type charset controls encoding; UTF-8 is the default. | read |
-| DEV-09 | New scenarios have default Accept headers. | New scenarios have no default headers. | read |
-| DEV-10 | Only GET is proxied as GET; other methods become POST. | The original method is forwarded. | read |
-| DEV-11 | Proxy bodies are decoded and re-encoded as text. | Proxy bodies are relayed byte for byte. | read |
-| DEV-12 | Relative proxy targets are built from the request path. | Relative targets use the default real URL. | read |
-| DEV-13 | Upstream errors use only the error body. | Error status, headers, and body are used. | read |
-| DEV-14 | Set-Cookie is stripped to name and value. | Set-Cookie is relayed unchanged. | read |
-| DEV-15 | Missing rule keys skip required rules. | Required missing keys fail; optional ones pass and count. | read |
-| DEV-16 | Several received headers are invisible to rules. | Rules see every received header. | read |
-| DEV-17 | Form fields are unavailable to parameter rules. | Query and form parameters are available. | read |
-| DEV-18 | Saving a scenario clears universal-error designation. | Only an explicit change alters that designation. | read |
-| DEV-19 | Duplicated services reuse name and URL and drop defaults. | Copies get distinct names and URLs and keep designations. | read |
-| DEV-20 | Numeric IDs are reassigned and reused. | Opaque persisted identifiers are never reused. | read |
-| DEV-21 | Every save rewrites all files with display-name filenames. | Changed files are atomically written with collision-free slugs. | read |
-| DEV-22 | Transient flags suppress only save triggers. | Only global read-only mode remains. | read |
-| DEV-23 | Draft-03 schemas are accepted. | Draft-04 and later are required. | read |
-| DEV-24 | History is unbounded. | History retention is bounded and configurable. | read |
-| DEV-25 | Startup opens a browser. | Startup never opens a browser. | read |
-| DEV-26 | Admin traffic shares the mock port and is unauthenticated. | Admin traffic has a separate listener and optional token. | read |
-| DEV-27 | Runtime import can read arbitrary paths or URLs. | Runtime import accepts document content only. | read |
-| DEV-28 | Status exposes a path and locale-specific start time. | Status exposes state and ISO 8601 start time only. | read |
-| DEV-29 | Merge copies only equal-named services before deleting sources. | Scenarios, tags, and URLs merge before safe deletion. | read |
-| DEV-30 | Writable initialization deletes referenced stored definitions. | Initialization is refused unless the location is empty. | read |
+| DEV-01 | A template variable matches only literal `{...}` text (since `f0d83a4`). A text criterion sees the value of a variable only when the braces arrive unencoded. | A variable matches one path segment, and the whole target must match. The captured value is always evaluated. | run: `routing-url-template-nomatch`, `response-text-template-value` |
+| DEV-02 | The first matching service in ID order wins. Several services can share one mock URL, and then the first of them answers. | The most specific pattern wins. A mock URL pattern belongs to one service, and import reports a second service with the same pattern as a conflict. | run: `routing-competing-services` shows the first of two services with one mock URL answering, and `routing-unknown-target-registered` lists both. Because of DEV-01 no request reaches two different patterns in legacy, so no recording shows a more specific pattern losing. |
+| DEV-03 | The target is parsed from the first `http` substring. Otherwise the first path segment becomes a host: an unknown relative target registers a service for that host and proxies to it. | A target is absolute only if it starts with `http://` or `https://`. An unknown relative target gets a 404 with an explanation. | run: `routing-embedded-absolute-target`, `routing-relative-target-as-host`, `routing-unknown-relative-target` |
+| DEV-04 | A matching service that lacks the filter tag causes a second service to be registered for the same URL. For a relative URL, that service proxies to the first path segment as a host. | No second service. The request is handled as unmatched: an absolute target is forwarded, and a relative target gets a 404. | run: `routing-tag-hidden-absolute-registered`, `routing-tag-hidden`, `routing-tag-untagged` |
+| DEV-05 | Twisting checks the origination as literal text but replaces it as a regular expression. | Literal replacement. | run: `routing-twist-regular-expression` |
+| DEV-06 | A platform line separator is appended to every static or dynamic response body. | The body is sent exactly as stored. | run: 117 recordings, such as `response-body-trailing-newline` and `response-body-empty` |
+| DEV-07 | With no matching scenario and no error scenario, an explanation is sent with status 200: legacy sets the invalid status -1, which the container ignores. | 404 with an explanation. | run: `response-fallback-builtin` |
+| DEV-08 | A scenario response is encoded as UTF-8 only if some response header value contains `utf-8`. Otherwise it is encoded as ISO-8859-1, and a character outside that charset becomes `?`. | UTF-8 unless the scenario's `Content-Type` declares another charset. | run: `response-charset-none`, `response-charset-json` |
+| DEV-09 | A scenario without response header text answers with `Accept-Language: en-US` and `Accept: text/plain`, the default headers of every new scenario. | New scenarios have no default headers. | run: `response-headers-default` |
+| DEV-10 | Proxy mode sends GET as GET and every other method as POST, HEAD included. A HEAD request therefore gets a redirect back and does not follow it. | The method is forwarded unchanged. | run: `proxy-method-put`, `proxy-method-patch`, `proxy-method-delete`, `proxy-method-options`, `proxy-method-trace`, `proxy-redirect-head-302` |
+| DEV-11 | A proxied request body is decoded with the default charset of the JVM and encoded again as ISO-8859-1, which corrupts binary content and every character outside ISO-8859-1. A request without a `Content-Type` that is sent as POST gains `Content-Type: text/plain; charset=ISO-8859-1`. | Bodies are relayed byte for byte, and no header is added. | run: `proxy-body-utf8`, `proxy-body-binary`, `proxy-body-empty-post` |
+| DEV-12 | Proxy mode for a relative target forwards to a URL built from the path, with the first path segment as the host. | Forwards to the service's default real URL. | run: `proxy-relative-target`, `proxy-relative-target-default-real-url` |
+| DEV-13 | On upstream failure the client gets status 200. The body is that of the error scenario, whose status and headers are not used, or else a JSON object with `fail` and `proxyInfo`. | The error scenario's status, headers, and body are used. Without one, 502 with a JSON object that has `fail` and `proxyInfo`. | run: `proxy-failure-refused`, `proxy-failure-refused-error-scenario`, `proxy-failure-universal-error`, and 6 more recordings |
+| DEV-14 | Upstream `Set-Cookie` headers are relayed as bare `name=value`. | Relayed unchanged. | run: `proxy-session-set-cookie` |
+| DEV-15 | A header or parameter rule is skipped when its key is absent from the request. A required rule therefore does not fail, and an optional rule is not counted. | A required rule fails. An optional rule passes and counts toward the score. | run: `rule-key-absent-required`, `rule-key-absent-optional`, `rule-input-form-parameter-keyed` |
+| DEV-16 | Header rules cannot see `Host`, `Cookie`, `Content-Length`, `Accept-Encoding`, or `If-None-Match`. They see `If-Modified-Since` with the fixed value of DEV-39 in place of the client's value. | Rules see every received header. | run: the six `rule-input-header-*` recordings |
+| DEV-17 | Parameter rules see the query string but not form fields. | Rules see query and form parameters. | run: `rule-input-form-parameter`, `rule-input-form-parameter-keyed` |
+| DEV-18 | Saving any scenario without the universal-error flag clears the universal error scenario. | Only an explicit change alters it. | run: probe |
+| DEV-19 | Duplicating a service copies its name and mock URL and drops the default scenario. | The copy gets a distinct name and mock URL and keeps its designations. | run: probe |
+| DEV-20 | Integer IDs, reused after deletion. Service IDs are reassigned on every load. | Opaque, persisted identifiers that are never reused. A legacy number in a request to the shim identifies nothing. | run: probe for the reuse. 28 recordings, such as `automation-definitions-all`, show the numbers that a load assigns, and `automation-config-by-id` what becomes of a request that uses one. |
+| DEV-21 | Every save deletes and rewrites the files of every service. File names derived from display names can collide: services with the same name share one file. | Atomic per-file writes and collision-free names. | run: probe |
+| DEV-22 | Per-service and per-plan transient flags suppress only the save trigger: the next save of anything writes the change too. | Removed. Only the global read-only mode remains. The shim accepts and ignores the parameter. | run: probe for the service flag. `automation-config-transient-state` and `automation-plan-set-transient-state` show that legacy accepts both flags. The plan flag is read: `ServicePlanSetupServlet` sets it the same way. |
+| DEV-23 | Draft-03 JSON Schemas are accepted. | Draft-04 and later are required. A schema in an unsupported dialect is reported as unsupported. | run: probe |
+| DEV-24 | History grows without limit. | Bounded and configurable. | run: probe, which finds the first of 3,000 entries still there |
+| DEV-25 | The server opens a browser at startup unless told not to. | It never opens a browser. | run: probe, which gives legacy a stand-in for the browser |
+| DEV-26 | Admin operations are unauthenticated, share the mock port, and send `Access-Control-Allow-Origin: *`. | Separate admin listener, loopback by default, optional token. The mock listener answers the legacy automation endpoints only when the shim is enabled and answers 404 for every other legacy admin path. The CORS header appears only on mock responses. | run: every `automation-*` recording carries the header. `inspection-inspectors-listed`, `inspection-latest-entry`, `inspection-history-messages`, and `automation-config-second-path` state the 404. |
+| DEV-27 | At runtime, initialization and upload can read any server-local path or fetch any URL. A file that is no definitions document is read after the existing definitions were deleted. | Runtime import accepts document content only. File and URL sources are startup options. The shim limits `file` to the definitions root, refuses `url`, and leaves the definitions unchanged when it refuses. | run: `automation-home-init-not-a-document`, `automation-home-init-url`, and their two `-effect` recordings. Probe for the upload. |
+| DEV-28 | `/status` reports the definitions path, and the start time as `MM/dd/yyyy \| hh:mm:ss`. | `/status` reports the status and an ISO 8601 start time only. The path is available through the admin API. | run: `automation-status` |
+| DEV-29 | Merging services whose names differ copies nothing, because the merge routine acts only on equal names, and then deletes the source services. | Scenarios, tags, and real URLs are merged first. Sources are deleted only when no scenario was skipped. | run: probe |
+| DEV-30 | Starting in writable mode with an initialization document deletes the stored definitions before the document is loaded, including the service files the document refers to. | Refused unless the definitions location is empty. | run: probe |
+| DEV-31 | A request for a real URL of a service reaches that service only when the real URL holds a variable (`routing-real-url-with-variable`). For any other real URL legacy registers a new proxy service and forwards the request. | A request for a real URL of a service reaches that service. | run: `routing-real-url-of-relative-service` |
+| DEV-32 | A definitions document names the enabled twist configuration, but legacy enables none when it loads the document. | Import enables the twist configuration that the document names. | run: `routing-twist-document-enabled` |
+| DEV-33 | A static service whose default scenario ID refers to no scenario answers `NO SCENARIO SELECTED` with status 200. | A service with scenarios always has a default scenario: the earliest one takes the place of a missing default. | run: `response-static-dangling-default` |
+| DEV-34 | Of scenario response headers that share a name, only the last is sent. | Every header is sent, in the stored order. | run: `response-headers-repeated` |
+| DEV-35 | The evaluation text of a text criterion lists the request parameters in the order of the container's parameter map, whatever their order in the request. | The parameters are listed in the order of the request. | run: `response-text-params-reordered` |
+| DEV-36 | A `%` in the evaluation text that starts no escape fails the request with status 500 and a page that shows a Java stack trace. | The text is evaluated with that `%` as it is. | run: `response-text-body-percent` |
+| DEV-37 | When no scenario matches, the delay of the error scenario is ignored, and the service delay applies. | The delay of the scenario that answers applies, also when it is an error scenario. | run: `response-delay-error-scenario` |
+| DEV-38 | Proxy mode rebuilds the query string from the parsed parameters. They are reordered and encoded again, an empty value loses its `=`, and the values of a repeated parameter are joined without a separator. | The query string is forwarded as received. | run: `proxy-query-order-and-encoding`, `proxy-query-empty-value`, `proxy-query-repeated-parameter` |
+| DEV-39 | `If-Modified-Since` is forwarded upstream with the fixed value `Fri, 13 May 2006 23:54:18 GMT`. | `If-Modified-Since` is not forwarded. | run: `proxy-headers-conditional-and-encoding` |
+| DEV-40 | The hop-by-hop request headers `Keep-Alive`, `TE`, and `Trailer` are forwarded upstream. | Hop-by-hop headers are not forwarded. | run: `proxy-headers-hop-by-hop` |
+| DEV-41 | Of an upstream response header that occurs several times, only the last value is relayed. | Every value is relayed. | run: `proxy-relay-headers` |
+| DEV-42 | A POST that the upstream answers with 303 is followed with a GET. | Only GET and HEAD follow a redirect. Any other method gets the redirect response back unchanged. | run: `proxy-redirect-post-303` |
+| DEV-43 | Through the outbound proxy, the request line loses the port of the target. | The request line names the whole target. | run: `proxy-outbound-get`, `proxy-outbound-post`, `proxy-outbound-credentials` |
+| DEV-44 | A rule key that contains `*` anywhere is treated as the wildcard. | Only the key `*` is the wildcard. | run: `rule-key-partial-wildcard` |
+| DEV-45 | A rule of an unknown type never fails, so its rule set counts as satisfied. | A rule set with an unknown rule type is not well formed and is never satisfied. | run: `rule-type-unknown` |
+| DEV-46 | `/config/service` for an unknown service answers with status 500 and a page that shows a Java stack trace. | The result has a `fail` member. | run: `automation-config-unknown-service` |
+| DEV-47 | `/definitions` leaves out what has no value: `serviceDefinitions` when there is no service, and `scenarioArray` and `defaultScenarioName` for a service without scenarios. | Every member is always present. | run: `automation-definitions-empty`, `automation-definitions-all`, and 5 more recordings |
+| DEV-48 | `/plan/setup` reports the identifier of a plan as `planId` for `delete_plan` and as `planid` for the other actions. | Every action reports it under both names. | run: `automation-plan-delete`, `automation-plan-set-by-name`, `automation-plan-default`, `automation-plan-set-transient-state` |
+| DEV-49 | A `filterTag` given together with `/home?action=init` is cleared again when the definitions are replaced. | The filter is applied after the definitions are replaced. | run: `automation-home-init-filter-tag` |
+| DEV-50 | Where it has no JSON result, legacy answers with HTML: `/home?action=init` without `type=json` redirects to the home page, and `/plan/setup?action=set_plan` for an unknown plan renders it. | The endpoints of the shim always answer with the result envelope. | run: `automation-home-init-without-type`, `automation-plan-set-unknown` |

@@ -328,6 +328,8 @@ The routing, `port`, and URI behaviors named here were read in the Ktor and Jett
 
 Evidence: **run** means verified by executing legacy code. **read** means taken from the source and still to be confirmed by a recorded parity case.
 
+This table is the register as the design started it. Task 2.9 confirmed the entries against legacy, corrected their wording where legacy behaved otherwise, and added DEV-31 to DEV-50 for the differences that the review of the parity recordings found. `docs/deviations.md` holds the register in its current form, with the evidence for each entry.
+
 | ID | Legacy behavior | New behavior | Evidence |
 |----|-----------------|--------------|----------|
 | DEV-01 | A template variable matches only literal `{...}` text (since `f0d83a4`) | A variable matches one path segment and the whole target must match | run |

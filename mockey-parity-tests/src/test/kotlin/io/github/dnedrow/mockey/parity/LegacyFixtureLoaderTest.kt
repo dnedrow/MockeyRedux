@@ -46,19 +46,65 @@ class LegacyFixtureLoaderTest {
         }
     }
 
+    @Test
+    fun disablesTheTwistConfigurationThatLegacyKeptEnabled() {
+        val toggles = mutableListOf<String>()
+        val info = """{"result":{"twist_enabled":true,"twist-name":"to stub","twist-id":7,"proxy_enabled":"false"}}"""
+        val server = homeServer(mutableListOf(), """{"result":{"success":"Loaded"}}""", info, toggles)
+        try {
+            LegacyFixtureLoader(server.baseUrl()).load(fixture)
+
+            assertEquals(listOf("twist-id=7&twist-enable=false&response-type=json"), toggles)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun appliesTheSettingsThatAFixtureCannotCarry() {
+        val toggles = mutableListOf<String>()
+        val filters = mutableListOf<String>()
+        val server = homeServer(mutableListOf(), """{"result":{"success":"Loaded"}}""", toggles = toggles, filters = filters)
+        try {
+            val loader = LegacyFixtureLoader(server.baseUrl())
+
+            loader.setTagFilter("keep me")
+            loader.enableTwist(3)
+
+            assertEquals(listOf("action=filter_tag_on&tag=keep+me"), filters)
+            assertEquals(listOf("twist-id=3&twist-enable=true&response-type=json"), toggles)
+        } finally {
+            server.stop(0)
+        }
+    }
+
     private fun homeServer(
         queries: MutableList<String>,
         result: String,
+        configuration: String = """{"result":{"twist_enabled":false,"proxy_enabled":"false"}}""",
+        toggles: MutableList<String> = mutableListOf(),
+        filters: MutableList<String> = mutableListOf(),
     ): HttpServer =
         HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
-            createContext("/home") {
-                queries += it.requestURI.rawQuery
-                val body = result.toByteArray()
-                it.sendResponseHeaders(200, body.size.toLong())
-                it.responseBody.use { output -> output.write(body) }
-            }
+            answering("/home", result, queries)
+            answering("/configuration/info", configuration, mutableListOf())
+            answering("/twisting/toggle", """{"result":{"success":"Twist configuration off"}}""", toggles)
+            answering("/taghelp", """{"success":"Filter by tag is on."}""", filters)
             start()
         }
+
+    private fun HttpServer.answering(
+        path: String,
+        result: String,
+        queries: MutableList<String>,
+    ) {
+        createContext(path) {
+            queries += it.requestURI.rawQuery.orEmpty()
+            val body = result.toByteArray()
+            it.sendResponseHeaders(200, body.size.toLong())
+            it.responseBody.use { output -> output.write(body) }
+        }
+    }
 
     private fun HttpServer.baseUrl() = URI("http://127.0.0.1:${address.port}")
 }
