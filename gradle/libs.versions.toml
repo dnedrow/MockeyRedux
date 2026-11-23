@@ -1,10 +1,14 @@
 [versions]
+jmail = "2.1.0"
+json-schema = "1.9.1"
 kotlin = "2.4.21"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.13.0"
 ktlint = "14.2.0"
 
 [libraries]
+jmail = { module = "com.sanctionco.jmail:jmail", version.ref = "jmail" }
+json-schema = { module = "dev.harrel:json-schema", version.ref = "json-schema" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-serialization-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

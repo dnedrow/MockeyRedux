@@ -23,6 +23,9 @@ public enum class DiagnosticKind {
 
     /** A rule set of the service or of one of its scenarios is not well formed. */
     UNREADABLE_RULE_SET,
+
+    /** The response body of a scenario does not conform to the response schema of the service, which is enabled. */
+    SCHEMA_VIOLATION,
 }
 
 /**
@@ -42,7 +45,7 @@ public data class Diagnostic(
  * Returns the diagnostics for these definitions, service by service. [installedInspectors] are the names of
  * the inspectors that a service can name, and [isWellFormedRuleSet] tells whether the text of a rule set is a
  * well-formed rule set. URLs, names, and response bodies are compared as the changes to services and the merge
- * of services compare them.
+ * of services compare them. A response schema is applied only while it is enabled.
  */
 internal fun Definitions.diagnostics(
     installedInspectors: Set<String>,
@@ -54,7 +57,8 @@ internal fun Definitions.diagnostics(
             sharedRealUrls(service, others) +
             duplicateScenarios(service) +
             listOfNotNull(unknownInspector(service, installedInspectors)) +
-            unreadableRuleSets(service, isWellFormedRuleSet)
+            unreadableRuleSets(service, isWellFormedRuleSet) +
+            schemaViolations(service)
     }
 
 private fun sharedMockUrls(
@@ -118,4 +122,15 @@ private fun unreadableRuleSets(
                 Diagnostic(DiagnosticKind.UNREADABLE_RULE_SET, service.id, service.name, message, scenarioIds = listOf(scenario.id))
             }
     return listOfNotNull(ofService) + ofScenarios
+}
+
+/** Reports the scenarios of [service] that its response schema is against, when that schema is enabled. */
+private fun schemaViolations(service: Service): List<Diagnostic> {
+    val report = if (service.responseSchemaEnabled) service.responseSchemaReport() else null
+    return (report as? SchemaReport.Checked)?.scenarios.orEmpty().filterNot { it.conforms }.map { scenario ->
+        val message =
+            "The response body of the scenario '${scenario.scenarioName}' does not conform to the response schema: " +
+                scenario.violations.joinToString(" ")
+        Diagnostic(DiagnosticKind.SCHEMA_VIOLATION, service.id, service.name, message, scenarioIds = listOf(scenario.scenarioId))
+    }
 }

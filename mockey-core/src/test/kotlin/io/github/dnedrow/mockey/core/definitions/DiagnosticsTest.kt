@@ -121,6 +121,44 @@ class DiagnosticsTest {
     }
 
     @Test
+    fun aBodyThatDoesNotConformToAnEnabledResponseSchemaIsReported() {
+        val conforming = scenario("with id", """{"id": 7}""")
+        val violating = scenario("no id", """{"name": "Jane"}""")
+        val customers =
+            service("Customers", "customer/{id}").copy(
+                responseSchema = """{"required": ["id"]}""",
+                responseSchemaEnabled = true,
+                scenarios = listOf(conforming, violating),
+            )
+
+        val diagnostic = Definitions(services = listOf(customers)).diagnostics().single()
+
+        assertEquals(DiagnosticKind.SCHEMA_VIOLATION, diagnostic.kind)
+        assertEquals(customers.id, diagnostic.serviceId)
+        assertEquals(listOf(violating.id), diagnostic.scenarioIds)
+        assertContains(diagnostic.message, "'no id'")
+        assertContains(diagnostic.message, "[id]")
+    }
+
+    @Test
+    fun aResponseSchemaThatIsNotEnabledOrCannotBeAppliedGivesNoDiagnostic() {
+        val violating = scenario("no id", """{"name": "Jane"}""")
+        val disabled =
+            service(
+                "Customers",
+                "customer/{id}",
+            ).copy(responseSchema = """{"required": ["id"]}""", scenarios = listOf(violating))
+        val draft3 =
+            service("Orders", "orders").copy(
+                responseSchema = """{"${'$'}schema": "http://json-schema.org/draft-03/schema"}""",
+                responseSchemaEnabled = true,
+                scenarios = listOf(violating),
+            )
+
+        assertEquals(emptyList(), Definitions(services = listOf(disabled, draft3)).diagnostics())
+    }
+
+    @Test
     fun aRuleSetIsReportedWhetherOrNotItIsEnabled() {
         val customers = service("Customers", "customer/{id}").copy(requestRules = "not a rule set", requestRulesEnabled = false)
 

@@ -189,7 +189,8 @@ class that holds the port, or the task that ports the class.
 
 - `/validateSyntax` has no place. It checks a JSON Schema by itself, and no legacy page uses it. Either the
   design names it as a non-goal next to the sample loader, or `service-definitions` gains a requirement for a
-  schema that cannot be used.
+  schema that cannot be used. The response schema report of task 3.7 already says what is wrong with such a
+  schema, although no requirement asks for it.
 - `/setup` can also set the response mode of every service at once, with the parameters `all` and
   `responseType`. The legacy pages offer that as three buttons. No requirement describes one operation for
   all services: `admin-api`: Partial updates changes one service for each request.
