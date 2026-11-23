@@ -15,7 +15,6 @@ subprojects {
 tasks.register("checkModuleDependencies") {
     group = "verification"
     description = "Checks that project dependencies follow the modular architecture."
-    notCompatibleWithConfigurationCache("The dependency graph is inspected from project configuration.")
     val actualProjectDependencies = allowedProjectDependencies.keys.associateWith { module ->
         project(":$module").configurations
             .flatMap { configuration ->
@@ -29,13 +28,23 @@ tasks.register("checkModuleDependencies") {
             }
             .toSet()
     }
+    inputs.property("allowedProjectDependencies", allowedProjectDependencies)
+    inputs.property("actualProjectDependencies", actualProjectDependencies)
     doLast {
-        allowedProjectDependencies.forEach { (module, allowed) ->
-            val actual = actualProjectDependencies.getValue(module)
-            val forbidden = actual - allowed
+        val allowedDependencies =
+            inputs.properties.getValue("allowedProjectDependencies") as? Map<*, *>
+                ?: error("Missing allowed project dependencies")
+        val actualDependencies =
+            inputs.properties.getValue("actualProjectDependencies") as? Map<*, *>
+                ?: error("Missing actual project dependencies")
+        allowedDependencies.forEach { (module, allowed) ->
+            val actual = actualDependencies[module]
+            val allowedPaths = (allowed as? Iterable<*>)?.map { it.toString() }?.toSet().orEmpty()
+            val actualPaths = (actual as? Iterable<*>)?.map { it.toString() }?.toSet().orEmpty()
+            val forbidden = actualPaths - allowedPaths
             check(forbidden.isEmpty()) {
                 "$module has forbidden project dependencies: ${forbidden.sorted().joinToString()}. " +
-                    "Allowed dependencies: ${allowed.sorted().joinToString().ifEmpty { "none" }}"
+                    "Allowed dependencies: ${allowedPaths.sorted().joinToString().ifEmpty { "none" }}"
             }
         }
     }
