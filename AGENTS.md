@@ -33,6 +33,11 @@ Run the smallest applicable Gradle check for a change. The standard project chec
 
 The root `checkModuleDependencies` task enforces the approved project dependency graph.
 
+## GitHub Actions
+
+Use direct setup actions in GitHub Actions workflows, such as `actions/setup-java`. Do not substitute them with
+internal setup action versions, such as `internal/actions/setup-java`.
+
 ## OpenSpec
 
 Implementation work tracked by OpenSpec belongs in the active change under
