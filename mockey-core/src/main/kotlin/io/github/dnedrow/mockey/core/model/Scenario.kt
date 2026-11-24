@@ -20,7 +20,7 @@ public data class Scenario(
     public val tags: Tags = Tags.EMPTY,
 )
 
-/** One header of a response. A list of headers keeps its order and can hold a name more than once. */
+/** One header of a request or of a response. A list of headers keeps its order and can hold a name more than once. */
 @Serializable
 public data class Header(
     public val name: String,
