@@ -53,7 +53,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 ## 6. Core: scenario responses (spec: scenario-responses)
 
-- [ ] 6.1 Implement static mode and response assembly: status, ordered headers, exact body (DEV-06), and encoding (DEV-08). Verify with unit tests that compare response bytes.
+- [x] 6.1 Implement static mode and response assembly: status, ordered headers, exact body (DEV-06), and encoding (DEV-08). Verify with unit tests that compare response bytes.
 - [ ] 6.2 Implement dynamic mode: method eligibility, the evaluation text, text and rule scores, best-match selection, and tie-breaking. Verify with unit tests for each scenario of those requirements.
 - [ ] 6.3 Implement the fallback chain: service error scenario, universal error scenario, and the built-in 404 (DEV-07). Verify with unit tests for each step of the chain.
 - [ ] 6.4 Implement the non-blocking response delay with the scenario override. Verify with virtual-time tests, including one that shows a delayed request does not hold up another.
