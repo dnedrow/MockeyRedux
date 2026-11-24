@@ -19,6 +19,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.security.cert.CertificateException
 import java.util.Base64
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import javax.net.ssl.SSLContext
@@ -62,6 +63,7 @@ internal class JdkUpstreamClient(
         allowBasicCredentialsForTunnels()
     }
 
+    @Volatile
     private var closed = false
 
     /** The JDK client for direct connections. The first request that needs it creates it, so a client that never sends starts no thread. */
@@ -179,6 +181,7 @@ internal class JdkUpstreamClient(
         val toProxy = proxy?.let { " to the outbound proxy at $it" }.orEmpty()
         val message = failure.message.orEmpty()
         return when {
+            closed -> "the upstream client was closed."
             failure is HttpConnectTimeoutException -> "no connection was made$toProxy within ${inWords(connectTimeout)}."
             failure is ConnectException -> "no connection could be made$toProxy."
             failure is SSLException && failure.isAboutCertificate() -> "its certificate was not accepted. $message".trim()
@@ -304,14 +307,18 @@ private fun isHexDigit(char: Char): Boolean = char in '0'..'9' || char in 'a'..'
 /**
  * Waits for the value of the future and returns it. When the coroutine is canceled while it waits, the future
  * is canceled as well, which ends the exchange that it stands for.
+ *
+ * A future that someone else cancels fails the wait with an [IOException]. The coroutine that waits is not
+ * canceled by that, so the cancellation of the future is not passed on as one of the coroutine.
  */
-private suspend fun <T> CompletableFuture<T>.awaitOrCancel(): T =
+internal suspend fun <T> CompletableFuture<T>.awaitOrCancel(): T =
     suspendCancellableCoroutine { continuation ->
         whenComplete { value, failure ->
-            when (failure) {
+            val cause = if (failure is CompletionException) failure.cause ?: failure else failure
+            when (cause) {
                 null -> continuation.resume(value)
-                is CompletionException -> continuation.resumeWithException(failure.cause ?: failure)
-                else -> continuation.resumeWithException(failure)
+                is CancellationException -> continuation.resumeWithException(IOException("the exchange was ended from outside", cause))
+                else -> continuation.resumeWithException(cause)
             }
         }
         continuation.invokeOnCancellation { cancel(true) }

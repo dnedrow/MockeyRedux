@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -15,6 +17,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -334,6 +337,59 @@ class JdkUpstreamClientTest {
                 assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < SLOW_MILLIS)
             }
         }
+    }
+
+    @Test
+    fun closingTheClientEndsARequestThatIsUnderWay() {
+        StubUpstream(respond = {
+            Thread.sleep(SLOW_MILLIS)
+            StubResponse(200, "late", text)
+        }).use { upstream ->
+            val client = JdkUpstreamClient()
+            val start = System.nanoTime()
+
+            val outcome =
+                runBlocking(Dispatchers.Default) {
+                    val pending = async { runCatching { client.send(UpstreamRequest("GET", "${upstream.origin}/slow")) } }
+                    while (upstream.requests.isEmpty()) Thread.sleep(POLL_MILLIS)
+                    client.close()
+                    pending.await().exceptionOrNull()
+                }
+
+            assertIs<UpstreamException>(outcome)
+            assertEquals(
+                "The real service at ${upstream.origin}/slow gave no complete answer: the upstream client was closed.",
+                outcome.message,
+            )
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < SLOW_MILLIS)
+        }
+    }
+
+    @Test
+    fun aFutureThatSomeoneElseCancelsIsAFailureAndNoCancellationOfTheCaller() {
+        val future = CompletableFuture<String>()
+
+        val outcome =
+            runBlocking(Dispatchers.Default) {
+                val waiting = async { runCatching { future.awaitOrCancel() } }
+                future.cancel(true)
+                waiting.await().exceptionOrNull()
+            }
+
+        assertIs<IOException>(outcome)
+        assertEquals("the exchange was ended from outside", outcome.message)
+    }
+
+    @Test
+    fun aFutureGivesItsValueOrItsFailureToTheOneWhoWaits() {
+        val done = CompletableFuture.completedFuture("answer")
+        val failed = CompletableFuture.supplyAsync<String> { throw IOException("broke off") }
+
+        val value = runBlocking { done.awaitOrCancel() }
+        val failure = assertFailsWith<IOException> { runBlocking { failed.awaitOrCancel() } }
+
+        assertEquals("answer", value)
+        assertEquals("broke off", failure.message)
     }
 
     @Test
