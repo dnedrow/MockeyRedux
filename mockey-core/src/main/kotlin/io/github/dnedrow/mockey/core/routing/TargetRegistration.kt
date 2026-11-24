@@ -3,6 +3,7 @@ package io.github.dnedrow.mockey.core.routing
 import io.github.dnedrow.mockey.core.definitions.ServiceChanges
 import io.github.dnedrow.mockey.core.engine.Change
 import io.github.dnedrow.mockey.core.engine.ChangeResult
+import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.Tags
 
@@ -21,13 +22,17 @@ internal object TargetRegistration {
      * request for the same target has registered, no service is registered and the request takes its new
      * route. A target for which no valid service can be defined, such as one whose name would be too long, is
      * forwarded without a service.
+     *
+     * [tableOf] gives the routing table of the definitions that the change gets. Whoever keeps such tables
+     * hands them out here, so that the change compiles none of its own.
      */
     fun register(
         target: Target,
         tagFilter: Tags,
+        tableOf: (Definitions) -> RoutingTable = ::RoutingTable,
     ): Change<Route> =
         { definitions ->
-            val route = RoutingTable(definitions).route(target, tagFilter, forwardUnknownTargets = true)
+            val route = tableOf(definitions).route(target, tagFilter, forwardUnknownTargets = true)
             val created = if (route is Route.Forward && route.registers) proxyService(target, tagFilter)(definitions) else null
             when {
                 created is ChangeResult.Changed -> ChangeResult.Changed(created.definitions, routeTo(created.value, target))

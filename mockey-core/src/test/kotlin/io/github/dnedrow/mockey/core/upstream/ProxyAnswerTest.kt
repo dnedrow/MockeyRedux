@@ -211,6 +211,40 @@ class ProxyAnswerTest {
         }
 
     @Test
+    fun theUniversalErrorScenarioAnswersForARequestThatWasForwardedWithoutAService() =
+        runTest {
+            val definitions =
+                Definitions(services = listOf(holder, service(backendDown)), settings = Settings(universalErrorScenario = universal))
+
+            val answer = definitions.proxyAnswer(service = null, get, ForwardTarget.To(url), failing(), UpstreamSession())
+
+            assertEquals(ProxyAnswer.UpstreamFailed(refused, universalError, noProxy), answer)
+        }
+
+    @Test
+    fun aRequestThatWasForwardedWithoutAServiceGetsTheStatus502WhenThereIsNoUniversalErrorScenario() =
+        runTest {
+            val definitions = Definitions(services = listOf(holder, service(backendDown)))
+
+            val answer = definitions.proxyAnswer(service = null, get, ForwardTarget.To(url), failing(), UpstreamSession())
+
+            assertEquals(ProxyAnswer.UpstreamFailed(refused, scenario = null, proxyInfo = noProxy), answer)
+            assertEquals(502, answer.response().status)
+        }
+
+    @Test
+    fun aRequestThatWasForwardedWithoutAServiceWaitsForNoDelay() =
+        runTest {
+            val definitions = Definitions(services = listOf(holder, service(delayMillis = 300)))
+            val client = FakeClient(MockResponse(200, body = "real".toByteArray()))
+
+            val answer = definitions.proxyAnswer(service = null, get, ForwardTarget.To(url), client, UpstreamSession())
+
+            assertEquals("real", assertIs<ProxyAnswer.Proxied>(answer).response().bodyText)
+            assertEquals(0, currentTime)
+        }
+
+    @Test
     fun theDescriptionOfAFailureIsWrittenAsJsonText() =
         runTest {
             val description = "The real service at $url gave no complete answer: it said \"caf\u00e9\\\" and broke off.\n"

@@ -21,6 +21,17 @@ public sealed interface ChangeResult<out T> {
     ) : ChangeResult<Nothing>
 }
 
+/**
+ * Returns this result with what a valid change yields put through [transform]. A result that is no change
+ * stays as it is.
+ */
+internal fun <T, R> ChangeResult<T>.map(transform: (T) -> R): ChangeResult<R> =
+    when (this) {
+        is ChangeResult.Changed -> ChangeResult.Changed(definitions, transform(value))
+        is ChangeResult.Rejected -> this
+        is ChangeResult.NotFound -> this
+    }
+
 /** Why a change was rejected: one error for each invalid field. */
 public data class ValidationFailure(
     public val errors: List<FieldError>,

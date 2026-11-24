@@ -3,6 +3,7 @@ package io.github.dnedrow.mockey.core.upstream
 import io.github.dnedrow.mockey.core.definitions.errorScenarioFor
 import io.github.dnedrow.mockey.core.definitions.outboundProxyInUse
 import io.github.dnedrow.mockey.core.definitions.proxyAddressOf
+import io.github.dnedrow.mockey.core.definitions.universalErrorScenario
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.model.OutboundProxy
@@ -58,7 +59,8 @@ internal sealed interface ProxyAnswer {
 private const val BAD_GATEWAY = 502
 
 /**
- * Answers [request] of [service] in proxy mode, and returns the answer when it is time to send it. [target]
+ * Answers [request] in proxy mode, and returns the answer when it is time to send it. [service] is the
+ * service that forwards the request, or `null` for a request that is forwarded without a service. [target]
  * is where the request goes, see [forwardTarget].
  *
  * The request is forwarded through [client] within [session], through the outbound proxy while one is
@@ -77,10 +79,10 @@ private const val BAD_GATEWAY = 502
  *
  * Every answer waits for the delay of the service before it is returned, also the answer of an error
  * scenario, whose own delay does not count here. The wait holds no thread, so it does not postpone the
- * handling of any other request.
+ * handling of any other request. A request without a service waits for nothing.
  */
 internal suspend fun Definitions.proxyAnswer(
-    service: Service,
+    service: Service?,
     request: MockRequest,
     target: ForwardTarget,
     client: UpstreamClient,
@@ -92,7 +94,7 @@ internal suspend fun Definitions.proxyAnswer(
             is ForwardTarget.Nowhere -> ProxyAnswer.NotForwarded(target.explanation)
             is ForwardTarget.To -> forwarded(service, request, target.url, client, session, responseTimeout)
         }
-    awaitResponseDelay(service, scenario = null)
+    if (service != null) awaitResponseDelay(service, scenario = null)
     return answer
 }
 
@@ -101,7 +103,7 @@ internal suspend fun Definitions.proxyAnswer(
  * place after an upstream failure.
  */
 private suspend fun Definitions.forwarded(
-    service: Service,
+    service: Service?,
     request: MockRequest,
     url: String,
     client: UpstreamClient,
@@ -113,7 +115,8 @@ private suspend fun Definitions.forwarded(
         ProxyAnswer.Proxied(relayed(client.forward(forwarding, session, responseTimeout), request.method))
     } catch (e: IOException) {
         val failure = e.message ?: "${whereOf(forwarding)} gave no complete answer: ${e.javaClass.simpleName}."
-        ProxyAnswer.UpstreamFailed(failure, errorScenarioFor(service), proxyInfo(forwarding.outboundProxy))
+        val errorScenario = if (service == null) universalErrorScenario else errorScenarioFor(service)
+        ProxyAnswer.UpstreamFailed(failure, errorScenario, proxyInfo(forwarding.outboundProxy))
     }
 }
 

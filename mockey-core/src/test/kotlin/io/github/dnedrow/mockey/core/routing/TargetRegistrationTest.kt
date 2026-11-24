@@ -234,6 +234,24 @@ class TargetRegistrationTest {
     }
 
     @Test
+    fun theChangeRoutesWithTheTableThatItIsGiven() {
+        val definitions = Definitions(services = listOf(service("Orders", "orders/{id}")))
+        val table = RoutingTable(definitions)
+        val asked = mutableListOf<Definitions>()
+
+        val registered =
+            definitions.changed(
+                TargetRegistration.register(customers, Tags.EMPTY) {
+                    asked += it
+                    table
+                },
+            )
+
+        assertEquals(listOf(definitions), asked)
+        assertIs<Route.ToService>(registered.value)
+    }
+
+    @Test
     @Timeout(30)
     fun requestsForOneUnknownTargetAtTheSameTimeRegisterOneService() {
         val changes = AtomicInteger()

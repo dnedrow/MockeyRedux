@@ -49,3 +49,24 @@ internal data class MockRequestUri(
         }
     }
 }
+
+/** The characters that the scheme of a URL can hold after its first letter. */
+private const val SCHEME_CHARACTERS = "+-."
+
+/**
+ * Returns the path of [url]: what follows its scheme, its host, and its port, as it is written. A URL that
+ * ends with its host has an empty path, and a text without a scheme is a path as it is.
+ */
+internal fun pathOf(url: String): String {
+    val schemeEnd = url.indexOf("://")
+    val hasScheme = schemeEnd > 0 && url.substring(0, schemeEnd).all { it.isLetterOrDigit() || it in SCHEME_CHARACTERS }
+    if (!hasScheme) return url
+    val pathStart = url.indexOf('/', schemeEnd + "://".length)
+    return if (pathStart < 0) "" else url.substring(pathStart)
+}
+
+/**
+ * Returns the target that a request for [url] asks for: what follows `/service/` in the path of the URL.
+ * Returns `null` when the path does not begin with that, because such a request is no mock traffic.
+ */
+internal fun targetOf(url: String): Target? = MockRequestUri.parse(pathOf(url))?.target

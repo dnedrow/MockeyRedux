@@ -95,6 +95,17 @@ class EngineStateTest {
         }
 
     @Test
+    fun whatAChangeYieldsCanBePutThroughAFunctionAndAnyOtherResultStaysAsItIs() {
+        val changed: ChangeResult<Int> = ChangeResult.Changed(Definitions.EMPTY, 21)
+        val rejected: ChangeResult<Int> = ChangeResult.Rejected(ValidationFailure(listOf(FieldError("name", "A name is required."))))
+        val notFound: ChangeResult<Int> = ChangeResult.NotFound("No service has that identifier.")
+
+        val mapped = listOf(changed, rejected, notFound).map { result -> result.map { "${it * 2}" } }
+
+        assertEquals(listOf(ChangeResult.Changed(Definitions.EMPTY, "42"), rejected, notFound), mapped)
+    }
+
+    @Test
     fun aValidationFailureNamesAtLeastOneField() {
         assertFailsWith<IllegalArgumentException> { ValidationFailure(emptyList()) }
     }
