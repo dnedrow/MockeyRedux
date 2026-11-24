@@ -34,6 +34,33 @@ class MockRequestTest {
     }
 
     @Test
+    fun aRequestForATargetIsARequestToTheMockEndpoint() {
+        val headers = listOf(Header("Accept", "text/plain"))
+
+        val request = MockRequest.forTarget("POST", "customer/7", "page=2", headers, "ordered".toByteArray())
+
+        assertEquals("POST" to "http://localhost/service/customer/7", request.method to request.url)
+        assertEquals("page=2", request.query)
+        assertEquals(headers, request.headers)
+        assertEquals("ordered", String(request.body))
+    }
+
+    @Test
+    fun aRequestForATargetNeedsOnlyAMethodAndTheTarget() {
+        val request = MockRequest.forTarget("GET", "http://api.example.com/orders")
+
+        assertEquals("http://localhost/service/http://api.example.com/orders", request.url)
+        assertNull(request.query)
+        assertEquals(emptyList(), request.headers)
+        assertEquals(0, request.body.size)
+    }
+
+    @Test
+    fun theTargetOfARequestHoldsNoQueryString() {
+        assertFailsWith<IllegalArgumentException> { MockRequest.forTarget("GET", "customer/7?page=2") }
+    }
+
+    @Test
     fun theUrlOfARequestHoldsNoQueryString() {
         assertFailsWith<IllegalArgumentException> { MockRequest("GET", "$url?page=2") }
     }

@@ -87,6 +87,32 @@ public class MockRequest
 
         /** Returns the method and the URL. The query string, the headers, and the body are left out, because they can hold secrets. */
         override fun toString(): String = "MockRequest($method $url)"
+
+        public companion object {
+            /**
+             * The start of the path of every request to the mock endpoint. What follows it in the path of a
+             * request is the target of the request.
+             */
+            public const val SERVICE_PATH: String = "/service/"
+
+            /**
+             * Returns a request for [target], for a program that hands requests to an engine without a server
+             * in between. The request is the one of a client that addresses the mock endpoint at
+             * `http://localhost`: its URL is `http://localhost/service/` followed by [target].
+             *
+             * [target] is a relative target such as `customer/7`, or the URL of a real service. The query
+             * string is no part of it: it is given as [query], without its `?`.
+             */
+            @JvmStatic
+            @JvmOverloads
+            public fun forTarget(
+                method: String,
+                target: String,
+                query: String? = null,
+                headers: List<Header> = emptyList(),
+                body: ByteArray = ByteArray(0),
+            ): MockRequest = MockRequest(method, "http://localhost$SERVICE_PATH$target", query, headers, body)
+        }
     }
 
 /** One parameter of a request: a name and a value of its query string or of its URL-encoded form, both decoded. */

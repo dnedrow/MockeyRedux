@@ -83,8 +83,8 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 9.3 Implement the file store: layout, deterministic serialization, atomic writes, rewriting only changed files, collision-free names, and identity from content (DEV-21). Verify with tests for a byte-identical load and save, an interrupted write, similar names, and a renamed directory.
 - [x] 9.4 Implement loading at startup, the format version check, reload, and reset. Verify with tests for an empty location, a corrupt file, a newer format version, and a failed reload that leaves memory unchanged.
 - [x] 9.5 Implement export and import of definition documents with the merge rules, the report, and tagging. Verify with unit tests, including an export and import round trip into an empty engine.
-- [ ] 9.6 Implement engine creation with replaceable storage, upstream client, inspectors, and clock, plus engine isolation and closing. Verify with tests for two engines in one process, a substitute upstream client, a fixed clock, and a build check that `mockey-core` has no HTTP server dependency.
-- [ ] 9.7 Write `docs/library.md` and a sample project under `samples/embedded` that uses `mockey-core` from the local Maven repository. Verify that the sample builds and its test passes in CI.
+- [x] 9.6 Implement engine creation with replaceable storage, upstream client, inspectors, and clock, plus engine isolation and closing. Verify with tests for two engines in one process, a substitute upstream client, a fixed clock, and a build check that `mockey-core` has no HTTP server dependency.
+- [x] 9.7 Write `docs/library.md` and a sample project under `samples/embedded` that uses `mockey-core` from the local Maven repository. Verify that the sample builds and its test passes in CI.
 
 ## 10. Legacy import (spec: legacy-compatibility)
 

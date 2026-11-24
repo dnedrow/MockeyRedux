@@ -3,7 +3,6 @@ package io.github.dnedrow.mockey.core.engine
 import io.github.dnedrow.mockey.core.definitions.ServiceChanges
 import io.github.dnedrow.mockey.core.history.HistoryEntryId
 import io.github.dnedrow.mockey.core.history.Outcome
-import io.github.dnedrow.mockey.core.history.Replay
 import io.github.dnedrow.mockey.core.history.ReplayEdits
 import io.github.dnedrow.mockey.core.history.headersOf
 import io.github.dnedrow.mockey.core.history.requestFor
@@ -36,9 +35,9 @@ class EngineReplayTest {
             val original = engine.handle(requestFor("orders/7"), "192.0.2.10")
             engine.change(ServiceChanges.update(orders.id) { it.copy(defaultScenarioId = busy.id) })
 
-            val replayed = assertIs<Replay.Handled<HandledRequest>>(engine.replay(original.entry.id, clientAddress = "192.0.2.99"))
+            val replayed = assertIs<ReplayResult.Replayed>(engine.history.replay(original.entry.id, clientAddress = "192.0.2.99"))
 
-            val replay = replayed.result
+            val replay = replayed.handled
             assertEquals(200 to "ok", original.response.status to original.entry.scenario?.name)
             assertEquals(503 to "busy", replay.response.status to replay.entry.scenario?.name)
             assertEquals("192.0.2.99", replay.entry.clientAddress)
@@ -55,12 +54,12 @@ class EngineReplayTest {
             val original = engine.handle(requestFor("orders/7", "POST", "expand=items", sent, "ordered".toByteArray()))
             val edits = ReplayEdits(headersOf("X-Request-Id" to "8"), listOf(Parameter("note", "two words")), "ordered again".toByteArray())
 
-            val replayed = assertIs<Replay.Handled<HandledRequest>>(engine.replay(original.entry.id, edits))
+            val replayed = assertIs<ReplayResult.Replayed>(engine.history.replay(original.entry.id, edits))
 
             val forwarded = upstream.requests.last()
             assertEquals("http://api.example.com/orders/7?note=two%20words", forwarded.url)
             assertEquals(headersOf("X-Request-Id" to "8") to "ordered again", forwarded.headers to String(forwarded.body))
-            assertEquals(Outcome.PROXIED, replayed.result.entry.outcome)
+            assertEquals(Outcome.PROXIED, replayed.handled.entry.outcome)
             assertEquals(2, upstream.requests.size)
         }
 
@@ -75,9 +74,9 @@ class EngineReplayTest {
             val original = engine.handle(requestFor("http://qa1.example.com/orders"))
             engine.change { ChangeResult.Changed(it.copy(settings = it.settings.copy(enabledTwistId = toQa3.id)), Unit) }
 
-            val replayed = assertIs<Replay.Handled<HandledRequest>>(engine.replay(original.entry.id))
+            val replayed = assertIs<ReplayResult.Replayed>(engine.history.replay(original.entry.id))
 
-            val entry = replayed.result.entry
+            val entry = replayed.handled.entry
             assertEquals(listOf("http://qa2.example.com/orders", "http://qa3.example.com/orders"), upstream.urls)
             assertEquals("http://qa3.example.com/orders" to "http://qa1.example.com/orders", entry.target to entry.targetBeforeTwisting)
         }
@@ -88,13 +87,13 @@ class EngineReplayTest {
             val engine = engineOf(Definitions(services = listOf(orders))) { bodyCaptureLimit = 4 }
             val original = engine.handle(requestFor("orders/7", "POST", body = "ordered".toByteArray()))
 
-            val refused = assertIs<Replay.Refused>(engine.replay(original.entry.id))
+            val refused = assertIs<ReplayResult.Refused>(engine.history.replay(original.entry.id))
             val replayed =
-                assertIs<Replay.Handled<HandledRequest>>(engine.replay(original.entry.id, ReplayEdits(body = "new".toByteArray())))
+                assertIs<ReplayResult.Replayed>(engine.history.replay(original.entry.id, ReplayEdits(body = "new".toByteArray())))
 
             assertContains(refused.explanation, "was cut when it was recorded")
             assertEquals("new", String(replayed.request.body))
-            assertEquals(listOf(replayed.result.entry, original.entry), engine.history.entries())
+            assertEquals(listOf(replayed.handled.entry, original.entry), engine.history.entries())
         }
 
     @Test
@@ -102,9 +101,9 @@ class EngineReplayTest {
         runTest {
             val engine = engineOf(Definitions(services = listOf(orders)))
 
-            val replay = engine.replay(HistoryEntryId(7))
+            val replay = engine.history.replay(HistoryEntryId(7))
 
-            assertEquals(Replay.NotFound("The history keeps no entry with the identifier 7."), replay)
+            assertEquals(ReplayResult.NotFound("The history keeps no entry with the identifier 7."), replay)
             assertEquals(emptyList(), engine.history.entries())
         }
 }

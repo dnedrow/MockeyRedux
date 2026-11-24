@@ -11,9 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: lmigtech/internal-actions/actions/setup-java@v0
         with:
           java-version: "21"
           distribution: "corretto"
       - name: Check
         run: ./gradlew check --no-daemon
+      - name: Publish core for the embedded sample
+        run: ./gradlew :mockey-core:publishToMavenLocal --no-daemon
+      - name: Check embedded sample
+        run: ./gradlew -p samples/embedded test --no-daemon

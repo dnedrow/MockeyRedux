@@ -1,5 +1,7 @@
 package io.github.dnedrow.mockey.core.routing
 
+import io.github.dnedrow.mockey.core.request.MockRequest
+
 /**
  * What a request to the mock endpoint asks for: the text that follows `/service/` in the path of the request,
  * as the client wrote it. The query string of the request is not part of it.
@@ -35,7 +37,7 @@ internal data class MockRequestUri(
 ) {
     companion object {
         /** The start of the path of every request that is mock traffic. */
-        const val PREFIX = "/service/"
+        const val PREFIX = MockRequest.SERVICE_PATH
 
         /**
          * Takes [requestUri] apart: the path of a request and its query string, as the client sent them.

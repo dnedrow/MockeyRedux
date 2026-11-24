@@ -114,16 +114,9 @@ internal fun HistoryStore.statistics(
     to: Instant? = null,
 ): HistoryStatistics {
     val kept = entries()
-    val counted =
-        kept
-            .filter {
-                (
-                    from == null ||
-                        !it.time.isBefore(
-                            from,
-                        )
-                ) && (to == null || !it.time.isAfter(to))
-            }.groupBy { it.service?.id }
+    val notTooEarly = { time: Instant -> from == null || !time.isBefore(from) }
+    val notTooLate = { time: Instant -> to == null || !time.isAfter(to) }
+    val counted = kept.filter { notTooEarly(it.time) && notTooLate(it.time) }.groupBy { it.service?.id }
     val ofServices =
         services.map { service ->
             val own = counted[service.id].orEmpty()
