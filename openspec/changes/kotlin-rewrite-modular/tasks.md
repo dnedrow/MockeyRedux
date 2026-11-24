@@ -88,7 +88,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 ## 10. Legacy import (spec: legacy-compatibility)
 
-- [ ] 10.1 Implement hardened XML reading and an inclusion resolver confined to the import root. Verify with tests for an external entity and for an inclusion that points outside the root.
+- [x] 10.1 Implement hardened XML reading and an inclusion resolver confined to the import root. Verify with tests for an external entity and for an inclusion that points outside the root.
 - [ ] 10.2 Implement mapping of single-file export documents: service and scenario attributes, header text splitting, criterion types, and placeholders. Verify with tests that import a copy of the legacy `web/sample.xml`, including the ported legacy `MockeyXmlFileManagerTest` cases.
 - [ ] 10.3 Implement import of the legacy directory layout: main file, service references, scenario inclusions, and response text files. Verify with tests that import a directory written by the legacy instance from task 2.1.
 - [ ] 10.4 Implement resolution of legacy numeric references and reporting of dangling ones. Verify with unit tests for the default scenario, error scenario, universal error scenario, enabled twist configuration, and default plan.
