@@ -136,7 +136,8 @@ internal object ServiceChanges {
             FieldError(field, "The service has no scenario with the identifier ${id.value}.")
         }
 
-    private fun normalized(service: Service): Service {
+    /** Returns [service] in the normal form in which a service is stored. */
+    fun normalized(service: Service): Service {
         val realUrls =
             service.realUrls
                 .map { it.trim() }
@@ -189,7 +190,7 @@ internal object ServiceChanges {
         service: Service,
         others: List<Service>,
     ): FieldError? =
-        others.firstOrNull { it.mockUrl.trim().equals(service.mockUrl, ignoreCase = true) }?.let { other ->
+        ownerOfMockUrl(service.mockUrl, others)?.let { other ->
             FieldError("mockUrl", "The service '${other.name}' already uses the mock URL pattern '${service.mockUrl}'.")
         }
 
@@ -204,7 +205,11 @@ internal object ServiceChanges {
             }
         }
 
-    private fun Service.lists(realUrl: String): Boolean = realUrls.any { it.trim().equals(realUrl, ignoreCase = true) }
+    /** Returns the service among [services] that has the mock URL pattern [mockUrl], without regard to letter case. */
+    fun ownerOfMockUrl(
+        mockUrl: String,
+        services: List<Service>,
+    ): Service? = services.firstOrNull { it.mockUrl.trim().equals(mockUrl.trim(), ignoreCase = true) }
 
     /** Reports request rules that are not a well-formed rule set, and says what is wrong with them. */
     private fun requestRulesError(service: Service): FieldError? =
@@ -214,6 +219,9 @@ internal object ServiceChanges {
 }
 
 internal fun Definitions.service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
+
+/** Tells whether the service lists the real URL [realUrl], without regard to letter case and surrounding whitespace. */
+internal fun Service.lists(realUrl: String): Boolean = realUrls.any { it.trim().equals(realUrl.trim(), ignoreCase = true) }
 
 /**
  * Returns the service that the name [name] refers to, as a plan item names a service: the service whose name

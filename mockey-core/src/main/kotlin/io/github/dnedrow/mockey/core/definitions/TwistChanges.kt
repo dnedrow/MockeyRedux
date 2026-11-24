@@ -92,7 +92,8 @@ internal object TwistChanges {
         return after
     }
 
-    private fun normalized(twist: TwistConfiguration): TwistConfiguration =
+    /** Returns [twist] in the normal form in which a twist configuration is stored. */
+    fun normalized(twist: TwistConfiguration): TwistConfiguration =
         twist.copy(
             name = twist.name.trim().ifEmpty { GENERATED_NAME },
             pairs = twist.pairs.filter { it.origination.isNotEmpty() },
@@ -100,6 +101,13 @@ internal object TwistChanges {
 }
 
 internal fun Definitions.twist(id: TwistId): TwistConfiguration? = twists.firstOrNull { it.id == id }
+
+/**
+ * Returns the twist configuration whose name is [name], without regard to letter case and surrounding
+ * whitespace, or `null` when there is none. Of several with that name, it is the one that was created first.
+ */
+internal fun Definitions.twistNamed(name: String): TwistConfiguration? =
+    twists.firstOrNull { it.name.trim().equals(name.trim(), ignoreCase = true) }
 
 internal fun twistNotFound(id: TwistId): ChangeResult.NotFound =
     ChangeResult.NotFound("No twist configuration has the identifier ${id.value}.")

@@ -1,5 +1,7 @@
 package io.github.dnedrow.mockey.core.engine
 
+import io.github.dnedrow.mockey.core.definitions.DefinitionImport
+import io.github.dnedrow.mockey.core.definitions.ImportReport
 import io.github.dnedrow.mockey.core.definitions.PlanApplyReport
 import io.github.dnedrow.mockey.core.definitions.PlanChanges
 import io.github.dnedrow.mockey.core.definitions.withoutProxyCredentials
@@ -31,7 +33,9 @@ import io.github.dnedrow.mockey.core.routing.Target
 import io.github.dnedrow.mockey.core.routing.TargetRegistration
 import io.github.dnedrow.mockey.core.routing.targetOf
 import io.github.dnedrow.mockey.core.routing.twisted
+import io.github.dnedrow.mockey.core.storage.DefinitionFiles
 import io.github.dnedrow.mockey.core.storage.DefinitionStorage
+import io.github.dnedrow.mockey.core.storage.FileFault
 import io.github.dnedrow.mockey.core.storage.StorageException
 import io.github.dnedrow.mockey.core.upstream.ForwardTarget
 import io.github.dnedrow.mockey.core.upstream.JdkUpstreamClient
@@ -204,6 +208,70 @@ public class MockeyEngine internal constructor(
         tagFilter = Tags.EMPTY
         history.clear()
         lastUsedTimes.clear()
+    }
+
+    /**
+     * Returns the definitions as one document: a JSON text with everything that a storage holds of them. The
+     * credentials of the outbound proxy are no part of it. [importDocument] takes such a document.
+     */
+    public fun exportDefinitions(): String = DefinitionFiles.documentText(state.current)
+
+    /**
+     * Imports the definitions of [document], which is a text as [exportDefinitions] gives it, and returns
+     * the report of the import, see [importDefinitions]. A text that is no such document is rejected, and
+     * the definitions stay as they are.
+     *
+     * @throws StorageException when the engine is in writable mode and the definitions cannot be saved
+     */
+    public suspend fun importDocument(
+        document: String,
+        tags: Tags = Tags.EMPTY,
+    ): ChangeResult<ImportReport> {
+        val definitions =
+            try {
+                DefinitionFiles.document(document)
+            } catch (e: FileFault) {
+                return ChangeResult.Rejected(
+                    ValidationFailure(listOf(FieldError("document", "The document cannot be imported: ${e.problem}"))),
+                )
+            }
+        return imported(definitions, tags)
+    }
+
+    /**
+     * Imports [definitions] into the definitions of the engine and returns the report, which names every
+     * part of [definitions] as an addition or as a conflict.
+     *
+     * - A service whose name no service has is added with its scenarios, unless another service has its
+     *   mock URL pattern. Names are compared without regard to letter case and surrounding whitespace.
+     * - A service whose name a service has is merged into that service, which gets the scenarios that it
+     *   does not have with the same name and response body, the real URLs, and the tags. Nothing else of
+     *   the existing service changes.
+     * - A plan and a twist configuration are added when their name is not in use.
+     * - The settings of the outbound proxy, the universal error scenario, the default plan, and the
+     *   enabled twist configuration are taken where the engine has none. A default plan that the import
+     *   designates is applied.
+     *
+     * What is added keeps its identifier, unless a definition of the engine has it already: then it gets a
+     * new one. [tags] are added to every service, scenario, and plan that is added, and to every service
+     * that is merged into.
+     *
+     * @throws StorageException when the engine is in writable mode and the definitions cannot be saved.
+     *   Nothing is imported then.
+     */
+    public suspend fun importDefinitions(
+        definitions: Definitions,
+        tags: Tags = Tags.EMPTY,
+    ): ImportReport = imported(definitions, tags).value
+
+    private suspend fun imported(
+        definitions: Definitions,
+        tags: Tags,
+    ): ChangeResult.Changed<ImportReport> {
+        val result = state.change(DefinitionImport.import(definitions, tags))
+        check(result is ChangeResult.Changed) { "An import changes the definitions or leaves them as they are. It does not give $result." }
+        result.value.appliedDefaultPlan?.let { lastUsedTimes.planApplied(it.plan.id, clock.instant()) }
+        return result
     }
 
     /**

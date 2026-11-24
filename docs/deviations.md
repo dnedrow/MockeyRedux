@@ -19,6 +19,8 @@ legacy behaved otherwise, and added DEV-31 to DEV-50 for the differences that th
 DEV-51 to DEV-53 were found when the routing was implemented (task 4.1), and recordings were added for them.
 DEV-54 to DEV-57 were found when the request rules were implemented (tasks 5.1 and 5.2), and recordings were added
 for them as well. DEV-58 was found when dynamic mode was implemented (task 6.2), and it has its recordings too.
+DEV-59 to DEV-61 were found when the import was implemented (task 9.5). They concern an import into definitions
+that are there already, which legacy offers through its upload page only, so they are taken from the source.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
@@ -80,3 +82,6 @@ for them as well. DEV-58 was found when dynamic mode was implemented (task 6.2),
 | DEV-56 | When a request writes the name of a parameter in several letter cases, a rule for that parameter is evaluated once for each spelling, and every spelling must satisfy it. | The rule is evaluated once, against the values of all spellings together. | run: `rule-key-two-letter-cases` |
 | DEV-57 | A request body is read as text in the default charset of the JVM, whatever charset the request declares. | The body is read in the charset that the `Content-Type` of the request declares, and as UTF-8 when it declares none. | run: `rule-input-body-declared-charset` |
 | DEV-58 | The evaluation text of a text criterion writes a parameter whose value is blank without its `=`. It writes the values of a parameter that the request repeats one after the other without a separator, as `a=1a=2`. | Every parameter of the query string is written as the request has it, and `&` separates each one from the next: `a=` and `a=1&a=2`. | run: `response-text-param-empty-value`, `response-text-param-repeated` |
+| DEV-59 | An import changes an existing scenario that has the name and the response body of a scenario of the document: it adds the tags of the import and the tags of that scenario to it. | An import changes no existing scenario. The tags of the import go to what the import adds, and to an existing service that it merges a service of the document into. | read: `MockeyXmlFileManager.mergeServices` |
+| DEV-60 | An import takes every plan and every twist configuration of the document by its number. One whose number is in use takes the place of the existing one, and any other is added, also under a name that is in use. | A plan or a twist configuration is added when its name is not in use, and it is reported as a conflict otherwise. An import replaces nothing. | read: steps 6 and 7 of `MockeyXmlFileManager.loadConfigurationWithXmlDef`, and `OrderedMap.save` |
+| DEV-61 | An import adds a service with all its real URLs, also with one that another service lists. | A real URL that another service lists is left out, and the report says so. | read: `MockeyXmlFileManager.addServicesToStore` and `mergeServices` |

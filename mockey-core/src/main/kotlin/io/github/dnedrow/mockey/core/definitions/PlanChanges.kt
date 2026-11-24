@@ -215,7 +215,8 @@ internal object PlanChanges {
         return after
     }
 
-    private fun normalized(plan: Plan): Plan =
+    /** Returns [plan] in the normal form in which a plan is stored. */
+    fun normalized(plan: Plan): Plan =
         plan.copy(
             name = plan.name.trim().ifEmpty { GENERATED_NAME },
             description = plan.description?.takeIf { it.isNotBlank() },

@@ -42,6 +42,7 @@ internal class FileFault(
  * order of the model, a member that has its default value is left out, and the text is indented by four
  * spaces and ends with a line feed. The same definitions therefore always give the same text.
  *
+ * - A document holds the format version and all definitions. It is what an export gives and an import takes.
  * - The main file holds the format version, the plans, the twist configurations, and the settings.
  * - A service file holds one service without its scenarios.
  * - A scenario file holds one scenario. Its response body is in a file of its own, unless it is no text that
@@ -60,9 +61,13 @@ internal object DefinitionFiles {
 
     private val format = Json { prettyPrint = true }
 
-    /** Returns the text of the main file for [definitions]. Their services are no part of it. */
-    fun mainText(definitions: Definitions): String {
-        val members = format.encodeToJsonElement(Definitions.serializer(), mainOf(definitions)).jsonObject
+    /**
+     * Returns the text of the document that holds all of [definitions]: the format version, and after it the
+     * services with their scenarios, the plans, the twist configurations, and the settings. The credentials
+     * of the outbound proxy are no part of it.
+     */
+    fun documentText(definitions: Definitions): String {
+        val members = format.encodeToJsonElement(Definitions.serializer(), definitions.withoutProxyCredentials()).jsonObject
         return text(
             buildJsonObject {
                 put(VERSION, JsonPrimitive(FORMAT_VERSION))
@@ -70,6 +75,16 @@ internal object DefinitionFiles {
             },
         )
     }
+
+    /** Returns the definitions that the document with the text [text] holds. */
+    fun document(text: String): Definitions {
+        val members = membersOf(text)
+        requireSupportedVersion(members[VERSION])
+        return decoded(Definitions.serializer(), members - VERSION)
+    }
+
+    /** Returns the text of the main file for [definitions]: their document without the services. */
+    fun mainText(definitions: Definitions): String = documentText(mainOf(definitions))
 
     /** Returns what the main file holds of [definitions]: everything but the services, and no credentials. */
     fun mainOf(definitions: Definitions): Definitions = definitions.copy(services = emptyList()).withoutProxyCredentials()

@@ -136,7 +136,8 @@ internal object ScenarioChanges {
         return after
     }
 
-    private fun normalized(
+    /** Returns [scenario] of [service] in the normal form in which a scenario is stored. */
+    fun normalized(
         scenario: Scenario,
         service: Service,
     ): Scenario =
