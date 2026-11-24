@@ -72,7 +72,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 8.1 Implement plans: save from services, update by identifier or name, delete, and the default designation. Verify with unit tests for each scenario of those requirements.
 - [x] 8.2 Implement plan application with its report, propagation of service and scenario renames, and application of the default plan after loading. Verify with unit tests for each scenario of those requirements.
 - [x] 8.3 Implement the history store: the entry model with its outcome, bounded retention (DEV-24), the body capture limit, and the target before twisting. Verify with unit tests for each scenario of those requirements.
-- [ ] 8.4 Implement history listing, token filtering, deletion, and flagging. Verify with unit tests, including negated tokens and case sensitivity.
+- [x] 8.4 Implement history listing, token filtering, deletion, and flagging. Verify with unit tests, including negated tokens and case sensitivity.
 - [ ] 8.5 Implement replay and saving an entry as a scenario. Verify with unit tests, including replay under changed definitions and refusal of a cut body.
 - [ ] 8.6 Implement per-service statistics as JSON and CSV, and last-used times with their clear operation. Verify with unit tests, including the ported legacy `ServiceStatHelperTest` cases.
 

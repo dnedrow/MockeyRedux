@@ -1,5 +1,6 @@
 package io.github.dnedrow.mockey.core.history
 
+import io.github.dnedrow.mockey.core.model.ServiceId
 import io.github.dnedrow.mockey.core.request.MockRequest
 import io.github.dnedrow.mockey.core.response.MockResponse
 import io.github.dnedrow.mockey.core.routing.Target
@@ -62,9 +63,59 @@ internal class HistoryStore(
         return entry
     }
 
-    /** Returns the entries that the history keeps, with the newest one first. */
+    /**
+     * Returns the entries that [query] asks for, with the newest one first. A query without anything, which is
+     * the default, asks for every entry that the history keeps.
+     */
     @Synchronized
-    fun entries(): List<HistoryEntry> = entries.reversed()
+    fun entries(query: HistoryQuery = HistoryQuery()): List<HistoryEntry> {
+        val newestFirst = entries.asReversed().asSequence()
+        // The identifiers grow with the entries, so no entry after the first one that is too old is new enough.
+        val recent = if (query.after == null) newestFirst else newestFirst.takeWhile { it.id > query.after }
+        val admitted = recent.filter(query::admits)
+        return (if (query.limit == null) admitted else admitted.take(query.limit)).toList()
+    }
+
+    /** Returns the entry with the identifier [id], or `null` when the history keeps no such entry. */
+    @Synchronized
+    fun entry(id: HistoryEntryId): HistoryEntry? = entries.firstOrNull { it.id == id }
+
+    /** Deletes the entry with the identifier [id], and returns whether the history kept such an entry. */
+    @Synchronized
+    fun delete(id: HistoryEntryId): Boolean = entries.removeAll { it.id == id }
+
+    /**
+     * Deletes the entries of the requests that the service [serviceId] handled, and returns how many these
+     * were. The entries of the other services stay, and so do those of the requests that no service handled.
+     */
+    @Synchronized
+    fun deleteOfService(serviceId: ServiceId): Int = deleteWhere { it.service?.id == serviceId }
+
+    /** Deletes every entry, and returns how many these were. The identifiers of later entries go on from where they were. */
+    @Synchronized
+    fun clear(): Int = deleteWhere { true }
+
+    /**
+     * Sets the mark of the entry with the identifier [id] when [flagged] is on, and removes it otherwise.
+     * Returns the entry as it is after that, or `null` when the history keeps no such entry.
+     */
+    @Synchronized
+    fun flag(
+        id: HistoryEntryId,
+        flagged: Boolean,
+    ): HistoryEntry? {
+        val index = entries.indexOfFirst { it.id == id }
+        if (index < 0) return null
+        val entry = entries[index].copy(flagged = flagged)
+        entries[index] = entry
+        return entry
+    }
+
+    private fun deleteWhere(condition: (HistoryEntry) -> Boolean): Int {
+        val before = entries.size
+        entries.removeAll(condition)
+        return before - entries.size
+    }
 
     private fun entryOf(
         id: HistoryEntryId,
