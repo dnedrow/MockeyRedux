@@ -18,6 +18,7 @@ import io.github.dnedrow.mockey.core.model.Settings
 import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistConfiguration
 import io.github.dnedrow.mockey.core.model.TwistId
+import io.github.dnedrow.mockey.core.request.MockRequest
 import io.github.dnedrow.mockey.core.storage.FileDefinitionStorage
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
@@ -481,6 +482,61 @@ class LegacyEngineImportTest {
             assertEquals(DiagnosticKind.UNREADABLE_RULE_SET, named.kind)
             assertEquals(orders.id to "Orders", named.serviceId to named.serviceName)
             assertEquals(emptyList(), named.scenarioIds)
+        }
+
+    @Test
+    fun aScenarioWithTheRulesFlagAndWithoutMatchTextIsImportedWithARuleSetWithoutText() =
+        withEngine { engine ->
+            val document =
+                """
+                <mockservice>
+                  <service name="Orders" url="orders">
+                    <scenario id="1" name="flagged">
+                      <scenario_match scenario_match_evaluation_rules_flag="true"/>
+                    </scenario>
+                    <scenario id="2" name="plain">
+                      <scenario_match scenario_match_evaluation_rules_flag="false"/>
+                    </scenario>
+                  </service>
+                </mockservice>
+                """.trimIndent()
+
+            val report = LegacyDocumentImporter.import(document).importInto(engine)
+
+            val orders = engine.service("Orders")
+            val flagged = orders.scenarios.single { it.name == "flagged" }
+            assertEquals(MatchCriterion.Rules(""), flagged.matchCriterion)
+            assertEquals(MatchCriterion.None, orders.scenarios.single { it.name == "plain" }.matchCriterion)
+            val named = report.unreadableRuleSets.single()
+            assertEquals(DiagnosticKind.UNREADABLE_RULE_SET, named.kind)
+            assertEquals(listOf(flagged.id), named.scenarioIds)
+            assertContains(named.message, "'flagged'")
+        }
+
+    /** Mockey 2.x evaluates no match text that is blank, so such a scenario answers no request in dynamic mode there either. */
+    @Test
+    fun aScenarioWithARuleSetWithoutTextAnswersNoRequestInDynamicMode() =
+        withEngine { engine ->
+            val document =
+                """
+                <mockservice>
+                  <service name="Orders" url="orders" service_response_type="2" error_scenario_id="2">
+                    <scenario id="1" name="flagged">
+                      <scenario_match scenario_match_evaluation_rules_flag="true"/>
+                      <scenario_response>FLAGGED</scenario_response>
+                    </scenario>
+                    <scenario id="2" name="no match" http_resp_status_code="404">
+                      <scenario_response>NO MATCH</scenario_response>
+                    </scenario>
+                  </service>
+                </mockservice>
+                """.trimIndent()
+            LegacyDocumentImporter.import(document).importInto(engine)
+
+            val handled = engine.handle(MockRequest.forTarget("GET", "orders"))
+
+            assertEquals("no match", handled.entry.scenario?.name)
+            assertEquals(404 to "NO MATCH", handled.response.status to handled.response.bodyText)
         }
 
     @Test

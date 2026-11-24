@@ -21,6 +21,8 @@ DEV-54 to DEV-57 were found when the request rules were implemented (tasks 5.1 a
 for them as well. DEV-58 was found when dynamic mode was implemented (task 6.2), and it has its recordings too.
 DEV-59 to DEV-61 were found when the import was implemented (task 9.5). They concern an import into definitions
 that are there already, which legacy offers through its upload page only, so they are taken from the source.
+DEV-62 was found when the import of legacy definitions was implemented (task 10.2). It changes no response, so
+it is taken from the source as well.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
@@ -85,3 +87,4 @@ that are there already, which legacy offers through its upload page only, so the
 | DEV-59 | An import changes an existing scenario that has the name and the response body of a scenario of the document: it adds the tags of the import and the tags of that scenario to it. | An import changes no existing scenario. The tags of the import go to what the import adds, and to an existing service that it merges a service of the document into. | read: `MockeyXmlFileManager.mergeServices` |
 | DEV-60 | An import takes every plan and every twist configuration of the document by its number. One whose number is in use takes the place of the existing one, and any other is added, also under a name that is in use. | A plan or a twist configuration is added when its name is not in use, and it is reported as a conflict otherwise. An import replaces nothing. | read: steps 6 and 7 of `MockeyXmlFileManager.loadConfigurationWithXmlDef`, and `OrderedMap.save` |
 | DEV-61 | An import adds a service with all its real URLs, also with one that another service lists. | A real URL that another service lists is left out, and the report says so. | read: `MockeyXmlFileManager.addServicesToStore` and `mergeServices` |
+| DEV-62 | A scenario can have its rules flag on and no match text. Legacy saves and loads it like any other scenario, and it never evaluates a match text that is blank, so the flag means nothing. | Import gives such a scenario a rule-set criterion without text, which is not a well-formed rule set. The scenario answers no request in dynamic mode, as in legacy. The import report and the definition diagnostics name it, and it is not saved again until its criterion is repaired or removed. | read: `Scenario.hasMatchArgument`, `Service.execute`, and `ScenarioValidator.validate` |

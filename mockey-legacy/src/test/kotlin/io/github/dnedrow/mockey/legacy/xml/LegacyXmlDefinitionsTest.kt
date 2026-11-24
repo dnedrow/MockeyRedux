@@ -199,11 +199,22 @@ class LegacyXmlDefinitionsTest {
     }
 
     @Test
-    fun aScenarioWithoutMatchTextHasNoCriterion() {
+    fun aScenarioWithoutMatchTextAndWithoutTheRulesFlagHasNoCriterion() {
         assertEquals(MatchCriterion.None, matching("false", ""))
-        assertEquals(MatchCriterion.None, matching("true", ""))
-        assertEquals(MatchCriterion.None, matching("true", " \n\t "))
+        assertEquals(MatchCriterion.None, matching("false", " \n\t "))
+        assertEquals(MatchCriterion.None, matching("", ""))
+        assertEquals(MatchCriterion.None, scenario("", "<scenario_match/>").matchCriterion)
         assertEquals(MatchCriterion.None, scenario("""name="plain"""").matchCriterion)
+    }
+
+    /** The rules flag alone says that the criterion of a scenario is a rule set. Without a match text, the rule set has no text. */
+    @Test
+    fun theRulesFlagMakesARuleSetOfAMatchTextThatIsBlank() {
+        val asMockey2WritesIt = """<scenario_match scenario_match_evaluation_rules_flag="true"/>"""
+
+        assertEquals(MatchCriterion.Rules(""), matching("true", ""))
+        assertEquals(MatchCriterion.Rules(""), matching("true", " \n\t "))
+        assertEquals(MatchCriterion.Rules(""), scenario("", asMockey2WritesIt).matchCriterion)
     }
 
     @Test

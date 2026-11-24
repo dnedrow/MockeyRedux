@@ -18,6 +18,9 @@ import io.github.dnedrow.mockey.core.definitions.ImportReport
  * rules of a service, and the rule-set criterion of a scenario. The import keeps the text of such a rule set
  * as the source has it. Each one is a diagnostic of the engine, which names the service, identifies the
  * scenario when the rule set is the criterion of one, and says what is wrong with the rule set.
+ *
+ * A scenario whose rules flag is on has a rule set also when it has no match text. That rule set has no text,
+ * so it is not well formed, and it is among these.
  */
 public data class LegacyImportReport(
     public val imported: ImportReport,

@@ -31,6 +31,13 @@ import org.w3c.dom.Element
  * Where Mockey 2.x writes that there is no value, there is none: the texts `null` and `0` and an empty text
  * are no name of an inspector, no method, and no reference.
  *
+ * The rules flag of a scenario says what its match text is. With the flag on, the match text is the rule set
+ * of the scenario, whatever the text is: the criterion holds the text as it is, also a text that is no rule
+ * set and a text that is blank. With the flag off, a match text that is not blank is a text criterion, and a
+ * scenario with a blank one has no criterion. Mockey 2.x evaluates no match text that is blank, so there a
+ * scenario with the flag on and without a match text answers no request in dynamic mode. It answers none
+ * here either, because a rule set that is not well formed is never satisfied.
+ *
  * What is mapped gets identifiers of its own, and a reference of a document is resolved to them. A document
  * refers by number: a service to its default scenario and to its error scenario, and the document to the
  * twist configuration that is enabled, to the default plan, and to the universal error scenario. Mockey 2.x
@@ -171,9 +178,9 @@ internal object LegacyXmlDefinitions {
                 headers = headers(element.childElement("scenario_response_header")?.text().orEmpty()),
                 matchCriterion =
                     when {
-                        matchText.isBlank() -> MatchCriterion.None
                         match?.flag("scenario_match_evaluation_rules_flag") == true -> MatchCriterion.Rules(matchText)
-                        else -> MatchCriterion.Text(matchText)
+                        matchText.isNotBlank() -> MatchCriterion.Text(matchText)
+                        else -> MatchCriterion.None
                     },
                 methodRestriction = element.attribute("http_method_type")?.takeUnless(::isPlaceholder),
                 delayMillis = delay(element),
