@@ -25,6 +25,13 @@ public class MockResponse
         public val body: ByteArray
             get() = bodyBytes.copyOf()
 
+        /** The number of bytes of the body. */
+        internal val bodySize: Int
+            get() = bodyBytes.size
+
+        /** Returns the first [limit] bytes of the body, or the whole body when it is not longer than that. */
+        internal fun bodyStart(limit: Int): ByteArray = bodyBytes.copyOf(minOf(limit, bodyBytes.size))
+
         /** The value of the `Content-Type` header, or `null` for a response without that header. */
         public val contentType: String?
             get() = header("Content-Type")

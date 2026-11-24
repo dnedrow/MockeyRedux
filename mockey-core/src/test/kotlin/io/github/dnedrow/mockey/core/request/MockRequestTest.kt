@@ -181,6 +181,51 @@ class MockRequestTest {
     }
 
     @Test
+    fun theCookiesOfARequestAreThoseOfItsCookieHeadersInTheirOrder() {
+        val headers = listOf(Header("Cookie", "sid=abc; theme=dark"), Header("X-Request-Id", "7"), Header("cookie", "sid=xyz"))
+
+        val cookies = MockRequest("GET", url, headers = headers).cookies
+
+        assertEquals(listOf(Cookie("sid", "abc"), Cookie("theme", "dark"), Cookie("sid", "xyz")), cookies)
+    }
+
+    @Test
+    fun aCookieIsTakenAsItIsWritten() {
+        val header = " token=a=b== ;quoted=\"x y\";; flag ;empty=; =nameless;caf%C3%A9=1+2 "
+
+        val cookies = cookiesOf(header)
+
+        val expected =
+            listOf(
+                Cookie("token", "a=b=="),
+                Cookie("quoted", "\"x y\""),
+                Cookie("flag", ""),
+                Cookie("empty", ""),
+                Cookie("", "nameless"),
+                Cookie("caf%C3%A9", "1+2"),
+            )
+        assertEquals(expected, cookies)
+    }
+
+    @Test
+    fun aRequestWithoutACookieHeaderHasNoCookies() {
+        assertEquals(emptyList(), MockRequest("GET", url, headers = listOf(Header("Set-Cookie", "sid=abc"))).cookies)
+        assertEquals(emptyList(), MockRequest("GET", url, headers = listOf(Header("Cookie", " ; "))).cookies)
+    }
+
+    @Test
+    fun theStartOfABodyIsAsLongAsItIsAskedForAtMost() {
+        val request = MockRequest("POST", url, body = "posted".toByteArray())
+
+        assertEquals(6, request.bodySize)
+        assertEquals("pos", String(request.bodyStart(3)))
+        assertEquals("posted", String(request.bodyStart(6)))
+        assertEquals("posted", String(request.bodyStart(100)))
+        assertEquals("", String(request.bodyStart(0)))
+        assertEquals(0, MockRequest("GET", url).bodySize)
+    }
+
+    @Test
     fun theTextOfARequestLeavesOutItsHeadersAndItsBody() {
         val request = MockRequest("POST", url, "token=t0p", listOf(Header("Authorization", "Bearer s3cret")), "pa55word".toByteArray())
 

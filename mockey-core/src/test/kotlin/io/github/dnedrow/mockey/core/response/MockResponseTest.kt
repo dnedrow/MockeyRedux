@@ -49,6 +49,16 @@ class MockResponseTest {
     }
 
     @Test
+    fun theStartOfABodyIsAsLongAsItIsAskedForAtMost() {
+        val response = MockResponse(200, body = "answer".toByteArray())
+
+        assertEquals(6, response.bodySize)
+        assertEquals("ans", String(response.bodyStart(3)))
+        assertEquals("answer", String(response.bodyStart(100)))
+        assertEquals(0, MockResponse(204).bodySize)
+    }
+
+    @Test
     fun everyReadOfTheBodyGivesANewArray() {
         val response = MockResponse(200, body = byteArrayOf(1, 2, 3))
 

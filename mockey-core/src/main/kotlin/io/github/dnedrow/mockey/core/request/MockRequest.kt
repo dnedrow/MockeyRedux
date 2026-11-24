@@ -62,6 +62,20 @@ public class MockRequest
             if (mediaTypeOf(contentType) == FORM_MEDIA_TYPE) ofQuery + parametersOf(bodyText) else ofQuery
         }
 
+        /**
+         * The cookies that the request carries in its `Cookie` headers, in the order in which the client wrote
+         * them. A name can occur more than once. Names and values are as they are written, without the
+         * whitespace around them. A cookie without `=` is a name with an empty value.
+         */
+        public val cookies: List<Cookie> by lazy(LazyThreadSafetyMode.PUBLICATION) { headerValues("Cookie").flatMap(::cookiesOf) }
+
+        /** The number of bytes of the body. */
+        internal val bodySize: Int
+            get() = bodyBytes.size
+
+        /** Returns the first [limit] bytes of the body, or the whole body when it is not longer than that. */
+        internal fun bodyStart(limit: Int): ByteArray = bodyBytes.copyOf(minOf(limit, bodyBytes.size))
+
         /** Returns the values of the headers with the name [name], in any letter case, in the order of the request. */
         public fun headerValues(name: String): List<String> = headers.filter { it.name.equals(name, ignoreCase = true) }.map { it.value }
 
@@ -81,7 +95,24 @@ public data class Parameter(
     public val value: String,
 )
 
+/** One cookie of a request: a name and a value of its `Cookie` header, both as the client wrote them. */
+public data class Cookie(
+    public val name: String,
+    public val value: String,
+)
+
 private const val FORM_MEDIA_TYPE = "application/x-www-form-urlencoded"
+
+/**
+ * Returns the cookies that [header] holds, which is the value of a `Cookie` header. Cookies are separated by
+ * `;`, and the first `=` of a cookie separates its name from its value. Nothing between two `;` is no cookie.
+ */
+internal fun cookiesOf(header: String): List<Cookie> =
+    header
+        .split(';')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { Cookie(it.substringBefore('=').trim(), it.substringAfter('=', missingDelimiterValue = "").trim()) }
 
 /**
  * Returns the parameters that [text] holds, which is a query string or the text of a URL-encoded form.
