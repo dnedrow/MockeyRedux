@@ -163,11 +163,16 @@ internal object PlanChanges {
      * Applies the default plan, as [apply] does, and yields its report. Without a default plan, nothing changes
      * and the change yields `null`. Definitions get their default plan applied after they are loaded.
      */
-    fun applyDefault(): Change<PlanApplyReport?> =
-        { definitions ->
-            val plan = definitions.defaultPlan
-            if (plan == null) ChangeResult.Changed(definitions, null) else applied(definitions, plan)
-        }
+    fun applyDefault(): Change<PlanApplyReport?> = ::withDefaultPlanApplied
+
+    /**
+     * Returns [definitions] with their default plan applied, as [apply] applies a plan, and the report of
+     * that. Without a default plan, the definitions are returned as they are, with `null` for the report.
+     */
+    fun withDefaultPlanApplied(definitions: Definitions): ChangeResult.Changed<PlanApplyReport?> {
+        val plan = definitions.defaultPlan
+        return if (plan == null) ChangeResult.Changed(definitions, null) else applied(definitions, plan)
+    }
 
     private fun applied(
         definitions: Definitions,

@@ -95,17 +95,23 @@ internal fun noUpstream(): FakeUpstream =
     }
 
 /**
- * Returns an engine for a test, with [definitions]. Unless [configure] says otherwise, the engine has no
+ * Returns the options of an engine for a test. Unless [configure] says otherwise, the engine has no
  * inspectors, its clock stands at noon, and its upstream client fails the test when a request reaches it.
  */
-internal fun engineOf(
-    definitions: Definitions = Definitions.EMPTY,
-    configure: EngineOptions.() -> Unit = {},
-): MockeyEngine {
+internal fun testOptions(configure: EngineOptions.() -> Unit = {}): EngineOptions {
     val options = EngineOptions()
     options.inspectors = emptyList()
     options.clock = TestClock()
     options.upstreamClient = noUpstream()
     options.configure()
-    return MockeyEngine(options, definitions)
+    return options
 }
+
+/** Returns an engine for a test that starts with [definitions], whatever its storage holds. Its options are [testOptions]. */
+internal fun engineOf(
+    definitions: Definitions = Definitions.EMPTY,
+    configure: EngineOptions.() -> Unit = {},
+): MockeyEngine = MockeyEngine(testOptions(configure), definitions)
+
+/** Returns an engine for a test that starts as a program starts one: with the definitions of its storage. Its options are [testOptions]. */
+internal suspend fun createdEngine(configure: EngineOptions.() -> Unit = {}): MockeyEngine = MockeyEngine.create(testOptions(configure))

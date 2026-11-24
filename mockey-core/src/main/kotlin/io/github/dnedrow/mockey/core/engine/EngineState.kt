@@ -67,6 +67,19 @@ internal class EngineState(
      * Once [action] has begun, it is completed even when the caller is canceled.
      */
     suspend fun <T> exclusively(action: suspend (Definitions) -> T): T = writer.withLock { withContext(NonCancellable) { action(current) } }
+
+    /**
+     * Puts the definitions that [source] gives in the place of the current ones, and returns them. No change
+     * is applied meanwhile. The observers are not told, because the definitions come from where an observer
+     * would take them: [source] is the storage. Nothing changes when [source] fails, and its failure is thrown
+     * to the caller.
+     */
+    suspend fun replace(source: suspend () -> Definitions): Definitions =
+        exclusively {
+            val definitions = source()
+            current = definitions
+            definitions
+        }
 }
 
 /**

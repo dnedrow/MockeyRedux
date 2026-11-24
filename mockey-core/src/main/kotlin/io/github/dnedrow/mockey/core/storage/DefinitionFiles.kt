@@ -77,8 +77,24 @@ internal object DefinitionFiles {
     /** Returns the definitions that the main file with the text [text] holds, which are definitions without services. */
     fun main(text: String): Definitions {
         val members = membersOf(text)
+        requireSupportedVersion(members[VERSION])
         if (SERVICES in members) throw FileFault("it holds services, and every service belongs in a directory of its own.")
         return decoded(Definitions.serializer(), members - VERSION)
+    }
+
+    /**
+     * Makes sure that definitions with the format version [version] can be read. A main file that states no
+     * version holds definitions of the first one.
+     */
+    private fun requireSupportedVersion(version: JsonElement?) {
+        if (version == null || version is JsonNull) return
+        val number = (version as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
+        if (number == null || number < 1) throw FileFault("its format version is no whole number above 0.")
+        if (number >
+            FORMAT_VERSION
+        ) {
+            throw FileFault("it has the format version $number, and this version of Mockey reads $SUPPORTED_VERSIONS.")
+        }
     }
 
     /** Returns the text of the service file for [service] at [position]. The scenarios of the service are no part of it. */
@@ -181,6 +197,9 @@ internal object DefinitionFiles {
             .substringBefore('\n')
             .trim()
             .ifEmpty { "it is no definition." }
+
+    /** The format versions that can be read, as a message names them. */
+    private val SUPPORTED_VERSIONS = if (FORMAT_VERSION == 1) "the format version 1 only" else "the format versions 1 to $FORMAT_VERSION"
 
     private const val BYTE_ORDER_MARK = "\uFEFF"
     private const val HEX = 16

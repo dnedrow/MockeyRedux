@@ -1,5 +1,7 @@
 package io.github.dnedrow.mockey.core.engine
 
+import io.github.dnedrow.mockey.core.definitions.PlanApplyReport
+import io.github.dnedrow.mockey.core.definitions.PlanChanges
 import io.github.dnedrow.mockey.core.definitions.withoutProxyCredentials
 import io.github.dnedrow.mockey.core.history.Exchange
 import io.github.dnedrow.mockey.core.history.Handling
@@ -167,12 +169,60 @@ public class MockeyEngine internal constructor(
     }
 
     /**
+     * Loads the definitions from the storage and puts them in the place of the definitions in memory. What
+     * was changed in memory and not saved is gone after that, and so are the credentials of the outbound
+     * proxy, which are in memory only. The history, the last-used times, and the tag filter stay as they are.
+     *
+     * The default plan of the loaded definitions is applied, as it is when an engine is created. In writable
+     * mode, what the plan changes is saved.
+     *
+     * @throws StorageException when the definitions cannot be loaded, such as when a file of them cannot be
+     *   read. The definitions in memory stay as they are then.
+     */
+    public suspend fun reload() {
+        var applied: PlanApplyReport? = null
+        state.replace {
+            val loaded = load()
+            val withPlan = PlanChanges.withDefaultPlanApplied(loaded)
+            if (writable && withPlan.definitions != loaded) save(withPlan.definitions)
+            applied = withPlan.value
+            withPlan.definitions
+        }
+        applied?.let { lastUsedTimes.planApplied(it.plan.id, clock.instant()) }
+    }
+
+    /**
+     * Makes a clean slate: removes every service with its scenarios, every plan, and every twist
+     * configuration, clears the settings of the outbound proxy and the designations of the universal error
+     * scenario and of the default plan, clears the tag filter, and empties the history and the last-used
+     * times. In writable mode, the storage holds no definitions after that either.
+     *
+     * @throws StorageException when the empty definitions cannot be saved. Nothing is cleared then.
+     */
+    public suspend fun reset() {
+        state.change { ChangeResult.Changed(Definitions.EMPTY, Unit) }
+        tagFilter = Tags.EMPTY
+        history.clear()
+        lastUsedTimes.clear()
+    }
+
+    /**
      * Applies [change] to the definitions and returns its result, see [EngineState.change]. In writable mode
      * the changed definitions are saved before they take effect.
      *
      * @throws StorageException when the changed definitions cannot be saved. They do not take effect then.
      */
     internal suspend fun <T> change(change: Change<T>): ChangeResult<T> = state.change(change)
+
+    /** Returns the definitions that the storage holds. */
+    private suspend fun load(): Definitions =
+        try {
+            storage.load()
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: IOException) {
+            throw StorageException("The definitions could not be loaded: ${e.message ?: e.javaClass.simpleName}", e)
+        }
 
     /**
      * Saves [definitions] to the storage, without the credentials of the outbound proxy, which are held in
@@ -340,8 +390,16 @@ public class MockeyEngine internal constructor(
         val inspectionMessages: List<String> = emptyList(),
     )
 
-    private companion object {
-        const val NO_MOCK_TRAFFIC = "the path of its URL does not begin with /service/."
+    internal companion object {
+        private const val NO_MOCK_TRAFFIC = "the path of its URL does not begin with /service/."
+
+        /**
+         * Creates an engine with [options]. The engine starts with the definitions that its storage holds,
+         * and with their default plan applied.
+         *
+         * @throws StorageException when the definitions cannot be loaded. No engine is created then.
+         */
+        suspend fun create(options: EngineOptions = EngineOptions()): MockeyEngine = MockeyEngine(options).also { it.reload() }
     }
 }
 

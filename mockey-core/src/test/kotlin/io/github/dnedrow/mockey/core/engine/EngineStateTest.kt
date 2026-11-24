@@ -427,6 +427,35 @@ class EngineStateTest {
         }
 
     @Test
+    fun definitionsFromASourceTakeThePlaceOfTheCurrentOnesAndNoObserverIsTold(): Unit =
+        runBlocking {
+            val told = AtomicInteger()
+            val state = EngineState(observers = listOf(ChangeObserver { _, _ -> told.incrementAndGet() }))
+            state.change(addService("customer/{id}"))
+            val fromSource = Definitions(plans = listOf(Plan(id = PlanId.generate(), name = "Gold path")))
+
+            val replaced = state.replace { fromSource }
+
+            assertSame(fromSource, replaced)
+            assertSame(fromSource, state.current)
+            assertEquals(1, told.get())
+        }
+
+    @Test
+    fun aSourceThatFailsLeavesTheDefinitionsAsTheyWere(): Unit =
+        runBlocking {
+            val state = EngineState()
+            state.change(addService("customer/{id}"))
+            val before = state.current
+
+            val failure = assertFailsWith<IOException> { state.replace { throw IOException("The file cannot be read.") } }
+            state.change(addService("orders"))
+
+            assertEquals("The file cannot be read.", failure.message)
+            assertEquals(before.services + state.current.services.last(), state.current.services)
+        }
+
+    @Test
     fun aCallerThatIsCanceledWhileItWaitsChangesNothing(): Unit =
         runBlocking {
             val firstStarted = CompletableDeferred<Unit>()
