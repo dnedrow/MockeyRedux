@@ -97,4 +97,18 @@ internal fun parametersOf(text: String): List<Parameter> =
         .filter { it.isNotEmpty() }
         .map { Parameter(formDecoded(it.substringBefore('=')), formDecoded(it.substringAfter('=', missingDelimiterValue = ""))) }
 
-private fun formDecoded(text: String): String = percentDecoded(text.replace('+', ' '))
+/**
+ * Returns [text] decoded as form data is: a `+` stands for a space, and a percent escape for a byte of UTF-8
+ * text. A `%` that starts no escape stays as it is.
+ */
+internal fun formDecoded(text: String): String = percentDecoded(text.replace('+', ' '))
+
+/**
+ * The body as text when there is something in it to evaluate, and `null` otherwise. A request without a body
+ * has nothing to evaluate, and neither has a request whose body holds nothing but whitespace.
+ */
+internal val MockRequest.nonBlankBodyText: String?
+    get() = bodyText.takeUnless { it.all(::isSpaceOrControl) }
+
+/** What counts as whitespace around a text and in a body: a space, and every control character below it. */
+internal fun isSpaceOrControl(char: Char): Boolean = char <= ' '

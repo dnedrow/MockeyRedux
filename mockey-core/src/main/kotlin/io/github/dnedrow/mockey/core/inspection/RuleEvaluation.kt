@@ -1,6 +1,8 @@
 package io.github.dnedrow.mockey.core.inspection
 
 import io.github.dnedrow.mockey.core.request.MockRequest
+import io.github.dnedrow.mockey.core.request.isSpaceOrControl
+import io.github.dnedrow.mockey.core.request.nonBlankBodyText
 
 /**
  * What evaluating a rule set against a request gave. [satisfiedRuleCount] is the number of rules that the
@@ -58,7 +60,7 @@ internal fun Rule.values(request: MockRequest): List<String> =
     when (group) {
         RuleGroup.PARAMETERS -> request.parameters.filter { evaluates(it.name) }.map { it.value }
         RuleGroup.HEADERS -> request.headers.filter { evaluates(it.name) }.map { it.value }
-        RuleGroup.BODY -> listOfNotNull(request.bodyText.takeUnless { it.all(::isSpaceOrControl) })
+        RuleGroup.BODY -> listOfNotNull(request.nonBlankBodyText)
         RuleGroup.URL -> listOf(request.url)
     }
 
@@ -94,6 +96,3 @@ private fun Rule.finds(value: String): Boolean =
         // The matcher calls itself once for every character that some expressions take, such as a repeated choice.
         false
     }
-
-/** What counts as whitespace around an argument and in a body: a space, and every control character below it. */
-private fun isSpaceOrControl(char: Char): Boolean = char <= ' '
