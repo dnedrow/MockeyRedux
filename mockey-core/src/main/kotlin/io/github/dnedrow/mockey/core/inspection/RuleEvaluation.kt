@@ -30,6 +30,18 @@ internal fun RuleSet.evaluate(request: MockRequest): RuleSetEvaluation {
     )
 }
 
+/**
+ * Evaluates what was read of a rule set against [request]. A rule set that is not well formed is never
+ * satisfied: no rule of it is counted, and none has failed.
+ */
+internal fun RuleSetReading.evaluate(request: MockRequest): RuleSetEvaluation =
+    when (this) {
+        is RuleSetReading.WellFormed -> ruleSet.evaluate(request)
+        is RuleSetReading.NotWellFormed -> NEVER_SATISFIED
+    }
+
+private val NEVER_SATISFIED = RuleSetEvaluation(satisfied = false, satisfiedRuleCount = 0, failedRules = emptyList())
+
 /** Returns whether [request] satisfies the rule: whether the [values] that the rule evaluates do, see [isSatisfiedBy]. */
 internal fun Rule.isSatisfiedBy(request: MockRequest): Boolean = isSatisfiedBy(values(request))
 
@@ -60,10 +72,14 @@ internal fun Rule.values(request: MockRequest): List<String> =
  */
 internal fun Rule.isSatisfiedBy(values: List<String>): Boolean =
     when (type) {
-        RuleType.STRING_REQUIRED -> argument.trim(::isSpaceOrControl).lowercase().let { wanted -> values.any { wanted in it.lowercase() } }
+        RuleType.STRING_REQUIRED -> wantedText.lowercase().let { wanted -> values.any { wanted in it.lowercase() } }
         RuleType.REGEX_REQUIRED -> values.any(::finds)
         RuleType.REGEX_OPTIONAL -> values.isEmpty() || values.any(::finds)
     }
+
+/** The text that a `string_required` rule looks for: its argument without the whitespace around it. */
+internal val Rule.wantedText: String
+    get() = argument.trim(::isSpaceOrControl)
 
 /** The key that stands for every parameter or every header. */
 private const val WILDCARD = "*"
