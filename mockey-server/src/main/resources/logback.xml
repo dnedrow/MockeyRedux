@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The log of the server program goes to the standard output. The program sets the level of the root logger
+  from its log level setting when it starts.
+-->
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
