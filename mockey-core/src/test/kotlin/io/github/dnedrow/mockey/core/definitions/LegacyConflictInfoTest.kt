@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
  */
 class LegacyConflictInfoTest {
     private fun Definitions.diagnosticsOf(service: Service): List<Diagnostic> =
-        diagnostics(installedInspectors = emptySet()) { true }.filter { it.serviceId == service.id }
+        diagnostics(installedInspectors = emptySet()).filter { it.serviceId == service.id }
 
     /** Two conflicts with the same service are both kept, and both name that service. */
     @Test

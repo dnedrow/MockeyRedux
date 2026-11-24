@@ -1,6 +1,8 @@
 package io.github.dnedrow.mockey.core.definitions
 
 import io.github.dnedrow.mockey.core.engine.Change
+import io.github.dnedrow.mockey.core.engine.ChangeResult
+import io.github.dnedrow.mockey.core.engine.EngineState
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.model.MatchCriterion
@@ -10,12 +12,15 @@ import io.github.dnedrow.mockey.core.model.ScenarioReference
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.ServiceId
 import io.github.dnedrow.mockey.core.model.Tags
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class ScenarioChangesTest {
     private val customersId = ServiceId("svc-customers")
@@ -34,6 +39,14 @@ class ScenarioChangesTest {
         body: String = "",
         serviceId: ServiceId = customersId,
     ): Change<Scenario> = ScenarioChanges.create(serviceId) { it.copy(name = name, responseBody = body) }
+
+    private val unknownType =
+        MatchCriterion.Rules("""{"parameters": [{"key": "count", "value_rule_arg": "5", "value_rule_type": "number_required"}]}""")
+
+    private fun byRules(
+        criterion: MatchCriterion,
+        name: String = "by rules",
+    ): Change<Scenario> = ScenarioChanges.create(customersId) { it.copy(name = name, matchCriterion = criterion) }
 
     private val a = empty.changed(scenario("A"))
     private val b = a.definitions.changed(scenario("B"))
@@ -132,6 +145,73 @@ class ScenarioChangesTest {
 
         assertEquals(longest, definitions.changed(scenario("  $longest ")).value.name)
         assertEquals("gold", definitions.changed(scenario(" gold\t")).value.name)
+    }
+
+    @Test
+    fun aScenarioThatIsGivenARuleSetThatIsNotValidJsonIsRejectedAndStaysAsItWas(): Unit =
+        runBlocking {
+            val state = EngineState(definitions)
+            val truncated = MatchCriterion.Rules("""{"parameters": [{"key": "ticker"""")
+            val update = ScenarioChanges.update(customersId, a.value.id) { it.copy(matchCriterion = truncated, statusCode = 404) }
+
+            val result = state.change(update)
+
+            val error = assertIs<ChangeResult.Rejected>(result).failure.errors.single()
+            assertEquals("matchCriterion", error.field)
+            assertContains(error.message, "not valid JSON")
+            assertSame(definitions, state.current)
+        }
+
+    @Test
+    fun aScenarioWithARuleSetThatIsNotWellFormedIsNotCreated(): Unit =
+        runBlocking {
+            val state = EngineState(definitions)
+
+            val result = state.change(byRules(unknownType))
+
+            val error = assertIs<ChangeResult.Rejected>(result).failure.errors.single()
+            assertEquals("matchCriterion", error.field)
+            assertContains(error.message, "'number_required'")
+            assertSame(definitions, state.current)
+        }
+
+    @Test
+    fun aRuleSetThatIsNotWellFormedIsReportedWithAnInvalidName() {
+        val errors = definitions.rejected(byRules(unknownType, name = "n".repeat(251)))
+
+        assertEquals(listOf("name", "matchCriterion"), errors.map { it.field })
+    }
+
+    @Test
+    fun aWellFormedRuleSetIsStoredExactlyAsItWasWritten() {
+        val source = " {\"url\": [{\"value_rule_arg\": \"\\\\b123\\\\b\", \"value_rule_type\": \"REGEX_REQUIRED\"}]}\n"
+
+        val created = definitions.changed(byRules(MatchCriterion.Rules(source)))
+
+        assertEquals(MatchCriterion.Rules(source), created.value.matchCriterion)
+    }
+
+    @Test
+    fun aRuleSetWithoutRulesIsAccepted() {
+        val created = definitions.changed(byRules(MatchCriterion.Rules("{}")))
+
+        assertEquals(MatchCriterion.Rules("{}"), created.value.matchCriterion)
+    }
+
+    /** A scenario can have such a rule set when it was not saved with it, as after an import. */
+    @Test
+    fun aScenarioWhoseStoredRuleSetIsNotWellFormedIsRejectedUntilItIsRepaired() {
+        val broken = a.value.copy(matchCriterion = unknownType)
+        val stored = definitions.withService(definitions.customers().copy(scenarios = listOf(broken, b.value, c.value)))
+
+        val renamed = stored.rejected(ScenarioChanges.update(customersId, broken.id) { it.copy(name = "silver") })
+        val repaired = stored.changed(ScenarioChanges.update(customersId, broken.id) { it.copy(matchCriterion = MatchCriterion.None) })
+        val other = stored.changed(ScenarioChanges.update(customersId, b.value.id) { it.copy(name = "gold") })
+
+        assertEquals(listOf("matchCriterion"), renamed.map { it.field })
+        assertEquals(MatchCriterion.None, repaired.value.matchCriterion)
+        assertEquals("gold", other.value.name)
+        assertEquals(listOf(broken, other.value, c.value), other.definitions.customers().scenarios)
     }
 
     @Test

@@ -23,8 +23,7 @@ class DiagnosticsTest {
         vararg realUrls: String,
     ) = Service(id = ServiceId.generate(), name = name, mockUrl = mockUrl, realUrls = realUrls.toList())
 
-    private fun Definitions.diagnostics(): List<Diagnostic> =
-        diagnostics(installedInspectors = setOf("session-check")) { it.startsWith("{") }
+    private fun Definitions.diagnostics(): List<Diagnostic> = diagnostics(installedInspectors = setOf("session-check"))
 
     @Test
     fun definitionsWithoutProblemsHaveNoDiagnostics() {
@@ -118,6 +117,23 @@ class DiagnosticsTest {
         assertEquals(listOf(DiagnosticKind.UNREADABLE_RULE_SET, DiagnosticKind.UNREADABLE_RULE_SET), diagnostics.map { it.kind })
         assertEquals(listOf(emptyList(), listOf(broken.id)), diagnostics.map { it.scenarioIds })
         assertContains(diagnostics.last().message, "'by rules'")
+        diagnostics.forEach { assertContains(it.message, "The rule set is not valid JSON") }
+    }
+
+    @Test
+    fun aDiagnosticAboutAStoredRuleSetSaysWhatIsWrongWithIt() {
+        val keyless = """{"headers": [{"value_rule_arg": "gold", "value_rule_type": "string_required"}]}"""
+        val unknownType = """{"parameters": [{"key": "count", "value_rule_arg": "5", "value_rule_type": "number_required"}]}"""
+        val byRules = scenario("by rules", criterion = MatchCriterion.Rules(unknownType))
+        val customers = service("Customers", "customer/{id}").copy(requestRules = keyless, scenarios = listOf(byRules))
+
+        val diagnostics = Definitions(services = listOf(customers)).diagnostics()
+
+        assertEquals(listOf(DiagnosticKind.UNREADABLE_RULE_SET, DiagnosticKind.UNREADABLE_RULE_SET), diagnostics.map { it.kind })
+        assertEquals(listOf(customers.id, customers.id), diagnostics.map { it.serviceId })
+        assertContains(diagnostics.first().message, "Rule 1 of the group 'headers' has no 'key'.")
+        assertContains(diagnostics.last().message, "'by rules'")
+        assertContains(diagnostics.last().message, "'number_required'")
     }
 
     @Test

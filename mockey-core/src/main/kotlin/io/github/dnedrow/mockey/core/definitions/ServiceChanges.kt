@@ -4,6 +4,7 @@ import io.github.dnedrow.mockey.core.engine.Change
 import io.github.dnedrow.mockey.core.engine.ChangeResult
 import io.github.dnedrow.mockey.core.engine.FieldError
 import io.github.dnedrow.mockey.core.engine.ValidationFailure
+import io.github.dnedrow.mockey.core.inspection.ruleSetProblems
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.ScenarioId
 import io.github.dnedrow.mockey.core.model.Service
@@ -18,9 +19,10 @@ import io.github.dnedrow.mockey.core.model.ServiceId
  * inspector name, or a response schema that is blank is absent.
  *
  * A service is rejected when its name is empty or longer than [MAX_NAME_LENGTH] characters, when another
- * service has its mock URL pattern, or when another service lists one of its real URLs. Mock URL patterns and
- * real URLs are compared without regard to letter case. The whole service is checked each time, also the
- * attributes that an update leaves as they are.
+ * service has its mock URL pattern, when another service lists one of its real URLs, or when its request rules
+ * are not a well-formed rule set, whether or not they are enabled. Mock URL patterns and real URLs are compared
+ * without regard to letter case. The whole service is checked each time, also the attributes that an update
+ * leaves as they are.
  *
  * An update can designate the default scenario and the error scenario of the service. A scenario that is
  * newly designated must be one of the scenarios of the service. The scenarios themselves are changed with
@@ -168,7 +170,8 @@ internal object ServiceChanges {
     private fun errors(
         service: Service,
         others: List<Service>,
-    ): List<FieldError> = listOfNotNull(nameError(service), mockUrlError(service, others), realUrlError(service, others))
+    ): List<FieldError> =
+        listOfNotNull(nameError(service), mockUrlError(service, others), realUrlError(service, others), requestRulesError(service))
 
     private fun nameError(service: Service): FieldError? =
         when {
@@ -197,6 +200,12 @@ internal object ServiceChanges {
         }
 
     private fun Service.lists(realUrl: String): Boolean = realUrls.any { it.trim().equals(realUrl, ignoreCase = true) }
+
+    /** Reports request rules that are not a well-formed rule set, and says what is wrong with them. */
+    private fun requestRulesError(service: Service): FieldError? =
+        service.requestRules?.let(::ruleSetProblems)?.let { problems ->
+            FieldError("requestRules", "The request rules are not a well-formed rule set. $problems")
+        }
 }
 
 internal fun Definitions.service(id: ServiceId): Service? = services.firstOrNull { it.id == id }

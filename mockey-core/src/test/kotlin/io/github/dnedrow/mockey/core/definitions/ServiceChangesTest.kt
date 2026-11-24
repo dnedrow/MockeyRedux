@@ -33,6 +33,9 @@ class ServiceChangesTest {
         vararg realUrls: String,
     ): Change<Service> = ServiceChanges.create { it.copy(name = name, mockUrl = mockUrl, realUrls = realUrls.toList()) }
 
+    private val keyedRules = """{"headers": [{"key": "X-Tier", "value_rule_arg": "gold", "value_rule_type": "string_required"}]}"""
+    private val keylessRules = """{"headers": [{"value_rule_arg": "gold", "value_rule_type": "string_required"}]}"""
+
     private val customers = Definitions.EMPTY.changed(service("Customers", "customer/{id}"))
     private val orders =
         customers.definitions.changed(service("Orders", "orders", "http://api.example.com/orders", "http://qa.example.com/orders"))
@@ -393,6 +396,66 @@ class ServiceChangesTest {
         assertEquals("session-check", service.inspectorName)
         assertEquals("""{"type": "object"}""", service.responseSchema)
         assertTrue(service.responseSchemaEnabled)
+    }
+
+    @Test
+    fun aServiceWithRequestRulesThatAreNotWellFormedIsNotCreated(): Unit =
+        runBlocking {
+            val state = EngineState(definitions)
+
+            val result = state.change(ServiceChanges.create { it.copy(name = "Billing", mockUrl = "billing", requestRules = keylessRules) })
+
+            val error = assertIs<ChangeResult.Rejected>(result).failure.errors.single()
+            assertEquals("requestRules", error.field)
+            assertContains(error.message, "Rule 1 of the group 'headers' has no 'key'.")
+            assertSame(definitions, state.current)
+        }
+
+    @Test
+    fun aServiceThatIsGivenRequestRulesThatAreNotWellFormedIsRejectedAndStaysAsItWas(): Unit =
+        runBlocking {
+            val state = EngineState(definitions)
+            val update = ServiceChanges.update(orders.value.id) { it.copy(requestRules = "not a rule set", delayMillis = 250) }
+
+            val result = state.change(update)
+
+            val error = assertIs<ChangeResult.Rejected>(result).failure.errors.single()
+            assertEquals("requestRules", error.field)
+            assertContains(error.message, "not valid JSON")
+            assertSame(definitions, state.current)
+        }
+
+    @Test
+    fun requestRulesAreCheckedWhetherOrNotTheyAreEnabled() {
+        val errors =
+            listOf(true, false).map { enabled ->
+                val update = ServiceChanges.update(orders.value.id) { it.copy(requestRules = keylessRules, requestRulesEnabled = enabled) }
+                definitions.rejected(update)
+            }
+
+        assertEquals(listOf(listOf("requestRules"), listOf("requestRules")), errors.map { fields -> fields.map { it.field } })
+    }
+
+    @Test
+    fun requestRulesThatAreNotWellFormedAreReportedWithTheOtherInvalidFields() {
+        val errors = definitions.rejected(ServiceChanges.create { it.copy(name = "  ", mockUrl = "ORDERS", requestRules = keylessRules) })
+
+        assertEquals(listOf("name", "mockUrl", "requestRules"), errors.map { it.field })
+    }
+
+    /** A service can have such request rules when it was not saved with them, as after an import. */
+    @Test
+    fun aServiceWhoseStoredRequestRulesAreNotWellFormedIsRejectedUntilTheyAreRepaired() {
+        val stored = definitions.copy(services = listOf(customers.value, orders.value.copy(requestRules = keylessRules)))
+
+        val delayed = stored.rejected(ServiceChanges.update(orders.value.id) { it.copy(delayMillis = 250) })
+        val repaired = stored.changed(ServiceChanges.update(orders.value.id) { it.copy(requestRules = keyedRules, delayMillis = 250) })
+        val removed = stored.changed(ServiceChanges.update(orders.value.id) { it.copy(requestRules = null, delayMillis = 250) })
+
+        assertEquals(listOf("requestRules"), delayed.map { it.field })
+        assertEquals(keyedRules, repaired.value.requestRules)
+        assertNull(removed.value.requestRules)
+        assertEquals(listOf(250L, 250L), listOf(repaired, removed).map { it.value.delayMillis })
     }
 
     @Test

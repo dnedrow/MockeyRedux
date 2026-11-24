@@ -9,10 +9,11 @@ import dev.harrel.jsonschema.SpecificationVersion
 import dev.harrel.jsonschema.Validator
 import dev.harrel.jsonschema.ValidatorFactory
 import dev.harrel.jsonschema.providers.KotlinxJsonNode
+import io.github.dnedrow.mockey.core.json.JSON_NUMBER
+import io.github.dnedrow.mockey.core.json.JsonReading
+import io.github.dnedrow.mockey.core.json.readJson
 import io.github.dnedrow.mockey.core.model.ScenarioId
 import io.github.dnedrow.mockey.core.model.Service
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -107,8 +108,6 @@ private val SCHEMA_URI: URI = URI.create("mockey:/response-schema")
 private val LARGEST_NUMBER = Double.MAX_VALUE.toBigDecimal()
 private val SMALLEST_NUMBER = Double.MIN_VALUE.toBigDecimal()
 
-private val JSON_NUMBER = Regex("""-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?""")
-
 private fun unusable(problem: String): SchemaReport = SchemaReport.UnusableSchema(listOf(problem))
 
 private fun JsonElement.dialect(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content?.removeSuffix("#")
@@ -133,21 +132,9 @@ private fun SchemaError.text(): String {
 
 /**
  * Returns [text] as JSON, or `null` when it cannot be read as JSON, which is also the case for JSON that is
- * nested more deeply than the parser accepts. The parser alone would let a bare word pass as a value.
+ * nested more deeply than the parser accepts.
  */
-private fun json(text: String): JsonElement? =
-    try {
-        Json.parseToJsonElement(text).takeIf { it.isJson() }
-    } catch (e: SerializationException) {
-        null
-    }
-
-private fun JsonElement.isJson(): Boolean =
-    when (this) {
-        is JsonObject -> values.all { it.isJson() }
-        is JsonArray -> all { it.isJson() }
-        is JsonPrimitive -> isString || content == "true" || content == "false" || content == "null" || JSON_NUMBER.matches(content)
-    }
+private fun json(text: String): JsonElement? = (readJson(text) as? JsonReading.Valid)?.element
 
 private fun JsonElement.hasNumberOutOfRange(): Boolean =
     when (this) {

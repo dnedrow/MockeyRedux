@@ -1,5 +1,6 @@
 package io.github.dnedrow.mockey.core.definitions
 
+import io.github.dnedrow.mockey.core.inspection.ruleSetProblems
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.MatchCriterion
 import io.github.dnedrow.mockey.core.model.Scenario
@@ -43,21 +44,18 @@ public data class Diagnostic(
 
 /**
  * Returns the diagnostics for these definitions, service by service. [installedInspectors] are the names of
- * the inspectors that a service can name, and [isWellFormedRuleSet] tells whether the text of a rule set is a
- * well-formed rule set. URLs, names, and response bodies are compared as the changes to services and the merge
- * of services compare them. A response schema is applied only while it is enabled.
+ * the inspectors that a service can name. URLs, names, and response bodies are compared as the changes to
+ * services and the merge of services compare them. A rule set is reported when it is not well formed, whether
+ * or not it is enabled, and a response schema is applied only while it is enabled.
  */
-internal fun Definitions.diagnostics(
-    installedInspectors: Set<String>,
-    isWellFormedRuleSet: (String) -> Boolean,
-): List<Diagnostic> =
+internal fun Definitions.diagnostics(installedInspectors: Set<String>): List<Diagnostic> =
     services.flatMap { service ->
         val others = services.filter { it.id != service.id }
         sharedMockUrls(service, others) +
             sharedRealUrls(service, others) +
             duplicateScenarios(service) +
             listOfNotNull(unknownInspector(service, installedInspectors)) +
-            unreadableRuleSets(service, isWellFormedRuleSet) +
+            unreadableRuleSets(service) +
             schemaViolations(service)
     }
 
@@ -106,21 +104,20 @@ private fun unknownInspector(
         Diagnostic(DiagnosticKind.UNKNOWN_INSPECTOR, service.id, service.name, "The inspector '$name' is not installed.")
     }
 
-private fun unreadableRuleSets(
-    service: Service,
-    isWellFormedRuleSet: (String) -> Boolean,
-): List<Diagnostic> {
+/** Reports the request rules of [service] and the rule sets of its scenarios that are not well formed, with what is wrong. */
+private fun unreadableRuleSets(service: Service): List<Diagnostic> {
     val ofService =
-        service.requestRules?.takeUnless(isWellFormedRuleSet)?.let {
-            Diagnostic(DiagnosticKind.UNREADABLE_RULE_SET, service.id, service.name, "The request rules of the service cannot be read.")
+        service.requestRules?.let(::ruleSetProblems)?.let { problems ->
+            val message = "The request rules of the service cannot be read. $problems"
+            Diagnostic(DiagnosticKind.UNREADABLE_RULE_SET, service.id, service.name, message)
         }
     val ofScenarios =
-        service.scenarios
-            .filter { scenario -> (scenario.matchCriterion as? MatchCriterion.Rules)?.let { !isWellFormedRuleSet(it.source) } ?: false }
-            .map { scenario ->
-                val message = "The rules of the scenario '${scenario.name}' cannot be read."
+        service.scenarios.mapNotNull { scenario ->
+            (scenario.matchCriterion as? MatchCriterion.Rules)?.source?.let(::ruleSetProblems)?.let { problems ->
+                val message = "The rules of the scenario '${scenario.name}' cannot be read. $problems"
                 Diagnostic(DiagnosticKind.UNREADABLE_RULE_SET, service.id, service.name, message, scenarioIds = listOf(scenario.id))
             }
+        }
     return listOfNotNull(ofService) + ofScenarios
 }
 

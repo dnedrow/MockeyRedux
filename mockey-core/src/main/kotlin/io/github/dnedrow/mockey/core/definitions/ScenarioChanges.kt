@@ -4,8 +4,10 @@ import io.github.dnedrow.mockey.core.engine.Change
 import io.github.dnedrow.mockey.core.engine.ChangeResult
 import io.github.dnedrow.mockey.core.engine.FieldError
 import io.github.dnedrow.mockey.core.engine.ValidationFailure
+import io.github.dnedrow.mockey.core.inspection.ruleSetProblems
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Header
+import io.github.dnedrow.mockey.core.model.MatchCriterion
 import io.github.dnedrow.mockey.core.model.Scenario
 import io.github.dnedrow.mockey.core.model.ScenarioId
 import io.github.dnedrow.mockey.core.model.ScenarioReference
@@ -22,7 +24,9 @@ import io.github.dnedrow.mockey.core.model.ServiceId
  * names and values are trimmed, and a header without a name is left out. The response body stays exactly as
  * it was given.
  *
- * A scenario is rejected when its name is longer than [MAX_NAME_LENGTH] characters.
+ * A scenario is rejected when its name is longer than [MAX_NAME_LENGTH] characters, or when its match criterion
+ * is a rule set that is not well formed. The whole scenario is checked each time, also the attributes that an
+ * update leaves as they are.
  *
  * Every change keeps the designations of the service valid, see [withValidDesignations]. No change alters a
  * designation otherwise: only deleting the designated scenario ends a designation.
@@ -143,13 +147,27 @@ internal object ScenarioChanges {
         service: Service,
         scenario: Scenario,
         replace: (List<Scenario>) -> List<Scenario>,
-    ): ChangeResult<Scenario> =
-        if (scenario.name.length > MAX_NAME_LENGTH) {
-            val error = FieldError("name", "The name of a scenario must not be longer than $MAX_NAME_LENGTH characters.")
-            ChangeResult.Rejected(ValidationFailure(listOf(error)))
-        } else {
+    ): ChangeResult<Scenario> {
+        val errors = listOfNotNull(nameError(scenario), matchCriterionError(scenario))
+        return if (errors.isEmpty()) {
             val changed = service.copy(scenarios = replace(service.scenarios)).withValidDesignations()
             ChangeResult.Changed(definitions.withService(changed), scenario)
+        } else {
+            ChangeResult.Rejected(ValidationFailure(errors))
+        }
+    }
+
+    private fun nameError(scenario: Scenario): FieldError? =
+        if (scenario.name.length > MAX_NAME_LENGTH) {
+            FieldError("name", "The name of a scenario must not be longer than $MAX_NAME_LENGTH characters.")
+        } else {
+            null
+        }
+
+    /** Reports a match criterion that is a rule set which is not well formed, and says what is wrong with it. */
+    private fun matchCriterionError(scenario: Scenario): FieldError? =
+        (scenario.matchCriterion as? MatchCriterion.Rules)?.source?.let(::ruleSetProblems)?.let { problems ->
+            FieldError("matchCriterion", "The match criterion is not a well-formed rule set. $problems")
         }
 }
 
