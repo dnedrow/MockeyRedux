@@ -129,8 +129,3 @@ public object LegacyXmlDefinitions {
     private fun Document.findScenario(id: String): Element? =
         services().asSequence().flatMap { it.childElements("scenario").asSequence() }.firstOrNull { it.attribute("id") == id }
 }
-
-internal fun Element.childElement(name: String): Element? = childElements(name).firstOrNull()
-
-internal fun Element.childElements(name: String): List<Element> =
-    (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }.filter { it.localName == name || it.nodeName == name }

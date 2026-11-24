@@ -28,16 +28,16 @@ public class LegacyDirectoryImporter(
                     .mapIndexedNotNull { index, reference ->
                         val fileName = reference.getAttribute("file").takeUnless(String::isBlank)
                         if (fileName == null) {
-                            issues += LegacyXmlIssue(mainFile, LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference has no file.")
+                            issues += LegacyXmlIssue(LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference has no file.", mainFile)
                             null
                         } else {
                             val file = normalizedRoot.resolve(fileName).normalize()
                             if (!file.startsWith(normalizedRoot)) {
                                 issues +=
                                     LegacyXmlIssue(
-                                        file,
                                         LegacyXmlIssueKind.OUTSIDE_IMPORT_ROOT,
                                         "A service reference points outside the import root.",
+                                        file,
                                     )
                                 null
                             } else {
@@ -78,7 +78,7 @@ public class LegacyDirectoryImporter(
                 val file = serviceDirectory.resolve(fileName).normalize()
                 if (!file.startsWith(normalizedRoot) || !Files.isRegularFile(file)) {
                     if (response.hasAttribute("file")) {
-                        issues += LegacyXmlIssue(file, LegacyXmlIssueKind.UNREADABLE_FILE, "The scenario response file could not be read.")
+                        issues += LegacyXmlIssue(LegacyXmlIssueKind.UNREADABLE_FILE, "The scenario response file could not be read.", file)
                     }
                     return@mapNotNull null
                 }
@@ -87,9 +87,9 @@ public class LegacyDirectoryImporter(
                 } catch (e: Exception) {
                     issues +=
                         LegacyXmlIssue(
-                            file,
                             LegacyXmlIssueKind.UNREADABLE_FILE,
                             e.message ?: "The scenario response file could not be read.",
+                            file,
                         )
                     null
                 }
