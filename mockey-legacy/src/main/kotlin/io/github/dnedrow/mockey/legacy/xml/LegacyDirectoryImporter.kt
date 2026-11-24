@@ -25,6 +25,9 @@ public class LegacyDirectoryImporter(
      *
      * A file that is missing or that cannot be read does not end the import. It is among the issues of the
      * result, and what the other files hold is imported.
+     *
+     * The result holds the definitions of the directory. [LegacyImportResult.importInto] imports them into
+     * an engine.
      */
     public fun import(mainFile: Path = directory.resolve(MAIN_FILE)): LegacyImportResult {
         val file = directory.resolve(mainFile).normalize()

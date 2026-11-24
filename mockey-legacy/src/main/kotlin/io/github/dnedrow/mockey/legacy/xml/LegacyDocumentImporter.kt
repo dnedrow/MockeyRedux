@@ -9,7 +9,10 @@ package io.github.dnedrow.mockey.legacy.xml
  * every such reference is among the issues of the result. [LegacyDirectoryImporter] imports such a document.
  */
 public object LegacyDocumentImporter {
-    /** Imports the export document [document]. */
+    /**
+     * Imports the export document [document]. The result holds the definitions of the document.
+     * [LegacyImportResult.importInto] imports them into an engine.
+     */
     public fun import(document: String): LegacyImportResult {
         val reader = LegacyXmlReader(importRoot = null)
         return LegacyImport(reader).of(reader.readText(document), "The document")

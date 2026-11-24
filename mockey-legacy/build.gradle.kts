@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":mockey-core"))
+
+    testImplementation(libs.kotlinx.coroutines.core)
 }
