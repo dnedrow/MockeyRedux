@@ -31,4 +31,10 @@ public enum class LegacyXmlIssueKind {
 
     /** A document is XML, but it holds no definitions of Mockey 2.x. */
     NOT_A_DEFINITIONS_DOCUMENT,
+
+    /**
+     * A reference by number names nothing that the source holds: no scenario, no service, no plan, or no
+     * twist configuration. The reference was dropped.
+     */
+    DANGLING_REFERENCE,
 }

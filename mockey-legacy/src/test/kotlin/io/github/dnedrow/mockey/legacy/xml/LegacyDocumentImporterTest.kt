@@ -50,16 +50,20 @@ class LegacyDocumentImporterTest {
         assertNull(service.inspectorName)
         assertNull(service.requestRules)
         assertEquals(emptyList(), service.realUrls)
+        // The document lists the scenarios by their names. They are in the order of their numbers, 1 to 5.
         assertEquals(
             listOf(
                 "123 Customer GET" to "GET",
-                "123 Customer POST" to "POST",
-                "888 Customer with a POST REST verb and x-http-method-override as PUT" to "POST",
-                "888 Customer with POST and x-http-method-override as GET" to "POST",
                 "Customer 456" to null,
+                "123 Customer POST" to "POST",
+                "888 Customer with POST and x-http-method-override as GET" to "POST",
+                "888 Customer with a POST REST verb and x-http-method-override as PUT" to "POST",
             ),
             service.scenarios.map { it.name to it.methodRestriction },
         )
+        assertEquals(service.scenarios.first().id, service.defaultScenarioId)
+        assertNull(service.errorScenarioId)
+        assertEquals(Definitions.EMPTY.settings, result.definitions.settings)
         assertEquals(listOf(200, 200, 200, 200, 200), service.scenarios.map { it.statusCode })
         assertEquals(emptyList(), service.scenarios.flatMap { it.headers })
         val first = service.scenarios.first()

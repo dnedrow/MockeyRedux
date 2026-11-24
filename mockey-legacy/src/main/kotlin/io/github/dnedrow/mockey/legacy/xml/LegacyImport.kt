@@ -26,7 +26,8 @@ internal class LegacyImport(
         issues += main.issues
         val root = main.document?.let { rootOf(it, name) } ?: return LegacyImportResult(Definitions.EMPTY, issues.toList())
         val services = root.childElements(SERVICE_REFERENCE).flatMap(::referenced) + root.childElements(LegacyXmlDefinitions.SERVICE)
-        return LegacyImportResult(LegacyXmlDefinitions.map(services), issues.toList())
+        val mapped = LegacyXmlDefinitions.map(root, services)
+        return LegacyImportResult(mapped.definitions, issues + mapped.issues)
     }
 
     /** Returns the root element of [document] when the document holds definitions, and reports a document that holds none. */
@@ -43,24 +44,24 @@ internal class LegacyImport(
         )
     }
 
-    /** Returns the `service` elements of the service file that [reference] names. A file that cannot be read has none. */
-    private fun referenced(reference: Element): List<Element> {
+    /**
+     * Returns the `service` elements of the service file that [reference] names. A file that cannot be read
+     * gives `null` in the place of its service, so that the services after it keep their places in the
+     * document, by which a document names the service of its universal error scenario.
+     */
+    private fun referenced(reference: Element): List<Element?> {
         val name = reference.getAttribute("file")
-        if (name.isBlank()) {
-            issue(LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference names no file.")
-            return emptyList()
-        }
+        if (name.isBlank()) return listOf(issue(LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference names no file."))
         val file =
             try {
                 Path.of(name)
             } catch (_: InvalidPathException) {
-                issue(LegacyXmlIssueKind.UNREADABLE_FILE, "The service reference '$name' names no file.")
-                return emptyList()
+                return listOf(issue(LegacyXmlIssueKind.UNREADABLE_FILE, "The service reference '$name' names no file."))
             }
         val read = reader.read(file)
         issues += read.issues
-        val root = read.document?.let { rootOf(it, "The file $name") }
-        return root?.childElements(LegacyXmlDefinitions.SERVICE).orEmpty()
+        val root = read.document?.let { rootOf(it, "The file $name") } ?: return listOf(null)
+        return root.childElements(LegacyXmlDefinitions.SERVICE)
     }
 
     private fun issue(

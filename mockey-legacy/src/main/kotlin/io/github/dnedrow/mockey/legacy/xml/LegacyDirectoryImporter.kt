@@ -6,9 +6,10 @@ import java.nio.file.Path
  * Imports the definitions of a definitions directory of Mockey 2.x: the directory in which Mockey 2.x in
  * writable mode stores its definitions.
  *
- * The main file of the directory, `mock_service_definitions.xml`, refers to one file for each service. A
- * service file includes one file for each scenario, and a scenario file includes the text file that holds
- * its response body. A main file can also hold its services itself, as an export document does.
+ * The main file of the directory, `mock_service_definitions.xml`, holds the plans, the twist configurations,
+ * and the settings, and it refers to one file for each service. A service file includes one file for each
+ * scenario, and a scenario file includes the text file that holds its response body. A main file can also
+ * hold its services itself, as an export document does.
  *
  * Only files inside the directory [root] are read, see [LegacyXmlReader], and no file is ever written,
  * changed, or deleted: the directory stays as it is.
