@@ -37,7 +37,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 ## 4. Core: routing (spec: request-routing)
 
-- [ ] 4.1 Implement target extraction and normalization: absolute and relative targets, query separation, percent-decoding, slashes, letter case, and default ports. Verify with unit tests, including the ported legacy `UrlTest` and `MockServiceBeanTest` cases, which both test the legacy `Url` class. The checks of `MockServiceBeanTest` that read a text without a scheme as a host are linked to DEV-03.
+- [x] 4.1 Implement target extraction and normalization: absolute and relative targets, query separation, percent-decoding, slashes, letter case, and default ports. Verify with unit tests, including the ported legacy `UrlTest` and `MockServiceBeanTest` cases, which both test the legacy `Url` class. The checks of `MockServiceBeanTest` that read a text without a scheme as a host are linked to DEV-03.
 - [ ] 4.2 Implement the URL pattern compiler and matcher with single-segment variables, whole-target matching, and captured values in request case (DEV-01). Verify with unit tests, including the ported legacy `UriTemplateTest` cases.
 - [ ] 4.3 Implement candidate lookup through mock URL patterns and real URLs, and selection of the most specific service (DEV-02). Verify with unit tests, including the services from upstream issue 109.
 - [ ] 4.4 Implement the tag filter and the handling of unknown targets: forwarding and registration for absolute targets, refusal for relative targets, and the setting that disables handling (DEV-03, DEV-04). Verify with unit tests for each scenario of those requirements.
