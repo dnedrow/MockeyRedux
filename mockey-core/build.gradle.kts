@@ -16,3 +16,10 @@ dependencies {
     runtimeOnly(libs.jmail)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+tasks.test {
+    // The JDK HTTP client reads this property once, when it is first used, and by default it sends no Basic
+    // credentials to a proxy for a tunnel. The tests of the upstream client need the same answer whichever of
+    // them runs first, see docs/decisions/upstream-client.md.
+    systemProperty("jdk.http.auth.tunneling.disabledSchemes", "")
+}
