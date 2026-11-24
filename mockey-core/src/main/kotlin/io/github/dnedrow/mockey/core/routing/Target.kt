@@ -20,6 +20,9 @@ internal data class Target(
      * forwarded to [text], never to this form.
      */
     val normalized: String by lazy(LazyThreadSafetyMode.PUBLICATION) { normalizedUrl(text) }
+
+    /** What [normalized] holds between its slashes. A URL pattern matches the target one such part at a time. */
+    val segments: List<String> by lazy(LazyThreadSafetyMode.PUBLICATION) { normalized.split('/') }
 }
 
 /**
