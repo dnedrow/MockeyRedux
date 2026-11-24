@@ -35,8 +35,7 @@ The root `checkModuleDependencies` task enforces the approved project dependency
 
 ## GitHub Actions
 
-Use direct setup actions in GitHub Actions workflows, such as `actions/setup-java`. Do not substitute them with
-internal setup action versions, such as `internal/actions/setup-java`.
+Use direct setup actions in GitHub Actions workflows, such as `actions/setup-java`. Never make a change to a GitHub workflow without asking first, and never use a third-party action without asking first. If you need to add a new workflow, ask first.
 
 ## OpenSpec
 
