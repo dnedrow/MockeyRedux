@@ -168,7 +168,7 @@ Legacy reads three more parameters that its documentation does not describe:
 The 13 test classes under `src/test` of legacy Mockey are ported with the code that takes the place of what
 they test (design decision 16). A ported case keeps the name of its legacy test method. A row names the test
 class that holds the port, or the task that ports the class. `None` stands for a legacy class without a
-test.
+test, and `Obsolete` for one whose subject no longer exists.
 
 | Legacy test class | Port | Notes |
 |---|---|---|
@@ -180,8 +180,8 @@ test.
 | `com.mockey.storage.TestInMemoryMockeyStorage` | None | The class holds no test. The engine state holder takes the place of the legacy storage singleton, and `EngineStateTest` covers it. |
 | `com.mockey.util.UrlTest` | `mockey-core`: `LegacyUrlTest` | All five cases pass. The legacy class took a URL apart. A target does not, but the form in which URLs are compared shows the scheme, the port, and the path that legacy read. `validateEmptySetings` asked whether a URL is set, which legacy asked of the outbound proxy only (`ProxyServerModelTest`): the port checks that an empty text is not the URL of a real service. `extractMockUrlFromFullUrl` refused a text without a scheme, which is a relative target here (DEV-03), and passed `null`, which the type of a request URI does not admit. |
 | `com.mockey.model.UriTemplateTest` | `mockey-core`: `LegacyUriTemplateTest` | All five cases pass. In legacy the three cases that expect a pattern with variables to match fail, because a variable matches only text in braces there (DEV-01). A pattern answers with nothing for a target that does not match, where legacy answered with an empty map, and the names of variables keep their letter case. |
-| `com.mockey.plugin.TestPluginStore` | Task 5.4 | |
-| `com.mockey.plugin.TestPackageInfoPeerClassFinder` | Task 5.4 | Its subject, the scan of the class path for annotated packages, no longer exists. |
+| `com.mockey.plugin.TestPluginStore` | `mockey-core`: `LegacyPluginStoreTest` | All three cases pass. Legacy had commented out every check of these cases. The port asks what those checks asked, of the inspectors that the service loader finds: the sample inspector is listed, an inspector that is named twice is listed once, and an inspector is created from the name of its class. The sample inspector is the port of the legacy `SampleRequestInspector`, which keeps that class name as its name. |
+| `com.mockey.plugin.TestPackageInfoPeerClassFinder` | Obsolete | Its subject, the scan of the class path for annotated packages, no longer exists. The service loader of the Java runtime finds the inspectors (design decision 14), and `InspectorsTest` covers that. Both cases of the class tested how a file name becomes a class or package name, which nothing does any more. |
 | `com.mockey.model.ProxyServerModelTest` | Task 7.5 | |
 | `com.mockey.util.ServiceStatHelperTest` | Task 8.6 | |
 | `com.mockey.storage.xml.MockeyXmlFileManagerTest` | Task 10.2 | |

@@ -44,9 +44,10 @@ public data class Diagnostic(
 
 /**
  * Returns the diagnostics for these definitions, service by service. [installedInspectors] are the names of
- * the inspectors that a service can name. URLs, names, and response bodies are compared as the changes to
- * services and the merge of services compare them. A rule set is reported when it is not well formed, whether
- * or not it is enabled, and a response schema is applied only while it is enabled.
+ * the inspectors that a service can name, which the inspectors of an engine give. URLs, names, and response
+ * bodies are compared as the changes to services and the merge of services compare them. A rule set is reported
+ * when it is not well formed, whether or not it is enabled, and a response schema is applied only while it is
+ * enabled.
  */
 internal fun Definitions.diagnostics(installedInspectors: Set<String>): List<Diagnostic> =
     services.flatMap { service ->

@@ -4,15 +4,27 @@ import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.request.MockRequest
 
 /**
+ * Inspects [request], which goes to [service], and returns the messages for the history entry of the request,
+ * each of them once: those of the [inspectors], and after them those of the request rules of the service, see
+ * [ruleMessages].
+ *
+ * Inspection gives messages and nothing else. It has no say in how the request is answered, and it does not
+ * fail, whatever the request, the rules, and the inspectors do.
+ */
+internal fun inspectionMessages(
+    service: Service,
+    request: MockRequest,
+    inspectors: Inspectors,
+    ruleSets: RuleSets,
+): List<String> = (inspectors.messages(service, request) + ruleSets.ruleMessages(service, request)).distinct()
+
+/**
  * Inspects [request], which goes to [service], with the request rules of the service, and returns the messages
  * for the history entry of the request.
  *
  * Request rules inspect only while they are enabled. Every rule that the request does not satisfy gives one
  * message, in the order of the rule set, whether or not the rule set as a whole is satisfied. Request rules
  * that cannot be read give one message, which says so.
- *
- * Inspection gives messages and nothing else. It has no say in how the request is answered, and it does not
- * fail, whatever the request and the rules are.
  */
 internal fun RuleSets.ruleMessages(
     service: Service,
