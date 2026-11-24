@@ -61,6 +61,19 @@ class TargetTest {
     }
 
     @Test
+    fun textIsWrittenAsDataOfAUrlAndReadBackAsItWas() {
+        val texts = listOf("Ab12-._~", "a/b?c#d", "jane doe", "a&b=c", "100%", "caf\u00e9 \u20ac", "+", "", "\ud83d\ude00")
+
+        val encoded = texts.map(::percentEncoded)
+
+        assertEquals(
+            listOf("Ab12-._~", "a%2Fb%3Fc%23d", "jane%20doe", "a%26b%3Dc", "100%25", "caf%C3%A9%20%E2%82%AC", "%2B", "", "%F0%9F%98%80"),
+            encoded,
+        )
+        assertEquals(texts, encoded.map(::percentDecoded))
+    }
+
+    @Test
     fun aPlusSignStaysAPlusSign() {
         assertEquals("a+b", normalized("a+b"))
         assertEquals("a+b", normalized("a%2Bb"))

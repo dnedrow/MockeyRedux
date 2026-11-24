@@ -4,6 +4,7 @@ import io.github.dnedrow.mockey.core.definitions.defaultRealUrl
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.routing.Target
 import io.github.dnedrow.mockey.core.routing.UrlPattern
+import io.github.dnedrow.mockey.core.routing.percentEncoded
 
 /** Where a request in proxy mode goes. */
 internal sealed interface ForwardTarget {
@@ -83,29 +84,7 @@ private fun withoutValue(names: List<String>): String {
 internal fun substituted(
     url: String,
     values: Map<String, String>,
-): String = UrlPattern.VARIABLE.replace(url) { variable -> values[variable.groupValues[1]]?.let(::escapedValue) ?: variable.value }
-
-private const val UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-private const val HEX = 16
-private const val BYTE_MASK = 0xFF
-
-private fun escapedValue(value: String): String {
-    val escaped = StringBuilder()
-    value.toByteArray(Charsets.UTF_8).forEach { byte ->
-        val char = (byte.toInt() and BYTE_MASK).toChar()
-        if (char in UNRESERVED) {
-            escaped.append(char)
-        } else {
-            escaped.append('%').append(
-                char.code
-                    .toString(HEX)
-                    .uppercase()
-                    .padStart(2, '0'),
-            )
-        }
-    }
-    return escaped.toString()
-}
+): String = UrlPattern.VARIABLE.replace(url) { variable -> values[variable.groupValues[1]]?.let(::percentEncoded) ?: variable.value }
 
 /** Returns [url] followed by [query]. A URL that has a query string of its own gets [query] as further parameters. */
 private fun withQuery(

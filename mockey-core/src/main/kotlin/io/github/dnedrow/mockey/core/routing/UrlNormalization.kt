@@ -59,6 +59,26 @@ internal fun percentDecoded(text: String): String {
 
 private const val ESCAPE_LENGTH = 3
 private const val HEX = 16
+private const val BYTE_MASK = 0xFF
+
+/** The characters that stand for themselves wherever a URL holds them: the unreserved characters of RFC 3986. */
+private const val UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+
+/**
+ * Returns [text] as data of a URL: every character other than a letter of ASCII, a digit, `-`, `.`, `_`, and
+ * `~` is written as the percent escapes of its bytes in UTF-8. What [percentDecoded] makes of the result is
+ * [text] again.
+ */
+internal fun percentEncoded(text: String): String {
+    val encoded = StringBuilder(text.length)
+    text.toByteArray(Charsets.UTF_8).forEach { byte ->
+        val char = (byte.toInt() and BYTE_MASK).toChar()
+        if (char in UNRESERVED) encoded.append(char) else encoded.append('%').append(hexPair(char.code))
+    }
+    return encoded.toString()
+}
+
+private fun hexPair(byte: Int): String = byte.toString(HEX).uppercase().padStart(2, '0')
 
 /** Returns the byte that the escape at [index] of [text] stands for, or `null` when no escape starts there. */
 private fun escapedByte(
