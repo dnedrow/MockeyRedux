@@ -58,6 +58,15 @@ internal class EngineState(
             }
             result
         }
+
+    /**
+     * Runs [action] while no change is applied, and returns what it returns. [action] gets the definitions as
+     * they are, and they stay as they are until it is done. It must not use this state, because it runs while
+     * changes wait.
+     *
+     * Once [action] has begun, it is completed even when the caller is canceled.
+     */
+    suspend fun <T> exclusively(action: suspend (Definitions) -> T): T = writer.withLock { withContext(NonCancellable) { action(current) } }
 }
 
 /**

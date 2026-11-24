@@ -348,6 +348,85 @@ class EngineStateTest {
         }
 
     @Test
+    fun anExclusiveActionGetsTheDefinitionsAsTheyAreAndReturnsItsResult(): Unit =
+        runBlocking {
+            val state = EngineState()
+            state.change(addService("customer/{id}"))
+
+            val names = state.exclusively { definitions -> definitions.services.map { it.name } }
+
+            assertEquals(listOf("Service for customer/{id}"), names)
+        }
+
+    @Test
+    fun noChangeIsAppliedWhileAnExclusiveActionRuns(): Unit =
+        runBlocking {
+            val state = EngineState()
+            val actionStarted = CompletableDeferred<Unit>()
+            val actionMayFinish = CompletableDeferred<Unit>()
+            val seenByAction = CompletableDeferred<Int>()
+
+            val action =
+                launch(Dispatchers.Default) {
+                    state.exclusively { definitions ->
+                        actionStarted.complete(Unit)
+                        actionMayFinish.await()
+                        seenByAction.complete(definitions.services.size)
+                    }
+                }
+            actionStarted.await()
+            val change = launch(Dispatchers.Default) { state.change(addService("customer/{id}")) }
+            repeat(100) { yield() }
+            val changedMeanwhile = state.current.services.size
+            actionMayFinish.complete(Unit)
+            joinAll(action, change)
+
+            assertEquals(0, changedMeanwhile)
+            assertEquals(0, seenByAction.await())
+            assertEquals(1, state.current.services.size)
+        }
+
+    @Test
+    fun anExclusiveActionThatFailsLetsLaterChangesThrough(): Unit =
+        runBlocking {
+            val state = EngineState()
+
+            val failure = assertFailsWith<IOException> { state.exclusively<Unit> { throw IOException("The disk is full.") } }
+            state.change(addService("customer/{id}"))
+
+            assertEquals("The disk is full.", failure.message)
+            assertEquals(1, state.current.services.size)
+        }
+
+    @Test
+    fun anExclusiveActionIsCompletedEvenWhenItsCallerIsCanceledMeanwhile(): Unit =
+        runBlocking {
+            val state = EngineState()
+            val actionStarted = CompletableDeferred<Unit>()
+            val actionMayFinish = CompletableDeferred<Unit>()
+            val actionFinished = AtomicBoolean(false)
+
+            val caller =
+                launch(Dispatchers.Default) {
+                    state.exclusively {
+                        actionStarted.complete(Unit)
+                        actionMayFinish.await()
+                        actionFinished.set(true)
+                    }
+                }
+            try {
+                actionStarted.await()
+                caller.cancel()
+            } finally {
+                actionMayFinish.complete(Unit)
+            }
+            caller.join()
+
+            assertTrue(caller.isCancelled)
+            assertTrue(actionFinished.get())
+        }
+
+    @Test
     fun aCallerThatIsCanceledWhileItWaitsChangesNothing(): Unit =
         runBlocking {
             val firstStarted = CompletableDeferred<Unit>()

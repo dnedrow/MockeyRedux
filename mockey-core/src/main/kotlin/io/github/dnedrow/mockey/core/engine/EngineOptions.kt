@@ -4,6 +4,8 @@ import io.github.dnedrow.mockey.core.history.DEFAULT_BODY_CAPTURE_LIMIT
 import io.github.dnedrow.mockey.core.history.DEFAULT_HISTORY_LIMIT
 import io.github.dnedrow.mockey.core.inspection.Inspector
 import io.github.dnedrow.mockey.core.model.Tags
+import io.github.dnedrow.mockey.core.storage.DefinitionStorage
+import io.github.dnedrow.mockey.core.storage.InMemoryDefinitionStorage
 import io.github.dnedrow.mockey.core.upstream.DEFAULT_CONNECT_TIMEOUT
 import io.github.dnedrow.mockey.core.upstream.DEFAULT_RESPONSE_TIMEOUT
 import io.github.dnedrow.mockey.core.upstream.UpstreamClient
@@ -15,6 +17,15 @@ import kotlin.time.Duration
  * engine reads the options once, when it is created: a change to them afterwards has no effect on it.
  */
 internal class EngineOptions {
+    /** Where the engine keeps its definitions between runs. Without another storage, that is in memory only. */
+    var storage: DefinitionStorage = InMemoryDefinitionStorage()
+
+    /**
+     * Whether the engine starts in read-only mode, in which it keeps every change in memory and saves nothing
+     * to its storage. The mode can be switched while the engine runs.
+     */
+    var readOnly: Boolean = true
+
     /**
      * The client that sends forwarded requests to real services, or `null` for the client that the library
      * brings, which sends over HTTP.

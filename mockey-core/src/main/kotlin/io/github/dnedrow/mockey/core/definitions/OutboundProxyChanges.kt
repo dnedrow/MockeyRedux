@@ -74,6 +74,15 @@ internal val Definitions.outboundProxyInUse: OutboundProxy?
     get() = settings.outboundProxy?.takeIf { it.enabled }
 
 /**
+ * Returns these definitions without the credentials of the outbound proxy, which is how they leave the memory
+ * of an engine. Definitions without such credentials are returned as they are.
+ */
+internal fun Definitions.withoutProxyCredentials(): Definitions {
+    val proxy = settings.outboundProxy?.takeIf { it.credentials != null } ?: return this
+    return copy(settings = settings.copy(outboundProxy = proxy.copy(credentials = null)))
+}
+
+/**
  * What a reader is shown of the outbound proxy: its [url], whether it is [enabled], the [username] of its
  * credentials, and whether they hold a password. The password itself is no part of it.
  */

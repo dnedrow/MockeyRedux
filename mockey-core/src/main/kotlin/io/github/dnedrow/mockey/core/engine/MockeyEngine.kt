@@ -1,5 +1,6 @@
 package io.github.dnedrow.mockey.core.engine
 
+import io.github.dnedrow.mockey.core.definitions.withoutProxyCredentials
 import io.github.dnedrow.mockey.core.history.Exchange
 import io.github.dnedrow.mockey.core.history.Handling
 import io.github.dnedrow.mockey.core.history.HistoryEntry
@@ -28,12 +29,15 @@ import io.github.dnedrow.mockey.core.routing.Target
 import io.github.dnedrow.mockey.core.routing.TargetRegistration
 import io.github.dnedrow.mockey.core.routing.targetOf
 import io.github.dnedrow.mockey.core.routing.twisted
+import io.github.dnedrow.mockey.core.storage.DefinitionStorage
+import io.github.dnedrow.mockey.core.storage.StorageException
 import io.github.dnedrow.mockey.core.upstream.ForwardTarget
 import io.github.dnedrow.mockey.core.upstream.JdkUpstreamClient
 import io.github.dnedrow.mockey.core.upstream.UpstreamClient
 import io.github.dnedrow.mockey.core.upstream.UpstreamSession
 import io.github.dnedrow.mockey.core.upstream.forwardTarget
 import io.github.dnedrow.mockey.core.upstream.proxyAnswer
+import java.io.IOException
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
@@ -63,7 +67,13 @@ public class MockeyEngine internal constructor(
     internal val history = HistoryStore(options.historyLimit, options.bodyCaptureLimit)
     internal val lastUsedTimes = LastUsedTimes()
 
-    private val state = EngineState(initial)
+    private val storage: DefinitionStorage = options.storage
+
+    @Volatile
+    private var writable: Boolean = !options.readOnly
+
+    /** The storage is told of a change before the change takes effect, so a change that cannot be saved does not. */
+    private val state = EngineState(initial, listOf(ChangeObserver { _, after -> if (writable) save(after) }))
     private val snapshot = AtomicReference(Snapshot(initial))
     private val clock: Clock = options.clock
     private val inspectors: Inspectors = options.inspectors?.let(Inspectors::of) ?: Inspectors.installed()
@@ -89,6 +99,32 @@ public class MockeyEngine internal constructor(
     /** The definitions as they are now. */
     public val definitions: Definitions
         get() = state.current
+
+    /**
+     * Whether the engine is in read-only mode. In that mode it keeps every change in memory and saves nothing
+     * to its storage: what the storage holds stays as it is. In writable mode it saves every change before
+     * the operation that made the change returns. See [setReadOnly].
+     */
+    public val readOnly: Boolean
+        get() = !writable
+
+    /**
+     * Switches read-only mode on or off. Nothing happens when the engine is in that mode already.
+     *
+     * Switching the mode off saves the definitions as they are now, with every change that was made in
+     * read-only mode. The engine is in writable mode when this function returns. When the definitions cannot
+     * be saved, the engine stays in read-only mode.
+     *
+     * @throws StorageException when read-only mode is switched off and the definitions cannot be saved
+     */
+    public suspend fun setReadOnly(readOnly: Boolean) {
+        state.exclusively { definitions ->
+            if (readOnly != this.readOnly) {
+                if (!readOnly) save(definitions)
+                writable = !readOnly
+            }
+        }
+    }
 
     /** The routing table of the definitions as they are now. */
     internal val routingTable: RoutingTable
@@ -130,8 +166,27 @@ public class MockeyEngine internal constructor(
         return HandledRequest(answer.handling.response, entry)
     }
 
-    /** Applies [change] to the definitions and returns its result, see [EngineState.change]. */
+    /**
+     * Applies [change] to the definitions and returns its result, see [EngineState.change]. In writable mode
+     * the changed definitions are saved before they take effect.
+     *
+     * @throws StorageException when the changed definitions cannot be saved. They do not take effect then.
+     */
     internal suspend fun <T> change(change: Change<T>): ChangeResult<T> = state.change(change)
+
+    /**
+     * Saves [definitions] to the storage, without the credentials of the outbound proxy, which are held in
+     * memory only.
+     */
+    private suspend fun save(definitions: Definitions) {
+        try {
+            storage.save(definitions.withoutProxyCredentials())
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: IOException) {
+            throw StorageException("The definitions could not be saved: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+    }
 
     /**
      * Replays the history entry with the identifier [id]: handles a request like the one of that entry, with
@@ -165,16 +220,23 @@ public class MockeyEngine internal constructor(
      * The registration is a change to the definitions. It twists the target and routes the request again in
      * the definitions that it gets, because they can have changed since the request was routed: another
      * request for the same target can have registered the service by then.
+     *
+     * A service that cannot be saved is not registered. The request is forwarded all the same, because the
+     * client has no part in what the storage fails at.
      */
     private suspend fun registered(
         received: Target,
         filter: Tags,
     ): Routing? {
+        val registration: Change<Pair<Target, Route>> = { definitions ->
+            val target = definitions.twisted(received)
+            TargetRegistration.register(target, filter) { snapshotOf(it).routes }(definitions).map { route -> target to route }
+        }
         val result =
-            state.change { definitions ->
-                val target = definitions.twisted(received)
-                val registration = TargetRegistration.register(target, filter) { snapshotOf(it).routes }
-                registration(definitions).map { route -> target to route }
+            try {
+                state.change(registration)
+            } catch (_: StorageException) {
+                return null
             }
         return (result as? ChangeResult.Changed)?.let { Routing(snapshotOf(it.definitions), it.value.first, it.value.second) }
     }

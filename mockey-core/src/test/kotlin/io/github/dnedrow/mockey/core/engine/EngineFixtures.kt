@@ -3,13 +3,16 @@ package io.github.dnedrow.mockey.core.engine
 import io.github.dnedrow.mockey.core.history.NOON
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.response.MockResponse
+import io.github.dnedrow.mockey.core.storage.DefinitionStorage
 import io.github.dnedrow.mockey.core.upstream.UpstreamClient
 import io.github.dnedrow.mockey.core.upstream.UpstreamRequest
+import java.io.IOException
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 /** A clock that tells the time that a test gives it. */
 internal class TestClock(
@@ -46,6 +49,42 @@ internal class FakeUpstream(
 
     override fun close() {
         closed = true
+    }
+}
+
+/**
+ * A storage that keeps every save in memory, in the order in which they came. A test can make it fail: while
+ * [failure] is set, a save and a load throw it, and nothing is stored.
+ */
+internal class RecordingStorage(
+    initial: Definitions = Definitions.EMPTY,
+) : DefinitionStorage {
+    val saves = CopyOnWriteArrayList<Definitions>()
+
+    /** How often the definitions were loaded. */
+    val loads = AtomicInteger()
+
+    @Volatile
+    var stored: Definitions = initial
+
+    @Volatile
+    var failure: IOException? = null
+
+    /** What a save does before it stores, such as looking at the engine that asks for it. */
+    @Volatile
+    var beforeSave: suspend (Definitions) -> Unit = {}
+
+    override suspend fun load(): Definitions {
+        loads.incrementAndGet()
+        failure?.let { throw it }
+        return stored
+    }
+
+    override suspend fun save(definitions: Definitions) {
+        beforeSave(definitions)
+        failure?.let { throw it }
+        saves += definitions
+        stored = definitions
     }
 }
 
