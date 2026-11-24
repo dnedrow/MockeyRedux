@@ -279,6 +279,33 @@ internal class StubProxy(
     }
 }
 
+/**
+ * A server on the loopback address that takes every connection and never sends a byte. A client that asks it
+ * over TLS waits for the handshake, and any other client waits for an answer.
+ */
+internal class StubSilence : AutoCloseable {
+    private val listener: ServerSocket = listen(tls = null)
+    private val sockets = ConcurrentHashMap.newKeySet<Socket>()
+    private val threads = stubThreads("stub-silence")
+
+    val port: Int
+        get() = listener.localPort
+
+    /** How many connections were opened to the stub. */
+    val connections: Int
+        get() = sockets.size
+
+    init {
+        threads.execute { acceptConnections(listener) { sockets += it } }
+    }
+
+    override fun close() {
+        listener.close()
+        sockets.forEach(::closeQuietly)
+        threads.shutdownNow()
+    }
+}
+
 private const val BACKLOG = 50
 
 private fun listen(tls: SSLContext?): ServerSocket {

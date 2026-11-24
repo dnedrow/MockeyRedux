@@ -1,10 +1,13 @@
 package io.github.dnedrow.mockey.core.upstream
 
 import io.github.dnedrow.mockey.core.model.Header
+import io.github.dnedrow.mockey.core.model.OutboundProxy
 import io.github.dnedrow.mockey.core.request.MockRequest
 import io.github.dnedrow.mockey.core.response.MockResponse
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URI
 import java.net.URISyntaxException
+import kotlin.time.Duration
 
 /** The headers that tell about one connection and not about the message that it carries. They end at every hop. */
 private val HOP_BY_HOP =
@@ -37,12 +40,14 @@ internal const val MAX_REDIRECTS: Int = 20
 
 /**
  * Returns the request that forwards [request] to [url], which is the URL of a real service with its query
- * string. The method and the body are those of [request], and the headers are its [forwardedHeaders].
+ * string. The method and the body are those of [request], and the headers are its [forwardedHeaders]. The
+ * request goes through [outboundProxy], or to the real service directly when that is `null`.
  */
 internal fun upstreamRequest(
     request: MockRequest,
     url: String,
-): UpstreamRequest = UpstreamRequest(request.method, url, forwardedHeaders(request.headers), request.body)
+    outboundProxy: OutboundProxy? = null,
+): UpstreamRequest = UpstreamRequest(request.method, url, forwardedHeaders(request.headers), request.body, outboundProxy)
 
 /**
  * Returns the headers of a request to the mock endpoint that are forwarded to a real service, in their order.
@@ -90,10 +95,22 @@ private fun List<Header>.withContentLength(length: Int): List<Header> {
  * status 301, 302, 303, 307, or 308 and a `Location` header that names a URL of `http` or `https`, in full or
  * relative to the URL of the request. A redirect of a request with another method is returned as it is.
  *
- * @throws UpstreamException when a real service gives no complete answer, or when more than [MAX_REDIRECTS]
- *   redirects follow one another
+ * The complete answer has to be there within [responseTimeout], counted from the start of the forwarding and
+ * across redirects. After that time the exchange that is under way is ended.
+ *
+ * @throws UpstreamException when a real service gives no complete answer, when that takes longer than
+ *   [responseTimeout], or when more than [MAX_REDIRECTS] redirects follow one another
  */
 internal suspend fun UpstreamClient.forward(
+    request: UpstreamRequest,
+    session: UpstreamSession,
+    responseTimeout: Duration = DEFAULT_RESPONSE_TIMEOUT,
+): MockResponse =
+    withTimeoutOrNull(responseTimeout) { followed(request, session) }
+        ?: throw UpstreamException("${whereOf(request)} gave no complete answer within ${inWords(responseTimeout)}.")
+
+/** Sends [request] within [session], follows the redirects of a GET or a HEAD request, and returns the last answer. */
+private suspend fun UpstreamClient.followed(
     request: UpstreamRequest,
     session: UpstreamSession,
 ): MockResponse {

@@ -152,9 +152,9 @@ class UpstreamClientSpikeTest {
      */
     @Test
     fun theJdkSendsBasicCredentialsForATunnelOnlyWhenItsPropertyAllowsThem() {
-        assertEquals(407, TunnelProbe.run(disabledSchemes = null))
-        assertEquals(407, TunnelProbe.run(disabledSchemes = "Basic"))
-        assertEquals(200, TunnelProbe.run(disabledSchemes = ""))
+        assertEquals("407", TunnelProbe.run(disabledSchemes = null)["status"])
+        assertEquals("407", TunnelProbe.run(disabledSchemes = "Basic")["status"])
+        assertEquals("200", TunnelProbe.run(disabledSchemes = "")["status"])
     }
 
     @Test

@@ -89,14 +89,25 @@ The Ktor client and Apache HttpClient would bring dependencies into every progra
 Credentials for the outbound proxy:
 
 - The adapter sends them itself, as a `Proxy-Authorization` header for the scheme Basic on every request that
-  goes through the proxy. It gives the JDK client no authenticator. Basic is the only scheme.
-- Before it creates its first JDK client, the adapter sets `jdk.http.auth.tunneling.disabledSchemes` to nothing,
-  unless the property is set. Whoever starts the JVM with a value for the property keeps that value.
+  goes through the proxy. It gives the JDK client no authenticator. Basic is the only scheme, and the user
+  name and the password are written in UTF-8.
+- When it is created, the adapter sets `jdk.http.auth.tunneling.disabledSchemes` to nothing, unless the
+  property is set. Whoever starts the JVM with a value for the property keeps that value. The JDK reads the
+  property with its first use of any part of its HTTP client, also the building of a request, so the adapter
+  cannot wait for its first request.
 - The setting holds for the whole JVM. It changes nothing for code that gives no credentials to a proxy.
 - In a JVM that has used the JDK HTTP client before the adapter exists, the JDK has read its default already.
   A request for an `https` target through a proxy with credentials then gets the status 407 of the proxy. The
   adapter treats a 407 from an outbound proxy as an upstream failure and says what to do. A program that
   embeds the core can start its JVM with `-Djdk.http.auth.tunneling.disabledSchemes=` to be sure.
+
+The outbound proxy:
+
+- The JDK client speaks plain HTTP to a proxy and nothing else. The URL of an outbound proxy therefore starts
+  with `http://` and names a host and, where it is not 80, a port. The settings take no other URL.
+- A request names the proxy that it goes through. The adapter keeps one JDK client for direct connections and
+  one for the proxy that is in use, because a JDK client has its proxy for good. When another proxy comes
+  into use, the client for the proxy before it finishes its requests and ends.
 
 The request:
 
@@ -117,8 +128,10 @@ The response:
   name keep their order, which is all that HTTP gives a meaning to.
 - The adapter follows no redirect and keeps no cookie. It builds the JDK client with `Redirect.NEVER` and
   without a cookie handler, and returns every answer as it came.
-- The adapter gives up on an exchange by canceling it, so that one limit covers the connection, the headers,
-  and the body of the response.
+- The connect timeout is that of the JDK client. It covers the handshake of a secure connection as well:
+  a server that takes a connection and then stays silent is given up after that time.
+- The adapter ends an exchange when the coroutine that waits for it is canceled. The core uses that for the
+  response timeout.
 
 ## What the core does above the port
 
@@ -133,8 +146,14 @@ client that a program supplies gets them without any work of its own.
 - Redirects. The core follows the redirects of `GET` and `HEAD` requests, up to 20 in a row, and sends the
   same request to each URL. Every other method gets the redirect response back. Each request of such a chain
   is an exchange of its own, with the cookies of the session that apply to it.
+- The response timeout. The core gives the forwarding of a request one time for its complete answer, from the
+  start and across redirects, and cancels the exchange that is under way when that time is up. One limit
+  therefore covers the connection, the headers, and the body of the response.
 
 ## Repeating the spike
 
 Run `./gradlew :mockey-core:test --tests '*UpstreamClientSpikeTest*'`. The test needs a JDK, because it calls
 `keytool` and starts JVMs of its own.
+
+`OutboundProxyTest` and `CertificateAndTimeoutTest` show the same for the adapter. They start JVMs of their own
+as well, to see what the adapter does about the property in a JVM that sets it and in one that does not.

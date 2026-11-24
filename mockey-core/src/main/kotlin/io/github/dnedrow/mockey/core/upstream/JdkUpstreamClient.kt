@@ -1,21 +1,32 @@
 package io.github.dnedrow.mockey.core.upstream
 
+import io.github.dnedrow.mockey.core.definitions.ProxyAddress
+import io.github.dnedrow.mockey.core.definitions.proxyAddressOf
 import io.github.dnedrow.mockey.core.model.Header
+import io.github.dnedrow.mockey.core.model.OutboundProxy
+import io.github.dnedrow.mockey.core.model.ProxyCredentials
 import io.github.dnedrow.mockey.core.response.MockResponse
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
 import java.net.ConnectException
+import java.net.InetSocketAddress
+import java.net.ProxySelector
 import java.net.URI
 import java.net.URISyntaxException
 import java.net.http.HttpClient
+import java.net.http.HttpConnectTimeoutException
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.security.cert.CertificateException
+import java.util.Base64
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 /**
  * The upstream client that the library brings. It sends requests with the HTTP client of the JDK, over
@@ -30,43 +41,103 @@ import kotlin.coroutines.resumeWithException
  * - It gives the names of the headers of an answer in lower case and in alphabetical order. The values of one
  *   name keep their order.
  *
+ * A request that names an outbound proxy goes through that proxy: a request for an `http` URL is handed to
+ * the proxy, and a request for an `https` URL goes through a tunnel that the proxy opens. The credentials of
+ * the proxy go to the proxy with every such request, for the scheme Basic, and never to a real service. For a
+ * tunnel, the JDK sends them only when the system property `jdk.http.auth.tunneling.disabledSchemes` allows
+ * the scheme Basic. The client sets that property to nothing when it is created, unless the property is set.
+ * The JDK reads the property once, when any part of its HTTP client is first used. A program that uses the
+ * HTTP client of the JDK elsewhere therefore creates this client first, or sets the property itself.
+ *
+ * A connection has to come about within [connectTimeout], which covers the handshake of a secure connection.
  * [sslContext] is what the client trusts the certificates of real services with. Without one, that is the
  * trust store of the runtime.
  */
 internal class JdkUpstreamClient(
+    private val connectTimeout: Duration = DEFAULT_CONNECT_TIMEOUT,
     private val sslContext: SSLContext? = null,
 ) : UpstreamClient {
-    /** The JDK client is created with the first request, so that a client that never sends starts no thread. */
-    private val client: Lazy<HttpClient> =
-        lazy {
-            val builder =
-                HttpClient
-                    .newBuilder()
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .followRedirects(HttpClient.Redirect.NEVER)
-                    .proxy(HttpClient.Builder.NO_PROXY)
-            sslContext?.let(builder::sslContext)
-            builder.build()
-        }
+    init {
+        require(connectTimeout.isPositive()) { "The connect timeout must be a time that passes." }
+        allowBasicCredentialsForTunnels()
+    }
+
+    private var closed = false
+
+    /** The JDK client for direct connections. The first request that needs it creates it, so a client that never sends starts no thread. */
+    private var direct: HttpClient? = null
+
+    /** The JDK client for the outbound proxy that was last used, with the address of that proxy. */
+    private var throughProxy: Pair<ProxyAddress, HttpClient>? = null
 
     override suspend fun send(request: UpstreamRequest): MockResponse {
-        val exchange = jdkRequest(request)
+        val proxy = request.outboundProxy
+        val address = proxy?.let { addressOf(it, request) }
+        val exchange = jdkRequest(request, proxy?.credentials)
         val response =
             try {
-                client.value.sendAsync(exchange, HttpResponse.BodyHandlers.ofByteArray()).awaitOrCancel()
+                clientFor(address).sendAsync(exchange, HttpResponse.BodyHandlers.ofByteArray()).awaitOrCancel()
             } catch (e: IOException) {
-                throw UpstreamException("${whereOf(request)} gave no complete answer: ${reasonOf(e)}", e)
+                throw UpstreamException("${whereOf(request)} gave no complete answer: ${reasonOf(e, address)}", e)
             }
+        if (address != null && response.statusCode() == PROXY_AUTHENTICATION_REQUIRED) throw refused(request, address, proxy.credentials)
         val headers = response.headers().map().flatMap { (name, values) -> values.map { Header(name, it) } }
         return MockResponse(response.statusCode(), headers, response.body() ?: ByteArray(0))
     }
 
+    @Synchronized
     override fun close() {
-        if (client.isInitialized()) client.value.shutdownNow()
+        closed = true
+        direct?.shutdownNow()
+        throughProxy?.second?.shutdownNow()
     }
 
-    /** Returns [request] as a request of the JDK client, or fails when the JDK client cannot send it. */
-    private fun jdkRequest(request: UpstreamRequest): HttpRequest {
+    /**
+     * Returns the JDK client for requests that go through the proxy at [proxy], or directly for `null`. One
+     * client serves all direct requests, and one serves the proxy that is in use. When another proxy comes into
+     * use, the client for the proxy before it finishes the requests that it has and then ends.
+     */
+    @Synchronized
+    private fun clientFor(proxy: ProxyAddress?): HttpClient {
+        check(!closed) { "The upstream client is closed." }
+        if (proxy == null) return direct ?: jdkClient(null).also { direct = it }
+        val current = throughProxy
+        if (current != null && current.first == proxy) return current.second
+        current?.second?.shutdown()
+        return jdkClient(proxy).also { throughProxy = proxy to it }
+    }
+
+    private fun jdkClient(proxy: ProxyAddress?): HttpClient {
+        val builder =
+            HttpClient
+                .newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .proxy(proxy?.let { ProxySelector.of(InetSocketAddress.createUnresolved(it.host, it.port)) } ?: HttpClient.Builder.NO_PROXY)
+        if (connectTimeout.isFinite()) builder.connectTimeout(connectTimeout.toJavaDuration())
+        sslContext?.let(builder::sslContext)
+        return builder.build()
+    }
+
+    /** Returns where the outbound proxy of [request] listens, or fails when its URL does not say. */
+    private fun addressOf(
+        proxy: OutboundProxy,
+        request: UpstreamRequest,
+    ): ProxyAddress =
+        try {
+            proxyAddressOf(proxy.url)
+        } catch (e: IllegalArgumentException) {
+            throw UpstreamException("${whereOf(request)} cannot be asked: ${e.message.orEmpty().replaceFirstChar(Char::lowercase)}", e)
+        }
+
+    /**
+     * Returns [request] as a request of the JDK client, or fails when the JDK client cannot send it.
+     * [credentials] are those of the outbound proxy that the request goes through, if it has some.
+     */
+    private fun jdkRequest(
+        request: UpstreamRequest,
+        credentials: ProxyCredentials?,
+    ): HttpRequest {
         val body = request.body
         return try {
             val builder = HttpRequest.newBuilder(uriOf(request.url))
@@ -82,7 +153,7 @@ internal class JdkUpstreamClient(
 
                 else -> builder.method(request.method, HttpRequest.BodyPublishers.ofByteArray(body))
             }
-            request.headers.forEach { builder.addIfAccepted(it) }
+            headersWith(request.headers, credentials).forEach { builder.addIfAccepted(it) }
             builder.build()
         } catch (e: IllegalArgumentException) {
             throw UpstreamException("${whereOf(request)} cannot be asked: ${e.message}", e)
@@ -98,6 +169,69 @@ internal class JdkUpstreamClient(
         } catch (_: IllegalArgumentException) {
             // The request is sent without this header.
         }
+    }
+
+    /** Returns why an exchange failed, in words. [proxy] is where the outbound proxy of the exchange listens, if it has one. */
+    private fun reasonOf(
+        failure: IOException,
+        proxy: ProxyAddress?,
+    ): String {
+        val toProxy = proxy?.let { " to the outbound proxy at $it" }.orEmpty()
+        val message = failure.message.orEmpty()
+        return when {
+            failure is HttpConnectTimeoutException -> "no connection was made$toProxy within ${inWords(connectTimeout)}."
+            failure is ConnectException -> "no connection could be made$toProxy."
+            failure is SSLException && failure.isAboutCertificate() -> "its certificate was not accepted. $message".trim()
+            failure is SSLException -> "the secure connection could not be set up. $message".trim()
+            else -> failure.message?.let { "$it." } ?: "${failure.javaClass.simpleName}."
+        }
+    }
+
+    private companion object {
+        const val PROXY_AUTHENTICATION_REQUIRED = 407
+        const val PROXY_AUTHORIZATION = "Proxy-Authorization"
+        const val TUNNELING_PROPERTY = "jdk.http.auth.tunneling.disabledSchemes"
+        const val TUNNEL_HINT =
+            "If they are right, start the Java runtime with -D$TUNNELING_PROPERTY= so that it sends them for an https URL."
+
+        /**
+         * Lets the JDK send Basic credentials with the request for a tunnel through a proxy. The JDK keeps them
+         * out by default, and it reads its setting once, with the first use of any part of its HTTP client. A
+         * value that the property has already is left as it is.
+         */
+        fun allowBasicCredentialsForTunnels() {
+            if (System.getProperty(TUNNELING_PROPERTY) == null) System.setProperty(TUNNELING_PROPERTY, "")
+        }
+
+        /** Returns [headers] with [credentials] for an outbound proxy as their only `Proxy-Authorization` header, if there are some. */
+        fun headersWith(
+            headers: List<Header>,
+            credentials: ProxyCredentials?,
+        ): List<Header> {
+            if (credentials == null) return headers
+            val pair = "${credentials.username}:${credentials.password}".toByteArray(Charsets.UTF_8)
+            val authorization = Header(PROXY_AUTHORIZATION, "Basic ${Base64.getEncoder().encodeToString(pair)}")
+            return headers.filterNot { it.name.equals(PROXY_AUTHORIZATION, ignoreCase = true) } + authorization
+        }
+
+        /** Returns the failure for a request that the outbound proxy at [proxy] answered with the status 407 itself. */
+        fun refused(
+            request: UpstreamRequest,
+            proxy: ProxyAddress,
+            credentials: ProxyCredentials?,
+        ): UpstreamException {
+            val notAccepted = "did not accept the user name and the password that are set."
+            val reason =
+                when {
+                    credentials == null -> "wants credentials, and none are set."
+                    request.url.startsWith("https:", ignoreCase = true) -> "$notAccepted $TUNNEL_HINT"
+                    else -> notAccepted
+                }
+            return UpstreamException("${whereOf(request)} gave no complete answer: the outbound proxy at $proxy $reason")
+        }
+
+        /** Returns whether a secure connection failed because of the certificate of the other side. */
+        fun SSLException.isAboutCertificate(): Boolean = generateSequence<Throwable>(this) { it.cause }.any { it is CertificateException }
     }
 }
 
@@ -166,17 +300,6 @@ private fun pathStartOf(url: String): Int {
 private const val BYTE_MASK = 0xFF
 
 private fun isHexDigit(char: Char): Boolean = char in '0'..'9' || char in 'a'..'f' || char in 'A'..'F'
-
-/** Returns what a failure message calls the real service of [request]: its URL without the query string. */
-internal fun whereOf(request: UpstreamRequest): String = "The real service at ${request.url.substringBefore('?')}"
-
-/** Returns why an exchange with a real service failed, in words. */
-private fun reasonOf(failure: IOException): String =
-    when (failure) {
-        is ConnectException -> "no connection could be made."
-        is SSLException -> "the secure connection could not be set up. ${failure.message.orEmpty()}".trim()
-        else -> failure.message?.let { "$it." } ?: "${failure.javaClass.simpleName}."
-    }
 
 /**
  * Waits for the value of the future and returns it. When the coroutine is canceled while it waits, the future

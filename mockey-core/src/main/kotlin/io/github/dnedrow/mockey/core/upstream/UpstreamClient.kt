@@ -1,8 +1,11 @@
 package io.github.dnedrow.mockey.core.upstream
 
 import io.github.dnedrow.mockey.core.model.Header
+import io.github.dnedrow.mockey.core.model.OutboundProxy
 import io.github.dnedrow.mockey.core.response.MockResponse
 import java.io.IOException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Sends requests to real services. An engine forwards every request of proxy mode through one upstream client.
@@ -15,7 +18,7 @@ import java.io.IOException
 public interface UpstreamClient : AutoCloseable {
     /**
      * Sends [request] to the real service that its URL names, and returns the answer of that service as it
-     * came, whatever its status is.
+     * came, whatever its status is. A request that names an outbound proxy goes through that proxy.
      *
      * @throws UpstreamException when the real service gives no complete answer
      */
@@ -31,6 +34,10 @@ public interface UpstreamClient : AutoCloseable {
  * [method] is the HTTP method, and [url] is the URL of the real service with its query string, such as
  * `http://api.example.com/customers/7?expand=orders`.
  *
+ * [outboundProxy] is the proxy that the request goes through, with the credentials for that proxy when it
+ * has some, and `null` for a request that goes to the real service directly. Its `enabled` flag has no say
+ * here: an engine names the proxy of its settings only while that proxy is enabled.
+ *
  * The request takes over the array of its body. Whoever creates a request must not change that array
  * afterwards.
  */
@@ -41,6 +48,7 @@ public class UpstreamRequest
         public val url: String,
         headers: List<Header> = emptyList(),
         body: ByteArray = ByteArray(0),
+        public val outboundProxy: OutboundProxy? = null,
     ) {
         /** The headers to send, in their order. A name can occur more than once. */
         public val headers: List<Header> = headers.toList()
@@ -55,7 +63,7 @@ public class UpstreamRequest
         internal fun copy(
             url: String = this.url,
             headers: List<Header> = this.headers,
-        ): UpstreamRequest = UpstreamRequest(method, url, headers, bodyBytes)
+        ): UpstreamRequest = UpstreamRequest(method, url, headers, bodyBytes, outboundProxy)
 
         /** Returns the method and the URL without its query string. The rest is left out, because it can hold secrets. */
         override fun toString(): String = "UpstreamRequest($method ${url.substringBefore('?')})"
@@ -63,8 +71,8 @@ public class UpstreamRequest
 
 /**
  * Tells that a real service gave no complete answer to a request: it could not be reached, its certificate was
- * not accepted, it took too long, or its answer broke off. The message says what happened, in words for
- * whoever sent the request.
+ * not accepted, it took too long, its answer broke off, or the outbound proxy did not let the request
+ * through. The message says what happened, in words for whoever sent the request.
  */
 public class UpstreamException
     @JvmOverloads
@@ -72,3 +80,24 @@ public class UpstreamException
         message: String,
         cause: Throwable? = null,
     ) : IOException(message, cause)
+
+/** How long a connection to a real service may take to come about, where no other time is set. */
+internal val DEFAULT_CONNECT_TIMEOUT: Duration = 10.seconds
+
+/** How long the complete answer to a forwarded request may take, where no other time is set. */
+internal val DEFAULT_RESPONSE_TIMEOUT: Duration = 60.seconds
+
+/** Returns what a failure message calls the real service of [request]: its URL without the query string. */
+internal fun whereOf(request: UpstreamRequest): String = "The real service at ${request.url.substringBefore('?')}"
+
+private const val MILLIS_IN_SECOND = 1000L
+
+/** Returns [duration] as a failure message states it: in seconds where it is a whole number of them, and in milliseconds otherwise. */
+internal fun inWords(duration: Duration): String {
+    val millis = duration.inWholeMilliseconds
+    return when {
+        millis % MILLIS_IN_SECOND != 0L -> "$millis milliseconds"
+        millis == MILLIS_IN_SECOND -> "1 second"
+        else -> "${millis / MILLIS_IN_SECOND} seconds"
+    }
+}
