@@ -65,7 +65,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 7.3 Implement forward-target resolution: absolute targets, relative targets through the default real URL with substitution, and the 502 cases (DEV-12). Verify with unit tests for each scenario of those requirements.
 - [x] 7.4 Implement the shared upstream cookie store with its reset operation, and redirect handling. Verify with tests against the stub upstream, including two clients that share a cookie.
 - [x] 7.5 Implement outbound proxy settings with in-memory credentials, certificate verification, and connect and response timeouts. Verify with tests against the stub proxy and a stub upstream with an untrusted certificate, including the ported legacy `ProxyServerModelTest` cases.
-- [ ] 7.6 Implement upstream failure handling: error scenario fallback, the built-in 502 JSON response (DEV-13), and the service delay on proxied responses. Verify with unit tests for each scenario of those requirements.
+- [x] 7.6 Implement upstream failure handling: error scenario fallback, the built-in 502 JSON response (DEV-13), and the service delay on proxied responses. Verify with unit tests for each scenario of those requirements.
 
 ## 8. Core: plans and history (specs: service-plans, request-history)
 

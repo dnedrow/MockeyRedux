@@ -63,19 +63,16 @@ internal fun forwardTarget(
             .filterNot { it in variables }
             .distinct()
             .toList()
-    if (missing.isNotEmpty()) {
-        val names = missing.joinToString(", ") { "'$it'" }
-        val what =
-            if (missing.size ==
-                1
-            ) {
-                "the variable $names, for which the request has no value"
-            } else {
-                "the variables $names, for which the request has no values"
-            }
-        return ForwardTarget.Nowhere("$cannotForward: its real URL $realUrl has $what.")
-    }
+    if (missing.isNotEmpty()) return ForwardTarget.Nowhere("$cannotForward: its real URL $realUrl has ${withoutValue(missing)}.")
     return ForwardTarget.To(withQuery(substituted(realUrl, variables), query))
+}
+
+/** Returns what an explanation calls the variables with the names [names], for which a request has no value. */
+private fun withoutValue(names: List<String>): String {
+    val quoted = names.joinToString(", ") { "'$it'" }
+    val one = "the variable $quoted, for which the request has no value"
+    val several = "the variables $quoted, for which the request has no values"
+    return if (names.size == 1) one else several
 }
 
 /**

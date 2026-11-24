@@ -65,8 +65,11 @@ public class UpstreamRequest
             headers: List<Header> = this.headers,
         ): UpstreamRequest = UpstreamRequest(method, url, headers, bodyBytes, outboundProxy)
 
-        /** Returns the method and the URL without its query string. The rest is left out, because it can hold secrets. */
-        override fun toString(): String = "UpstreamRequest($method ${url.substringBefore('?')})"
+        /**
+         * Returns the method and the URL without its query string and without a user name and a password. The
+         * rest is left out as well, because it can hold secrets.
+         */
+        override fun toString(): String = "UpstreamRequest($method ${shown(url)})"
     }
 
 /**
@@ -87,8 +90,17 @@ internal val DEFAULT_CONNECT_TIMEOUT: Duration = 10.seconds
 /** How long the complete answer to a forwarded request may take, where no other time is set. */
 internal val DEFAULT_RESPONSE_TIMEOUT: Duration = 60.seconds
 
-/** Returns what a failure message calls the real service of [request]: its URL without the query string. */
-internal fun whereOf(request: UpstreamRequest): String = "The real service at ${request.url.substringBefore('?')}"
+/** Returns what a failure message calls the real service of [request]: its URL as [shown]. */
+internal fun whereOf(request: UpstreamRequest): String = "The real service at ${shown(request.url)}"
+
+/** The user name and the password that a URL holds before its host, with the sign that ends them. */
+private val USER_INFO = Regex("(?<=://)[^/?#@]*@")
+
+/**
+ * Returns [url] as a message shows it: without its query string, and without a user name and a password
+ * before its host. Both can hold secrets, and a message can reach a client or a log.
+ */
+internal fun shown(url: String): String = url.substringBefore('?').replaceFirst(USER_INFO, "")
 
 private const val MILLIS_IN_SECOND = 1000L
 
