@@ -38,3 +38,10 @@ internal val Definitions.universalErrorScenario: Scenario?
  * designated.
  */
 internal fun Definitions.errorScenarioFor(service: Service): Scenario? = service.errorScenario ?: universalErrorScenario
+
+/**
+ * The default real URL of the service: the real URL at [Service.defaultRealUrlIndex], or the first real URL
+ * when there is none at that place. Only a service without real URLs has none.
+ */
+internal val Service.defaultRealUrl: String?
+    get() = realUrls.getOrNull(defaultRealUrlIndex) ?: realUrls.firstOrNull()

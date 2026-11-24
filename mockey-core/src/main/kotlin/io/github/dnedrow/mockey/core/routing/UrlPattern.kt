@@ -46,7 +46,8 @@ internal class UrlPattern private constructor(
     }
 
     companion object {
-        private val VARIABLE = Regex("""\{([^/{}]+)\}""")
+        /** A variable of a URL pattern: a name in braces, which is one or more characters other than `/`, `{`, and `}`. */
+        val VARIABLE = Regex("""\{([^/{}]+)\}""")
 
         /** Compiles [pattern]. Every text is a pattern: one without a variable matches the targets that equal it. */
         fun compile(pattern: String): UrlPattern {

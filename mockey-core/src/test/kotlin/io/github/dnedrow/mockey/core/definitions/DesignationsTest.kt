@@ -33,6 +33,23 @@ class DesignationsTest {
         assertNull(service.copy(scenarios = emptyList(), defaultScenarioId = gold.id).defaultScenario)
     }
 
+    @Test
+    fun theDefaultRealUrlIsTheOneAtTheDesignatedPlace() {
+        val urls = listOf("http://qa1.example.com/plans", "http://qa2.example.com/plans")
+
+        assertEquals("http://qa1.example.com/plans", service.copy(realUrls = urls).defaultRealUrl)
+        assertEquals("http://qa2.example.com/plans", service.copy(realUrls = urls, defaultRealUrlIndex = 1).defaultRealUrl)
+    }
+
+    @Test
+    fun theFirstRealUrlStandsInForAPlaceThatHasNone() {
+        val urls = listOf("http://qa1.example.com/plans", "http://qa2.example.com/plans")
+
+        assertEquals("http://qa1.example.com/plans", service.copy(realUrls = urls, defaultRealUrlIndex = 2).defaultRealUrl)
+        assertEquals("http://qa1.example.com/plans", service.copy(realUrls = urls, defaultRealUrlIndex = -1).defaultRealUrl)
+        assertNull(service.copy(realUrls = emptyList(), defaultRealUrlIndex = 0).defaultRealUrl)
+    }
+
     private val failure = Scenario(id = ScenarioId.generate(), name = "failure")
     private val errors = Service(id = ServiceId.generate(), name = "Errors", mockUrl = "errors", scenarios = listOf(failure))
 
