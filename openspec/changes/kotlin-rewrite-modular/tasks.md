@@ -40,7 +40,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 4.1 Implement target extraction and normalization: absolute and relative targets, query separation, percent-decoding, slashes, letter case, and default ports. Verify with unit tests, including the ported legacy `UrlTest` and `MockServiceBeanTest` cases, which both test the legacy `Url` class. The checks of `MockServiceBeanTest` that read a text without a scheme as a host are linked to DEV-03.
 - [x] 4.2 Implement the URL pattern compiler and matcher with single-segment variables, whole-target matching, and captured values in request case (DEV-01). Verify with unit tests, including the ported legacy `UriTemplateTest` cases.
 - [x] 4.3 Implement candidate lookup through mock URL patterns and real URLs, and selection of the most specific service (DEV-02). Verify with unit tests, including the services from upstream issue 109.
-- [ ] 4.4 Implement the tag filter and the handling of unknown targets: forwarding and registration for absolute targets, refusal for relative targets, and the setting that disables handling (DEV-03, DEV-04). Verify with unit tests for each scenario of those requirements.
+- [x] 4.4 Implement the tag filter and the handling of unknown targets: forwarding and registration for absolute targets, refusal for relative targets, and the setting that disables handling (DEV-03, DEV-04). Verify with unit tests for each scenario of those requirements.
 - [ ] 4.5 Implement twist configurations with at most one enabled, and literal twisting before lookup (DEV-05). Verify with unit tests for each scenario of those requirements.
 
 ## 5. Core: request rules and inspection (spec: request-inspection)
@@ -78,7 +78,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 ## 9. Core: pipeline, storage, and library surface (specs: definition-storage, embedded-engine)
 
-- [ ] 9.1 Assemble the request pipeline of design decision 4 into the engine's request-handling operation. Verify with in-process tests that run a request through twisting, routing, inspection, response, delay, and history.
+- [ ] 9.1 Assemble the request pipeline of design decision 4 into the engine's request-handling operation. Hold the tag filter and the setting for unknown targets in the engine, keep one routing table for each value of the definitions, and apply the registration of an unknown absolute target (task 4.4) before the request is forwarded. Verify with in-process tests that run a request through twisting, routing, inspection, response, delay, and history, including a request under a tag filter and two requests for one unknown absolute target.
 - [ ] 9.2 Implement the storage port, the in-memory store, read-only mode with runtime switching, and saving before acknowledging with rollback on failure. Verify with unit tests, including a store that fails on write.
 - [ ] 9.3 Implement the file store: layout, deterministic serialization, atomic writes, rewriting only changed files, collision-free names, and identity from content (DEV-21). Verify with tests for a byte-identical load and save, an interrupted write, similar names, and a renamed directory.
 - [ ] 9.4 Implement loading at startup, the format version check, reload, and reset. Verify with tests for an empty location, a corrupt file, a newer format version, and a failed reload that leaves memory unchanged.

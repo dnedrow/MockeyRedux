@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.core.routing
 
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Service
+import io.github.dnedrow.mockey.core.model.Tags
 
 /**
  * The URL patterns of the services of [definitions], compiled once. A table belongs to one value of the
@@ -22,6 +23,37 @@ internal class RoutingTable(
      * of them.
      */
     fun candidates(target: Target): List<Candidate> = entries.mapNotNull { it.candidate(target) }
+
+    /**
+     * Routes a request for [target].
+     *
+     * The request goes to the most specific of the candidates that [tagFilter] admits, see [mostSpecific]. A
+     * filter without tags admits every service. Any other filter admits a service when the service or one of
+     * its scenarios carries one of the tags of the filter.
+     *
+     * When no candidate is left, the request for an absolute target is forwarded to that target, unless
+     * [forwardUnknownTargets] is off. A service is registered for the target only when no service is a
+     * candidate at all: a target that the filter hides gets no second service. Every other request is not
+     * found.
+     */
+    fun route(
+        target: Target,
+        tagFilter: Tags,
+        forwardUnknownTargets: Boolean,
+    ): Route {
+        val candidates = candidates(target)
+        val selected = candidates.filter { tagFilter.admits(it.service) }.mostSpecific()
+        val noService = "No service matches the target '${target.text}'."
+        return when {
+            selected != null -> Route.ToService(target, selected.service, selected.variables)
+            !target.isAbsolute -> Route.NotFound(target, noService)
+            !forwardUnknownTargets -> Route.NotFound(target, "$noService Unknown targets are not forwarded.")
+            else -> Route.Forward(target, registers = candidates.isEmpty())
+        }
+    }
+
+    private fun Tags.admits(service: Service): Boolean =
+        isEmpty() || service.tags.any { it in this } || service.scenarios.any { scenario -> scenario.tags.any { it in this } }
 
     private class Entry(
         val service: Service,
