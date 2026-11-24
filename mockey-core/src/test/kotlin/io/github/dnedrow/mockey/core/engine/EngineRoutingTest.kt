@@ -16,12 +16,14 @@ import io.github.dnedrow.mockey.core.model.TwistPair
 import io.github.dnedrow.mockey.core.response.MockResponse
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Timeout
+import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -255,18 +257,23 @@ class EngineRoutingTest {
                 it.copy(name = if (scenarioB) "Orders B" else "Orders A", defaultScenarioId = if (scenarioB) b.id else a.id)
             }
 
+        // The changes and each of the four clients have a thread of their own. On the default dispatcher of a
+        // machine with four processors or fewer, the clients take every thread, the changes are never made,
+        // and the clients send requests without end.
         val handled =
-            runBlocking(Dispatchers.Default) {
-                val changes =
-                    launch(start = CoroutineStart.LAZY) { repeat(501) { round -> engine.change(switchTo(scenarioB = round % 2 == 0)) } }
-                List(4) {
-                    async {
-                        val requests = mutableListOf(engine.handle(requestFor("orders")))
-                        changes.start()
-                        while (changes.isActive) requests += engine.handle(requestFor("orders"))
-                        requests + engine.handle(requestFor("orders"))
-                    }
-                }.awaitAll().flatten()
+            Executors.newFixedThreadPool(5).asCoroutineDispatcher().use { threads ->
+                runBlocking(threads) {
+                    val changes =
+                        launch(start = CoroutineStart.LAZY) { repeat(501) { round -> engine.change(switchTo(scenarioB = round % 2 == 0)) } }
+                    List(4) {
+                        async {
+                            val requests = mutableListOf(engine.handle(requestFor("orders")))
+                            changes.start()
+                            while (changes.isActive) requests += engine.handle(requestFor("orders"))
+                            requests + engine.handle(requestFor("orders"))
+                        }
+                    }.awaitAll().flatten()
+                }
             }
 
         // Every request saw the service before a change or after it, and none saw a part of each.
