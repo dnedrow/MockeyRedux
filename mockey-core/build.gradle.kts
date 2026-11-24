@@ -14,4 +14,5 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     // json-schema checks the `format` keyword with jmail, which it declares as optional.
     runtimeOnly(libs.jmail)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
