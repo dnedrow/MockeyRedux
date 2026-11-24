@@ -19,6 +19,7 @@ import javax.net.ssl.SSLHandshakeException
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -314,9 +315,11 @@ class UpstreamClientSpikeTest {
             while (upstream.requests.isEmpty()) Thread.sleep(POLL_MILLIS)
 
             pending.cancel(true)
-            val failure = assertFailsWith<ExecutionException> { pending.get(SLOW_MILLIS, TimeUnit.MILLISECONDS) }
+            val failure = assertFails { pending.get(SLOW_MILLIS, TimeUnit.MILLISECONDS) }
 
-            assertIs<CancellationException>(failure.cause)
+            // The future ends with the cancellation itself, or with a failure that the cancellation caused,
+            // whichever of the two the JDK client gets to first.
+            assertIs<CancellationException>(if (failure is ExecutionException) failure.cause else failure)
             assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < SLOW_MILLIS)
         }
     }

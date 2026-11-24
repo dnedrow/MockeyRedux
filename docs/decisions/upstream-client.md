@@ -62,7 +62,7 @@ The tests ran on OpenJDK 21.0.13. What they show:
 | Redirects | With `Redirect.NEVER` the client returns the redirect response. |
 | Cookies | The cookie store of the JDK, `java.net.CookieManager`, writes a cookie that was set with `Max-Age` in the form of RFC 2965: `theme="dark";$Path="/stub/cookie";$Domain="127.0.0.1"`. |
 | HTTP/2 | A client that is not held to HTTP/1.1 adds `Upgrade: h2c`, `HTTP2-Settings`, and `Connection: Upgrade, HTTP2-Settings` to a request for an `http` URL. |
-| Canceling | `cancel(true)` on the future of a request ends the exchange at once. |
+| Canceling | `cancel(true)` on the future of a request ends the exchange at once. The future then ends with a `CancellationException`, or with a failure whose cause is one, whichever the client gets to first. |
 | The URL of a request | `java.net.URI` refuses characters that a request target can hold, such as a pipe sign, braces, a space, and a percent sign that starts no escape. |
 
 The JVM setting is the property `jdk.http.auth.tunneling.disabledSchemes`. The file `conf/net.properties` of
