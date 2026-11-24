@@ -1,9 +1,12 @@
 package io.github.dnedrow.mockey.core.definitions
 
+import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Scenario
 import io.github.dnedrow.mockey.core.model.ScenarioId
+import io.github.dnedrow.mockey.core.model.ScenarioReference
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.ServiceId
+import io.github.dnedrow.mockey.core.model.Settings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -28,5 +31,54 @@ class DesignationsTest {
     @Test
     fun aServiceWithoutScenariosHasNoDefaultScenario() {
         assertNull(service.copy(scenarios = emptyList(), defaultScenarioId = gold.id).defaultScenario)
+    }
+
+    private val failure = Scenario(id = ScenarioId.generate(), name = "failure")
+    private val errors = Service(id = ServiceId.generate(), name = "Errors", mockUrl = "errors", scenarios = listOf(failure))
+
+    private fun definitions(
+        universal: ScenarioReference?,
+        vararg services: Service,
+    ) = Definitions(services = services.toList(), settings = Settings(universalErrorScenario = universal))
+
+    @Test
+    fun theErrorScenarioIsTheDesignatedOne() {
+        assertEquals(gold, service.copy(errorScenarioId = gold.id).errorScenario)
+    }
+
+    @Test
+    fun aServiceHasNoErrorScenarioUnlessItDesignatesOneOfItsScenarios() {
+        assertNull(service.errorScenario)
+        assertNull(service.copy(errorScenarioId = failure.id).errorScenario)
+        assertNull(service.copy(scenarios = emptyList(), errorScenarioId = gold.id).errorScenario)
+    }
+
+    @Test
+    fun theUniversalErrorScenarioIsTheOneThatTheSettingsDesignate() {
+        val definitions = definitions(ScenarioReference(errors.id, failure.id), service, errors)
+
+        assertEquals(failure, definitions.universalErrorScenario)
+    }
+
+    @Test
+    fun thereIsNoUniversalErrorScenarioUnlessTheSettingsDesignateAScenarioThatExists() {
+        assertNull(definitions(universal = null, service, errors).universalErrorScenario)
+        assertNull(definitions(ScenarioReference(errors.id, gold.id), service, errors).universalErrorScenario)
+        assertNull(definitions(ScenarioReference(ServiceId.generate(), failure.id), service, errors).universalErrorScenario)
+        assertNull(definitions(ScenarioReference(errors.id, failure.id), service).universalErrorScenario)
+    }
+
+    @Test
+    fun theErrorScenarioOfAServiceComesBeforeTheUniversalErrorScenario() {
+        val definitions = definitions(ScenarioReference(errors.id, failure.id), service, errors)
+
+        assertEquals(gold, definitions.errorScenarioFor(service.copy(errorScenarioId = gold.id)))
+        assertEquals(failure, definitions.errorScenarioFor(service))
+        assertEquals(failure, definitions.errorScenarioFor(service.copy(errorScenarioId = failure.id)))
+    }
+
+    @Test
+    fun withoutADesignationNoErrorScenarioAnswersForAService() {
+        assertNull(definitions(universal = null, service, errors).errorScenarioFor(service))
     }
 }

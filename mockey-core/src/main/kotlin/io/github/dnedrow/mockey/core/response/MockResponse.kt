@@ -47,3 +47,12 @@ public class MockResponse
         /** Returns the status. The headers and the body are left out, because they can hold secrets. */
         override fun toString(): String = "MockResponse($status)"
     }
+
+/**
+ * Returns a response that the system gives on its own, where no scenario and no real service answers: the
+ * [status], and the [explanation] as plain text in UTF-8.
+ */
+internal fun builtInResponse(
+    status: Int,
+    explanation: String,
+): MockResponse = MockResponse(status, listOf(Header("Content-Type", "text/plain; charset=utf-8")), explanation.toByteArray(Charsets.UTF_8))
