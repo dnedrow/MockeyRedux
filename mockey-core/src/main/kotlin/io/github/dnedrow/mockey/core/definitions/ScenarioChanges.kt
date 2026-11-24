@@ -53,7 +53,10 @@ internal object ScenarioChanges {
             }
         }
 
-    /** Updates the scenario [scenarioId] of the service [serviceId]. [change] gets the scenario as it is. */
+    /**
+     * Updates the scenario [scenarioId] of the service [serviceId]. [change] gets the scenario as it is. When
+     * the scenario gets another name, the plan items that refer to it get that name as well.
+     */
     fun update(
         serviceId: ServiceId,
         scenarioId: ScenarioId,
@@ -68,7 +71,9 @@ internal object ScenarioChanges {
                 scenarioNotFound(service, scenarioId)
             } else {
                 val scenario = normalized(attributesChanged(current, change), service)
-                saved(definitions, service, scenario) { scenarios -> scenarios.map { if (it.id == scenarioId) scenario else it } }
+                val unchanged = scenario.name == current.name
+                val renamed = if (unchanged) definitions else definitions.withScenarioRenamedInPlans(service, current, scenario.name)
+                saved(renamed, service, scenario) { scenarios -> scenarios.map { if (it.id == scenarioId) scenario else it } }
             }
         }
 
@@ -184,6 +189,14 @@ internal fun Service.withValidDesignations(): Service {
         errorScenarioId = errorScenarioId?.takeIf { it in ids },
     )
 }
+
+/**
+ * Returns the scenario of the service that the name [name] refers to, as a plan item names a scenario: the
+ * scenario whose name is [name], without regard to letter case and surrounding whitespace, or `null` when the
+ * service has none. Of several scenarios with that name, it is the one that was created first.
+ */
+internal fun Service.scenarioNamed(name: String): Scenario? =
+    scenarios.firstOrNull { it.name.trim().equals(name.trim(), ignoreCase = true) }
 
 /**
  * Tells whether this scenario and [other] count as the same scenario when services are merged or definitions

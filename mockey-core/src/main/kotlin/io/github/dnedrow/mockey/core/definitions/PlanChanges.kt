@@ -6,11 +6,29 @@ import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Plan
 import io.github.dnedrow.mockey.core.model.PlanId
 import io.github.dnedrow.mockey.core.model.PlanItem
+import io.github.dnedrow.mockey.core.model.Scenario
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.ServiceId
 
+/** What applying a plan did: the [plan], the items that were skipped, and the scenario names that named no scenario. */
+public data class PlanApplyReport(
+    public val plan: Plan,
+    public val skippedItems: List<PlanItem>,
+    public val unresolvedScenarios: List<UnresolvedScenario>,
+)
+
 /**
- * The changes that create, save, update, and delete a plan, and the change that designates the default plan.
+ * A scenario name of a plan item that names no scenario of the service of that item. [serviceName] is the name
+ * of the service as the service has it, and [scenarioName] is the name as the item has it.
+ */
+public data class UnresolvedScenario(
+    public val serviceName: String,
+    public val scenarioName: String,
+)
+
+/**
+ * The changes that create, save, update, apply, and delete a plan, and the change that designates the default
+ * plan.
  *
  * A plan is stored in a normal form. Its name has no surrounding whitespace, and a plan without a name gets a
  * generated one. A blank description is absent. The service name and the scenario name of an item have no
@@ -122,6 +140,62 @@ internal object PlanChanges {
             }
         }
 
+    /**
+     * Applies the plan [id] and yields a report.
+     *
+     * Each item of the plan puts the service that it refers to into the state of the item, see
+     * [serviceNamed]: the service gets the delay and the response mode of the item, and the scenario that the
+     * item refers to becomes its default scenario, see [scenarioNamed]. The items apply in their order, so of
+     * several items for one service, the last one counts. Every service that no item refers to stays as it is.
+     *
+     * An item that refers to no service is skipped. An item that refers to no scenario of its service leaves
+     * the default scenario of that service as it is, and sets its delay and its response mode all the same. The
+     * report names both. An item without a scenario name leaves the default scenario as it is as well, and
+     * there is nothing to report about it.
+     */
+    fun apply(id: PlanId): Change<PlanApplyReport> =
+        { definitions ->
+            val plan = definitions.plan(id)
+            if (plan == null) planNotFound(id) else applied(definitions, plan)
+        }
+
+    /**
+     * Applies the default plan, as [apply] does, and yields its report. Without a default plan, nothing changes
+     * and the change yields `null`. Definitions get their default plan applied after they are loaded.
+     */
+    fun applyDefault(): Change<PlanApplyReport?> =
+        { definitions ->
+            val plan = definitions.defaultPlan
+            if (plan == null) ChangeResult.Changed(definitions, null) else applied(definitions, plan)
+        }
+
+    private fun applied(
+        definitions: Definitions,
+        plan: Plan,
+    ): ChangeResult.Changed<PlanApplyReport> {
+        val skipped = mutableListOf<PlanItem>()
+        val unresolved = mutableListOf<UnresolvedScenario>()
+        var result = definitions
+        for (item in plan.items) {
+            val service = result.serviceNamed(item.serviceName)
+            if (service == null) {
+                skipped += item
+                continue
+            }
+            val scenario = item.scenarioName?.let(service::scenarioNamed)
+            if (item.scenarioName != null && scenario == null) unresolved += UnresolvedScenario(service.name, item.scenarioName)
+            result =
+                result.withService(
+                    service.copy(
+                        delayMillis = item.delayMillis,
+                        responseMode = item.responseMode,
+                        defaultScenarioId = scenario?.id ?: service.defaultScenarioId,
+                    ),
+                )
+        }
+        return ChangeResult.Changed(result, PlanApplyReport(plan, skipped, unresolved))
+    }
+
     /** Returns the item that holds the settings that [service] has now. */
     private fun itemOf(service: Service): PlanItem =
         PlanItem(service.name, service.defaultScenario?.name, service.responseMode, service.delayMillis)
@@ -163,3 +237,42 @@ internal val Definitions.defaultPlan: Plan?
 internal fun Definitions.withPlan(plan: Plan): Definitions = copy(plans = plans.map { if (it.id == plan.id) plan else it })
 
 internal fun planNotFound(id: PlanId): ChangeResult.NotFound = ChangeResult.NotFound("No plan has the identifier ${id.value}.")
+
+/**
+ * Returns the definitions in which every plan item that refers to [service] names it [newName], see
+ * [serviceNamed]. [service] is the service as these definitions have it, before it is renamed.
+ */
+internal fun Definitions.withServiceRenamedInPlans(
+    service: Service,
+    newName: String,
+): Definitions = withPlanItems { item -> if (refersTo(item, service)) item.copy(serviceName = newName) else item }
+
+/**
+ * Returns the definitions in which every plan item that refers to [scenario] of [service] names the scenario
+ * [newName], see [serviceNamed] and [scenarioNamed]. [service] and [scenario] are as these definitions have
+ * them, before the scenario is renamed.
+ */
+internal fun Definitions.withScenarioRenamedInPlans(
+    service: Service,
+    scenario: Scenario,
+    newName: String,
+): Definitions =
+    withPlanItems { item ->
+        val named = item.scenarioName?.let(service::scenarioNamed)
+        if (refersTo(item, service) && named?.id == scenario.id) item.copy(scenarioName = newName) else item
+    }
+
+private fun Definitions.refersTo(
+    item: PlanItem,
+    service: Service,
+): Boolean = serviceNamed(item.serviceName)?.id == service.id
+
+/** Returns the definitions with every item of every plan as [change] returns it. A plan without a changed item stays the same value. */
+private fun Definitions.withPlanItems(change: (PlanItem) -> PlanItem): Definitions {
+    val changed =
+        plans.map { plan ->
+            val items = plan.items.map(change)
+            if (items == plan.items) plan else plan.copy(items = items)
+        }
+    return if (changed == plans) this else copy(plans = changed)
+}

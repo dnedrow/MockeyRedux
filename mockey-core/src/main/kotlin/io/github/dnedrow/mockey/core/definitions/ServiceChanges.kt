@@ -45,7 +45,10 @@ internal object ServiceChanges {
             saved(definitions, service, designationErrors(blank, defined)) { services -> services + service }
         }
 
-    /** Updates the service [id]. [change] gets the service as it is and returns it with its new attributes. */
+    /**
+     * Updates the service [id]. [change] gets the service as it is and returns it with its new attributes. When
+     * the service gets another name, the plan items that refer to it get that name as well.
+     */
     fun update(
         id: ServiceId,
         change: (Service) -> Service,
@@ -57,7 +60,9 @@ internal object ServiceChanges {
             } else {
                 val changed = attributesChanged(current, change)
                 val service = normalized(changed).withValidDesignations()
-                saved(definitions, service, designationErrors(current, changed)) { services ->
+                val unchanged = service.name == current.name
+                val renamed = if (unchanged) definitions else definitions.withServiceRenamedInPlans(current, service.name)
+                saved(renamed, service, designationErrors(current, changed)) { services ->
                     services.map { if (it.id == id) service else it }
                 }
             }
@@ -209,6 +214,14 @@ internal object ServiceChanges {
 }
 
 internal fun Definitions.service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
+
+/**
+ * Returns the service that the name [name] refers to, as a plan item names a service: the service whose name
+ * is [name], without regard to letter case and surrounding whitespace, or `null` when there is none. Of
+ * several services with that name, it is the one that was created first.
+ */
+internal fun Definitions.serviceNamed(name: String): Service? =
+    services.firstOrNull { it.name.trim().equals(name.trim(), ignoreCase = true) }
 
 /** Returns the definitions with [service] in the place of the service that has its identifier. */
 internal fun Definitions.withService(service: Service): Definitions =
