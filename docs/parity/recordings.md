@@ -72,10 +72,11 @@ A file states the body in exactly one of the five ways.
 
 ## Review of the recordings (task 2.9)
 
-Every recording was reviewed against the specifications of the change and labeled. Of the 246 recordings, 36
-are `same` and 210 name deviations, 125 of them DEV-06, the line break that legacy appends to every scenario
+Every recording was reviewed against the specifications of the change and labeled. Of the 259 recordings, 36
+are `same` and 223 name deviations, 138 of them DEV-06, the line break that legacy appends to every scenario
 response. `docs/deviations.md` describes each deviation and names recordings that show it. The 13 recordings
-of the group `routing-normalization` were added and reviewed with task 4.1.
+of the group `routing-normalization` were added and reviewed with task 4.1, and the 13 recordings of the groups
+`rules-malformed` and `rules-values` with tasks 5.1 and 5.2.
 
 `ParityReviewTest.everyRecordingIsReviewed` is the check. It fails when a recording is `unreviewed`, when a
 label names an ID that `docs/deviations.md` does not list, when a recording that deviates states no new
@@ -99,6 +100,8 @@ which the specifications should settle:
   specification says "percent-decode". A target is not read that way: there a `+` is a `+` (DEV-52).
 - Imported scenarios count as created in the order of their legacy IDs, which decides a tie between scenarios
   of the same name (`response-tie-id-order`).
+- A rule argument that is a JSON number is read as the text of that number (`rule-number-argument`).
+- A request body of nothing but spaces gives a body rule nothing to evaluate (`rule-input-body-blank`).
 - A character that the declared charset cannot encode is sent as `?` (`response-charset-latin1`).
 - The automation endpoints answer with the legacy texts, such as `Loaded definitions from suite-a.xml`, write
   the string `null` for a missing inspector name, list scenarios in the order of their names, find a service
@@ -399,17 +402,19 @@ Not recorded:
 
 ## Rule and inspection cases (task 2.7)
 
-Thirty-five `rule-*` recordings and four `inspection-*` recordings cover the request rules and service-level
-inspection. `RuleCases` defines them in four fixture groups:
+Forty-eight `rule-*` recordings and four `inspection-*` recordings cover the request rules and service-level
+inspection. `RuleCases` defines them in six fixture groups:
 
 | Fixture group | Cases | Coverage |
 |---|---|---|
 | `rules-keys` | 11 | Rules with a key: an absent key under a required and under an optional rule, the letter case of a key, the key `*` for parameters and for headers, and a key that contains `*`. |
 | `rules-inputs` | 14 | What each group evaluates: form fields, the headers that legacy hides or alters, an absent and a present body, and the URL with and without its query string. |
 | `rules-types` | 10 | The rule types: an empty argument, trimming and letter case, an expression that is found and one that is not, a type in upper case, an unknown type, an expression that does not compile, a rule without a key, a rule without an argument, and a rule set without rules. |
+| `rules-malformed` | 7 | Rule sets with a fault next to a `url` group that every request satisfies: a rule without a key, an expression that does not compile, a member that is no group, a group that is no array, and an entry that is no rule. A rule set in single quotes, and an argument that is a number. |
+| `rules-values` | 6 | What there is to evaluate: an optional rule with the key `*` without and with a parameter, a parameter name in two letter cases, a body in a declared charset and in UTF-8, and a body of spaces. |
 | `inspection` | 4 | A service whose own rule set is enabled: its response, the installed inspectors, the latest history entry as JSON, and the history page with every kind of inspection message. |
 
-Every service of the three rule groups is in dynamic mode. Its scenarios carry rule sets and answer with their
+Every service of the five rule groups is in dynamic mode. Its scenarios carry rule sets and answer with their
 own name, and its error scenario `no match` answers with status 404. The response therefore shows whether
 legacy took a rule set as satisfied and, where two rule sets compete, which one scored higher.
 
@@ -448,6 +453,24 @@ Legacy behaviors captured (each is visible in the named recording):
   expression that does not compile, a rule without a key, a rule without an argument, and a rule set
   without rules are not satisfied (`rule-type-invalid-regex`, `rule-type-missing-key`,
   `rule-type-missing-argument`, `rule-set-empty`).
+- A fault in a rule set spoils only the group that holds it (DEV-54). A rule without a key and a rule whose
+  expression does not compile fail their group. A member that is no group, a group that is no array, and an
+  entry that is no rule are ignored. In each case the rule set is still satisfied through its `url` group
+  (`rule-malformed-missing-key`, `rule-malformed-expression`, `rule-malformed-unknown-member`,
+  `rule-malformed-group-not-an-array`, `rule-malformed-rule-not-an-object`). Legacy's parser also reads a rule
+  set that is written in single quotes, which is not JSON (`rule-malformed-not-json`).
+- An argument that is a JSON number is read as the text of that number (`rule-number-argument`).
+- An optional rule with the key `*` fails when the request has no parameter at all (DEV-55), and is satisfied
+  by a parameter that matches (`rule-key-wildcard-optional-without-parameters`,
+  `rule-key-wildcard-optional-match`).
+- A rule is evaluated once for each spelling of its key in the request, and every spelling must satisfy it
+  (DEV-56): `Ticker=fb&ticker=goog` does not satisfy a rule that asks for `goog` in `ticker`
+  (`rule-key-two-letter-cases`).
+- The body is read as text in the default charset of the JVM, whatever the request declares (DEV-57). Legacy
+  runs with UTF-8 while recording: a word in ISO-8859-1 is not found although the request declares that
+  charset, and the same word in UTF-8 is found (`rule-input-body-declared-charset`, `rule-input-body-utf8`).
+- A body of nothing but spaces counts as no body, so an optional body rule is satisfied
+  (`rule-input-body-blank`).
 - Inspection does not change the response (`inspection-response-unaffected`).
 - `/requestinspectors` lists the class names of the installed inspectors. The legacy build holds one,
   `com.mockey.plugin.SampleRequestInspector`, which is global (`inspection-inspectors-listed`).

@@ -12,10 +12,16 @@ object RuleCases {
     private const val KEYS = "/service/keys"
     private const val INPUTS = "/service/inputs"
     private const val TYPES = "/service/types"
+    private const val MALFORMED = "/service/malformed"
+    private const val VALUES = "/service/values"
     private const val INSPECTION = "/service/inspection"
 
     private val form = mapOf("Content-Type" to "application/x-www-form-urlencoded")
     private val text = mapOf("Content-Type" to "text/plain")
+    private val latin1 = mapOf("Content-Type" to "text/plain; charset=ISO-8859-1")
+
+    /** The word `caf\u00e9` in ISO-8859-1, in which its last letter is one byte that is not valid UTF-8. */
+    private val accentedWordInLatin1 = "caf\u00e9".toByteArray(Charsets.ISO_8859_1)
 
     /** A request that fails the body rule and both parameter rules of the inspected service and omits `page_id`. */
     private const val FAILING_TARGET = "$INSPECTION/checked?ticker=msft&date=tomorrow"
@@ -67,6 +73,23 @@ object RuleCases {
                 get("rule-type-missing-key", "$TYPES/missing-key", mapOf("X-Tier" to "gold"))
                 get("rule-type-missing-argument", "$TYPES/missing-argument?ticker=goog")
                 get("rule-set-empty", "$TYPES/empty?ticker=goog")
+            },
+            parityCaseGroup("rules-malformed") {
+                get("rule-malformed-missing-key", "$MALFORMED/missing-key")
+                get("rule-malformed-expression", "$MALFORMED/expression?ticker=goog")
+                get("rule-malformed-unknown-member", "$MALFORMED/unknown-member")
+                get("rule-malformed-group-not-an-array", "$MALFORMED/group-not-an-array")
+                get("rule-malformed-rule-not-an-object", "$MALFORMED/rule-not-an-object?ticker=goog")
+                get("rule-malformed-not-json", "$MALFORMED/not-json")
+                get("rule-number-argument", "$MALFORMED/number-argument?id=1445")
+            },
+            parityCaseGroup("rules-values") {
+                get("rule-key-wildcard-optional-without-parameters", "$VALUES/optional-any")
+                get("rule-key-wildcard-optional-match", "$VALUES/optional-any?n=12")
+                get("rule-key-two-letter-cases", "$VALUES/two-cases?Ticker=fb&ticker=goog")
+                case("rule-input-body-declared-charset", "POST", "$VALUES/body-charset", latin1, accentedWordInLatin1)
+                post("rule-input-body-utf8", "$VALUES/body-charset", "caf\u00e9", "text/plain; charset=UTF-8")
+                post("rule-input-body-blank", "$VALUES/blank-body", "   ")
             },
             parityCaseGroup("inspection") {
                 val failing = request("POST", FAILING_TARGET, text, failingBody)
