@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.core.upstream
 
 import java.io.IOException
 import java.net.Authenticator
+import java.net.CookieManager
 import java.net.InetSocketAddress
 import java.net.PasswordAuthentication
 import java.net.ProxySelector
@@ -263,6 +264,17 @@ class UpstreamClientSpikeTest {
             assertEquals(listOf("/after"), response.headers().allValues("Location"))
             assertEquals(1, upstream.requests.size)
         }
+    }
+
+    @Test
+    fun theCookieStoreOfTheJdkWritesACookieWithAMaxAgeInAnOlderForm() {
+        val cookies = CookieManager()
+        val setCookies = listOf("sid=abc; Path=/stub/cookie; HttpOnly", "theme=dark; Path=/stub/cookie; Max-Age=3600")
+
+        cookies.put(URI("http://127.0.0.1:18091/stub/cookie/set"), mapOf("Set-Cookie" to setCookies))
+
+        val sent = cookies.get(URI("http://127.0.0.1:18091/stub/cookie/echo"), emptyMap())
+        assertEquals(mapOf("Cookie" to listOf("sid=abc", "theme=\"dark\";\$Path=\"/stub/cookie\";\$Domain=\"127.0.0.1\"")), sent)
     }
 
     @Test

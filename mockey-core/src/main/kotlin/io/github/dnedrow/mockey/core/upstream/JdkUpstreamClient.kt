@@ -102,9 +102,10 @@ internal class JdkUpstreamClient(
 }
 
 /**
- * Returns [url] as a URI. `java.net.URI` refuses some characters that the target of a request can hold, such
- * as a pipe sign or a brace. A URL with such characters is taken with those characters escaped, and every
- * other URL as it is written.
+ * Returns [url] as a URI. [url] is a URL, or a reference to one as a `Location` header holds it, such as a
+ * path. `java.net.URI` refuses some characters that the target of a request can hold, such as a pipe sign or
+ * a brace. A URL with such characters is taken with those characters escaped, and every other URL as it is
+ * written.
  */
 internal fun uriOf(url: String): URI {
     val uri =
@@ -118,6 +119,7 @@ internal fun uriOf(url: String): URI {
 
 private const val HEX = 16
 private const val ESCAPE_LENGTH = 3
+private const val SCHEME_END = "://"
 
 /** What a URL can hold as it is: the characters that RFC 3986 names, without the brackets of an IPv6 address. */
 private const val URL_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?#@!$&'()*+,;="
@@ -127,7 +129,7 @@ private const val URL_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr
  * in UTF-8. A percent sign stays where it starts an escape. What comes before the path stays as it is.
  */
 private fun escaped(url: String): String {
-    val pathStart = url.indexOf('/', startIndex = url.indexOf("://") + ESCAPE_LENGTH).let { if (it < 0) url.length else it }
+    val pathStart = pathStartOf(url)
     val result = StringBuilder(url.substring(0, pathStart))
     var index = pathStart
     while (index < url.length) {
@@ -148,12 +150,25 @@ private fun escaped(url: String): String {
     return result.toString()
 }
 
+/** Returns where the path of [url] starts: after the host of a URL that names one, and at the start of any other. */
+private fun pathStartOf(url: String): Int {
+    val delimiters = charArrayOf('/', '?', '#')
+    val schemeEnd = url.indexOf(SCHEME_END)
+    val hostStart =
+        when {
+            schemeEnd >= 0 && url.indexOfAny(delimiters) > schemeEnd -> schemeEnd + SCHEME_END.length
+            url.startsWith("//") -> 2
+            else -> return 0
+        }
+    return url.indexOfAny(delimiters, hostStart).let { if (it < 0) url.length else it }
+}
+
 private const val BYTE_MASK = 0xFF
 
 private fun isHexDigit(char: Char): Boolean = char in '0'..'9' || char in 'a'..'f' || char in 'A'..'F'
 
 /** Returns what a failure message calls the real service of [request]: its URL without the query string. */
-private fun whereOf(request: UpstreamRequest): String = "The real service at ${request.url.substringBefore('?')}"
+internal fun whereOf(request: UpstreamRequest): String = "The real service at ${request.url.substringBefore('?')}"
 
 /** Returns why an exchange with a real service failed, in words. */
 private fun reasonOf(failure: IOException): String =

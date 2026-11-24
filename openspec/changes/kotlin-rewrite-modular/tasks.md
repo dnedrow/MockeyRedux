@@ -63,7 +63,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 7.1 Spike: forward `http` and `https` requests through an authenticated outbound proxy with the JDK HTTP client, and decide the default adapter (design decision 8). Record the result in `docs/decisions/upstream-client.md`. Verify with a runnable spike test against the stub proxy.
 - [x] 7.2 Implement the upstream client port and the default adapter: unchanged method and body (DEV-10, DEV-11), request header filtering, and relay of status, headers, and body including `Set-Cookie` (DEV-14). Verify with tests against the stub upstream that compare bytes.
 - [x] 7.3 Implement forward-target resolution: absolute targets, relative targets through the default real URL with substitution, and the 502 cases (DEV-12). Verify with unit tests for each scenario of those requirements.
-- [ ] 7.4 Implement the shared upstream cookie store with its reset operation, and redirect handling. Verify with tests against the stub upstream, including two clients that share a cookie.
+- [x] 7.4 Implement the shared upstream cookie store with its reset operation, and redirect handling. Verify with tests against the stub upstream, including two clients that share a cookie.
 - [ ] 7.5 Implement outbound proxy settings with in-memory credentials, certificate verification, and connect and response timeouts. Verify with tests against the stub proxy and a stub upstream with an untrusted certificate, including the ported legacy `ProxyServerModelTest` cases.
 - [ ] 7.6 Implement upstream failure handling: error scenario fallback, the built-in 502 JSON response (DEV-13), and the service delay on proxied responses. Verify with unit tests for each scenario of those requirements.
 

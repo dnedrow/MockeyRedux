@@ -8,6 +8,9 @@ import java.io.IOException
  * Sends requests to real services. An engine forwards every request of proxy mode through one upstream client.
  * The client that the library brings sends over HTTP, and a program can put its own in that place, such as
  * one that answers without a network.
+ *
+ * A client stands for one exchange at a time: it sends a request as it is given, and returns the answer as it
+ * came. It follows no redirect and keeps no cookie. The engine does both, in the same way for every client.
  */
 public interface UpstreamClient : AutoCloseable {
     /**
@@ -47,6 +50,12 @@ public class UpstreamRequest
         /** The body to send, which is empty for a request without one. Every read gives a new array. */
         public val body: ByteArray
             get() = bodyBytes.copyOf()
+
+        /** Returns this request for another URL or with other headers. */
+        internal fun copy(
+            url: String = this.url,
+            headers: List<Header> = this.headers,
+        ): UpstreamRequest = UpstreamRequest(method, url, headers, bodyBytes)
 
         /** Returns the method and the URL without its query string. The rest is left out, because it can hold secrets. */
         override fun toString(): String = "UpstreamRequest($method ${url.substringBefore('?')})"

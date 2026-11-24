@@ -60,6 +60,7 @@ The tests ran on OpenJDK 21.0.13. What they show:
 | A response that ends early or does not come | An `IOException`. |
 | A certificate that the runtime does not trust | An `SSLHandshakeException` before any request is sent. |
 | Redirects | With `Redirect.NEVER` the client returns the redirect response. |
+| Cookies | The cookie store of the JDK, `java.net.CookieManager`, writes a cookie that was set with `Max-Age` in the form of RFC 2965: `theme="dark";$Path="/stub/cookie";$Domain="127.0.0.1"`. |
 | HTTP/2 | A client that is not held to HTTP/1.1 adds `Upgrade: h2c`, `HTTP2-Settings`, and `Connection: Upgrade, HTTP2-Settings` to a request for an `http` URL. |
 | Canceling | `cancel(true)` on the future of a request ends the exchange at once. |
 | The URL of a request | `java.net.URI` refuses characters that a request target can hold, such as a pipe sign, braces, a space, and a percent sign that starts no escape. |
@@ -114,10 +115,24 @@ The response:
 
 - The names of the headers reach the Mockey client in lower case and in alphabetical order. The values of one
   name keep their order, which is all that HTTP gives a meaning to.
-- The adapter follows redirects itself, for `GET` and `HEAD` requests only, so that every other method gets the
-  redirect response back.
+- The adapter follows no redirect and keeps no cookie. It builds the JDK client with `Redirect.NEVER` and
+  without a cookie handler, and returns every answer as it came.
 - The adapter gives up on an exchange by canceling it, so that one limit covers the connection, the headers,
   and the body of the response.
+
+## What the core does above the port
+
+The port stands for one exchange: a request goes out, and its answer comes back. The upstream session and
+the handling of redirects are the same for every client, so the core does both itself, around the port. A
+client that a program supplies gets them without any work of its own.
+
+- The upstream session. `UpstreamSession` keeps the cookies that real services set, and gives every forwarded
+  request the cookies that apply to its URL, as RFC 6265 says. The cookie store of the JDK is not used,
+  because of the form in which it writes a cookie that was set with `Max-Age`. The parity recording
+  `proxy-session-shared-cookie` states that such a cookie reaches the real service as `theme=dark`.
+- Redirects. The core follows the redirects of `GET` and `HEAD` requests, up to 20 in a row, and sends the
+  same request to each URL. Every other method gets the redirect response back. Each request of such a chain
+  is an exchange of its own, with the cookies of the session that apply to it.
 
 ## Repeating the spike
 
