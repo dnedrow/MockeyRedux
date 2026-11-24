@@ -198,8 +198,10 @@ class HistoryQueryTest {
 
     @Test
     fun aTokenIsNotLookedForInWhatIsNotSearched() {
+        // The identifier of a service is searched. One that is made at random can hold the digits of the status.
+        val service = customers.copy(id = ServiceId("customers"))
         val response = MockResponse(201, body = "answered".toByteArray())
-        val handling = Handling(customers, null, gold, Outcome.SCENARIO_SERVED, response, explanation = "explained")
+        val handling = Handling(service, null, gold, Outcome.SCENARIO_SERVED, response, explanation = "explained")
         val request = requestFor("customer/7", "PATCH")
         val entry = history.record(exchangeOf(handling, request, inspectionMessages = listOf("inspected"), target = targetOf(request)))
 
