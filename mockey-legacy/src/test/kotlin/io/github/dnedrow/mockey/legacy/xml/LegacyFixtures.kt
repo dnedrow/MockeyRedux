@@ -1,11 +1,16 @@
 package io.github.dnedrow.mockey.legacy.xml
 
+import io.github.dnedrow.mockey.core.definitions.ImportItem
+import io.github.dnedrow.mockey.core.definitions.ImportItemKind
+import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.PlanId
 import io.github.dnedrow.mockey.core.model.ScenarioId
 import io.github.dnedrow.mockey.core.model.ScenarioReference
 import io.github.dnedrow.mockey.core.model.ServiceId
 import io.github.dnedrow.mockey.core.model.TwistId
+import io.github.dnedrow.mockey.core.storage.InMemoryDefinitionStorage
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -28,6 +33,15 @@ internal object LegacyFixtures {
         return Path.of(url.toURI())
     }
 }
+
+/** Runs [test] with an engine that starts with the definitions [initial], and closes the engine after it. */
+internal fun withEngine(
+    initial: Definitions = Definitions.EMPTY,
+    test: suspend (MockeyEngine) -> Unit,
+): Unit = runBlocking { MockeyEngine.create { storage = InMemoryDefinitionStorage(initial) }.use { test(it) } }
+
+/** Returns what each of these items of an import report is about: its kind and its name. */
+internal fun List<ImportItem>.named(): List<Pair<ImportItemKind, String>> = map { it.kind to it.name }
 
 /**
  * Returns these definitions with identifiers that say where a definition is: the place of a service, of a

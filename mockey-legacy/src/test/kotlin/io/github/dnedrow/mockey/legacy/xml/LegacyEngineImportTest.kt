@@ -19,7 +19,6 @@ import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistConfiguration
 import io.github.dnedrow.mockey.core.model.TwistId
 import io.github.dnedrow.mockey.core.storage.FileDefinitionStorage
-import io.github.dnedrow.mockey.core.storage.InMemoryDefinitionStorage
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -40,12 +39,6 @@ import kotlin.test.assertTrue
 class LegacyEngineImportTest {
     @TempDir
     lateinit var directory: Path
-
-    /** Runs [test] with an engine that starts with the definitions [initial], and closes the engine after it. */
-    private fun withEngine(
-        initial: Definitions = Definitions.EMPTY,
-        test: suspend (MockeyEngine) -> Unit,
-    ): Unit = runBlocking { MockeyEngine.create { storage = InMemoryDefinitionStorage(initial) }.use { test(it) } }
 
     /** Writes [content] to the file [path] of the directory of the test. */
     private fun write(
@@ -88,11 +81,6 @@ class LegacyEngineImportTest {
                 root.relativize(path) to FileState(content, Files.getLastModifiedTime(path))
             }
         }
-
-    private fun List<ImportItem>.named(): List<Pair<ImportItemKind, String>> = map { it.kind to it.name }
-
-    private fun List<ImportItem>.ofDefinitionsOtherThanServices(): List<Pair<ImportItemKind, String>> =
-        named().filter { (kind, _) -> kind != ImportItemKind.SERVICE && kind != ImportItemKind.SCENARIO }
 
     private fun MockeyEngine.service(name: String): Service = definitions.services.single { it.name == name }
 
