@@ -1,103 +1,39 @@
 package io.github.dnedrow.mockey.legacy.xml
 
-import io.github.dnedrow.mockey.core.model.Definitions
-import java.nio.file.Files
 import java.nio.file.Path
 
-/** Imports the file-backed Mockey 2.x definitions layout without changing any source files. */
+/**
+ * Imports the definitions of a definitions directory of Mockey 2.x: the directory in which Mockey 2.x in
+ * writable mode stores its definitions.
+ *
+ * The main file of the directory, `mock_service_definitions.xml`, refers to one file for each service. A
+ * service file includes one file for each scenario, and a scenario file includes the text file that holds
+ * its response body. A main file can also hold its services itself, as an export document does.
+ *
+ * Only files inside the directory [root] are read, see [LegacyXmlReader], and no file is ever written,
+ * changed, or deleted: the directory stays as it is.
+ */
 public class LegacyDirectoryImporter(
-    private val root: Path,
+    root: Path,
 ) {
-    private val normalizedRoot = root.toAbsolutePath().normalize()
+    private val directory: Path = root.toAbsolutePath().normalize()
 
-    /** Imports [mainFile], or the conventional `mock_service_definitions.xml` when omitted. */
-    public fun import(mainFile: Path = normalizedRoot.resolve("mock_service_definitions.xml")): LegacyDirectoryImportResult {
-        val reader = LegacyXmlReader(normalizedRoot)
-        val main = reader.read(mainFile)
-        if (main.document == null) {
-            return LegacyDirectoryImportResult(Definitions.EMPTY, main.issues)
-        }
-
-        val issues = main.issues.toMutableList()
-        val services = main.document.documentElement.childElements("serviceref")
-        val definitions =
-            if (services.isEmpty()) {
-                LegacyXmlDefinitions.map(main.document)
-            } else {
-                services
-                    .mapIndexedNotNull { index, reference ->
-                        val fileName = reference.getAttribute("file").takeUnless(String::isBlank)
-                        if (fileName == null) {
-                            issues += LegacyXmlIssue(LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference has no file.", mainFile)
-                            null
-                        } else {
-                            val file = normalizedRoot.resolve(fileName).normalize()
-                            if (!file.startsWith(normalizedRoot)) {
-                                issues +=
-                                    LegacyXmlIssue(
-                                        LegacyXmlIssueKind.OUTSIDE_IMPORT_ROOT,
-                                        "A service reference points outside the import root.",
-                                        file,
-                                    )
-                                null
-                            } else {
-                                val result = reader.read(file)
-                                issues += result.issues
-                                result.document?.let { document ->
-                                    val responseFiles = responseFiles(document, file.parent, issues)
-                                    LegacyXmlDefinitions.mapServiceFiles(document, responseFiles).services
-                                }
-                            }
-                        }
-                    }.flatten()
-                    .let { Definitions(services = it) }
-            }
-        return LegacyDirectoryImportResult(definitions, issues)
+    /**
+     * Imports the definitions with the main file [mainFile], which is `mock_service_definitions.xml` of the
+     * directory unless another file of the directory is given. A relative path starts at the directory.
+     *
+     * A file that is missing or that cannot be read does not end the import. It is among the issues of the
+     * result, and what the other files hold is imported.
+     */
+    public fun import(mainFile: Path = directory.resolve(MAIN_FILE)): LegacyImportResult {
+        val file = directory.resolve(mainFile).normalize()
+        val name = if (file.startsWith(directory)) directory.relativize(file) else file
+        val reader = LegacyXmlReader(directory)
+        return LegacyImport(reader).of(reader.read(file), "The file $name")
     }
 
-    private fun responseFiles(
-        document: org.w3c.dom.Document,
-        serviceDirectory: Path?,
-        issues: MutableList<LegacyXmlIssue>,
-    ): Map<String, String> {
-        if (serviceDirectory == null) return emptyMap()
-        val serviceElements =
-            if (document.documentElement.localName == "service" || document.documentElement.nodeName == "service") {
-                listOf(document.documentElement)
-            } else {
-                document.documentElement.childElements("service")
-            }
-        return serviceElements
-            .flatMap { it.childElements("scenario") }
-            .mapNotNull { scenario ->
-                val response = scenario.childElement("scenario_response") ?: return@mapNotNull null
-                val fileName =
-                    response.getAttribute("file").takeUnless(String::isBlank)
-                        ?: response.textContent.trim().takeIf { it.isNotEmpty() && !it.contains('\n') }
-                        ?: return@mapNotNull null
-                val file = serviceDirectory.resolve(fileName).normalize()
-                if (!file.startsWith(normalizedRoot) || !Files.isRegularFile(file)) {
-                    if (response.hasAttribute("file")) {
-                        issues += LegacyXmlIssue(LegacyXmlIssueKind.UNREADABLE_FILE, "The scenario response file could not be read.", file)
-                    }
-                    return@mapNotNull null
-                }
-                try {
-                    scenario.getAttribute("id") to Files.readString(file)
-                } catch (e: Exception) {
-                    issues +=
-                        LegacyXmlIssue(
-                            LegacyXmlIssueKind.UNREADABLE_FILE,
-                            e.message ?: "The scenario response file could not be read.",
-                            file,
-                        )
-                    null
-                }
-            }.toMap()
+    public companion object {
+        /** The name of the main file of a definitions directory. */
+        public const val MAIN_FILE: String = "mock_service_definitions.xml"
     }
 }
-
-public data class LegacyDirectoryImportResult(
-    public val definitions: Definitions,
-    public val issues: List<LegacyXmlIssue>,
-)

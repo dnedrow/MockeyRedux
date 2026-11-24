@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice default_service_plan_id="2" timestamp="1795539867247" universal_error_scenario_id="3" universal_error_service_id="1" universal_twist_info_id="1" version="1.0" xml:lang="en-US">
+<proxy_settings proxy_enabled="false" proxy_url="http://proxy.example.com:3128"/>
+<service default_real_url_index="1" default_scenario_id="2" description="Customers by their identifier." error_scenario_id="3" hang_time="500" name="Customer Directory" request_inspector_name="com.example.inspectors.SessionInspector" service_response_type="2" tag="directory team-a" url="customer/{customerId}">
+<request_inspector_json_rules enable_flag="true"><![CDATA[{
+    "headers": [{
+        "desc": "page_id is mandatory",
+        "key": "page_id",
+        "value_rule_arg": "",
+        "value_rule_type": "string_required"
+    }]
+}]]></request_inspector_json_rules>
+<response_schema enable_flag="false"><![CDATA[{"type": "object", "required": ["id"]}]]></response_schema>
+<real_url url="http://qa1.example.com/customers/{customerId}"/>
+<real_url url="http://qa2.example.com/customers/{customerId}"/>
+<real_url url="http://qa3.example.com/customers/{customerId}"/>
+<scenario hang_time="0" http_method_type="" http_resp_status_code="500" id="3" name="Directory down" tag="">
+<scenario_match scenario_match_evaluation_rules_flag="false"/>
+<scenario_response><![CDATA[The customer directory is down.]]></scenario_response>
+<scenario_response_header/>
+</scenario>
+<scenario hang_time="250" http_method_type="POST" http_resp_status_code="201" id="2" name="gold" tag="premium">
+<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{
+    "url": [{
+        "desc": "The customer 123",
+        "value_rule_arg": "\\b123\\b",
+        "value_rule_type": "regex_required"
+    }]
+}]]></scenario_match>
+<scenario_response><![CDATA[{"id": "123", "tier": "gold"}]]></scenario_response>
+<scenario_response_header><![CDATA[Content-Type: application/json; charset=utf-8 | X-Rate: 10]]></scenario_response_header>
+</scenario>
+<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="silver" tag="">
+<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[silver]]></scenario_match>
+<scenario_response><![CDATA[{"id": "1", "tier": "silver"}]]></scenario_response>
+<scenario_response_header><![CDATA[Content-Type: application/json]]></scenario_response_header>
+</scenario>
+</service>
+<service default_real_url_index="0" default_scenario_id="2" description="" error_scenario_id="0" hang_time="50" name="Orders" request_inspector_name="null" service_response_type="1" tag="" url="orders">
+<request_inspector_json_rules enable_flag="false"/>
+<response_schema enable_flag="false"/>
+<scenario hang_time="0" http_method_type="" http_resp_status_code="204" id="2" name="no orders" tag="">
+<scenario_match scenario_match_evaluation_rules_flag="false"/>
+<scenario_response/>
+<scenario_response_header/>
+</scenario>
+<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="order list" tag="">
+<scenario_match scenario_match_evaluation_rules_flag="false"/>
+<scenario_response><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<orders>
+	<order id="1" note="caf&#233; &amp; cr&#232;me">Grüße ✓</order>
+	<order id="2"><![CDATA[1 < 2]]]]><![CDATA[></order>
+</orders>]]></scenario_response>
+<scenario_response_header><![CDATA[Content-Type: text/xml; charset=utf-8]]></scenario_response_header>
+</scenario>
+</service>
+<service default_real_url_index="0" default_scenario_id="0" description="A proxy service without scenarios." error_scenario_id="0" hang_time="0" name="Billing" request_inspector_name="null" service_response_type="0" tag="" url="http://billing.example.com/api">
+<request_inspector_json_rules enable_flag="false"/>
+<response_schema enable_flag="false"/>
+<real_url url="http://billing.example.com/api"/>
+</service>
+<service_plan description="Every customer is a gold customer." id="1" name="Gold path" tag="premium">
+<plan_item hang_time="0" scenario_name="gold" service_name="Customer Directory" service_response_type="1"/>
+<plan_item hang_time="0" scenario_name="order list" service_name="Orders" service_response_type="1"/>
+</service_plan>
+<service_plan description="" id="2" name="Slow day" tag="">
+<plan_item hang_time="50" scenario_name="no orders" service_name="Orders" service_response_type="1"/>
+</service_plan>
+<twist_config id="1" name="to qa2">
+<twist_pattern destination="qa2.example.com" origination="qa1.example.com"/>
+</twist_config>
+</mockservice>

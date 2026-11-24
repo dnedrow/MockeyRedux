@@ -64,3 +64,39 @@ The response must be JSON containing `"status": "running"`, for example:
   "repoPath": "/tmp/mockey-legacy-readonly"
 }
 ```
+
+## Write a definitions directory
+
+Started with `-t false`, legacy is in writable mode. It stores its definitions in the directory that `-l`
+names: `mock_service_definitions.xml` is the main file, and the files of the services are under
+`mockey_def_depot`. The tests of the importer in `mockey-legacy` import such a directory,
+`mockey-legacy/src/test/resources/legacy/directory`. Legacy wrote it from the export document
+`legacy/export.xml` next to it, which is the export of the instance that wrote the directory.
+
+From the legacy `dist` directory:
+
+```shell
+mkdir -p /tmp/mockey-legacy-writable
+java -Dfile.encoding=UTF-8 -jar Mockey.jar \
+  -p 18080 \
+  -t false \
+  -H true \
+  -l /tmp/mockey-legacy-writable/definitions
+```
+
+Then, with the path of the export document in the checkout of this repository:
+
+```shell
+EXPORT=/path/to/mockey-kt/mockey-legacy/src/test/resources/legacy/export.xml
+curl "http://127.0.0.1:18080/home?action=init&transientState=false&type=json&file=$EXPORT"
+curl "http://127.0.0.1:18080/twisting/toggle?twist-id=1&twist-enable=true&response-type=json"
+curl --output export.xml "http://127.0.0.1:18080/export/definitions.xml"
+```
+
+The first request loads the document and stores it in `/tmp/mockey-legacy-writable/definitions`. Legacy
+enables no twist configuration when it loads a document (DEV-32), so the second request enables the one of
+the fixture, which puts `universal_twist_info_id` into the main file. The third request is the export.
+
+Apart from the `timestamp` attribute of the main file and of the export, both come out as they are in this
+repository. Legacy keeps its log, `mockeyDebugFile.log`, in the definitions directory as well. It is no part
+of the fixture.

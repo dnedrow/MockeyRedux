@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice default_service_plan_id="2" timestamp="1795539844802" universal_error_scenario_id="3" universal_error_service_id="1" universal_twist_info_id="1" version="1.0" xml:lang="en-US">
+<proxy_settings proxy_enabled="false" proxy_url="http://proxy.example.com:3128"/>
+<serviceref file="mockey_def_depot/customerdirectory/customerdirectory.xml"/>
+<serviceref file="mockey_def_depot/orders/orders.xml"/>
+<serviceref file="mockey_def_depot/billing/billing.xml"/>
+<service_plan description="Every customer is a gold customer." id="1" name="Gold path" tag="premium">
+<plan_item hang_time="0" scenario_name="gold" service_name="Customer Directory" service_response_type="1"/>
+<plan_item hang_time="0" scenario_name="order list" service_name="Orders" service_response_type="1"/>
+</service_plan>
+<service_plan description="" id="2" name="Slow day" tag="">
+<plan_item hang_time="50" scenario_name="no orders" service_name="Orders" service_response_type="1"/>
+</service_plan>
+<twist_config id="1" name="to qa2">
+<twist_pattern destination="qa2.example.com" origination="qa1.example.com"/>
+</twist_config>
+</mockservice>

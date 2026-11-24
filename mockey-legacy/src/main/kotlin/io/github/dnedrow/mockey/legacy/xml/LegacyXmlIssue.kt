@@ -28,4 +28,7 @@ public enum class LegacyXmlIssueKind {
 
     /** A document includes itself, directly or through the documents that it includes. */
     INCLUSION_CYCLE,
+
+    /** A document is XML, but it holds no definitions of Mockey 2.x. */
+    NOT_A_DEFINITIONS_DOCUMENT,
 }

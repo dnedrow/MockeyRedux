@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="silver" tag="" version="1.0" xml:lang="en-US">
+<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[silver]]></scenario_match>
+<scenario_response>
+<xi:include href="silver.txt" parse="text" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+</scenario_response>
+<scenario_response_header><![CDATA[Content-Type: application/json]]></scenario_response_header>
+</scenario>

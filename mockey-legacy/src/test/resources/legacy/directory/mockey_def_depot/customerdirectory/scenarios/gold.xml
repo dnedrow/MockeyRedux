@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<scenario hang_time="250" http_method_type="POST" http_resp_status_code="201" id="2" name="gold" tag="premium" version="1.0" xml:lang="en-US">
+<scenario_match scenario_match_evaluation_rules_flag="true"><![CDATA[{
+    "url": [{
+        "desc": "The customer 123",
+        "value_rule_arg": "\\b123\\b",
+        "value_rule_type": "regex_required"
+    }]
+}]]></scenario_match>
+<scenario_response>
+<xi:include href="gold.txt" parse="text" xmlns:xi="http://www.w3.org/2001/XInclude"/>
+</scenario_response>
+<scenario_response_header><![CDATA[Content-Type: application/json; charset=utf-8 | X-Rate: 10]]></scenario_response_header>
+</scenario>
