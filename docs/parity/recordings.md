@@ -72,9 +72,10 @@ A file states the body in exactly one of the five ways.
 
 ## Review of the recordings (task 2.9)
 
-Every recording was reviewed against the specifications of the change and labeled. Of the 233 recordings, 36
-are `same` and 197 name deviations, 117 of them DEV-06, the line break that legacy appends to every scenario
-response. `docs/deviations.md` describes each deviation and names recordings that show it.
+Every recording was reviewed against the specifications of the change and labeled. Of the 246 recordings, 36
+are `same` and 210 name deviations, 125 of them DEV-06, the line break that legacy appends to every scenario
+response. `docs/deviations.md` describes each deviation and names recordings that show it. The 13 recordings
+of the group `routing-normalization` were added and reviewed with task 4.1.
 
 `ParityReviewTest.everyRecordingIsReviewed` is the check. It fails when a recording is `unreviewed`, when a
 label names an ID that `docs/deviations.md` does not list, when a recording that deviates states no new
@@ -95,7 +96,7 @@ which the specifications should settle:
 
 - Import trims the whitespace around a response body, as the legacy loader does (`response-body-whitespace`).
 - The evaluation text is form-decoded, so that a `+` becomes a space (`response-text-body-plus`). The
-  specification says "percent-decode".
+  specification says "percent-decode". A target is not read that way: there a `+` is a `+` (DEV-52).
 - Imported scenarios count as created in the order of their legacy IDs, which decides a tie between scenarios
   of the same name (`response-tie-id-order`).
 - A character that the declared charset cannot encode is sent as `?` (`response-charset-latin1`).
@@ -163,13 +164,14 @@ answers 407 with a Basic challenge until a request carries a `Proxy-Authorizatio
 
 ## Routing cases (task 2.4)
 
-Twenty-nine `routing-*` recordings cover how a target is read and matched, which service answers, what the
-tag filter hides, what becomes of an unknown target, and how twisting rewrites a target. `RoutingCases`
-defines them in four fixture groups:
+Forty-two `routing-*` recordings cover how a target is read, normalized, and matched, which service answers,
+what the tag filter hides, what becomes of an unknown target, and how twisting rewrites a target.
+`RoutingCases` defines them in five fixture groups. Task 4.1 added the group `routing-normalization`:
 
 | Fixture group | Cases | Coverage |
 |---|---|---|
 | `routing` | 16 | Relative and absolute targets, URL templates, two services with one mock URL, nested paths, matches through real URLs, unknown absolute targets and the service that legacy registers for them, and unknown relative targets. |
+| `routing-normalization` | 13 | What counts as the same URL: letter case, slashes at the start and at the end, percent escapes and the `+` in a target, a percent escape in the URL of a service, default ports, and an unknown target with an escape that is requested twice. |
 | `routing-tagged` | 6 | The tag filter `keep`: a service that carries the tag, a service whose scenario carries it, services with another tag or none, and a hidden service with an absolute mock URL. |
 | `routing-twist` | 6 | An enabled twist configuration: a pair that applies, a regular expression in the origination, the first matching pair only, a later pair, no pair, and a twisted target that is forwarded. |
 | `routing-twist-document` | 1 | A fixture that names its enabled twist configuration. |
@@ -196,6 +198,18 @@ Legacy behaviors captured (each is visible in the named recording):
   for it and forwards the request to that host (DEV-03): `routing-relative-target-as-host` reaches the stub
   upstream this way, and `routing-unknown-relative-target` fails on the unknown host. A target that holds
   `http` anywhere is read from there (`routing-embedded-absolute-target`).
+- The letter case of a target does not count, also not that of the scheme (`routing-letter-case`,
+  `routing-scheme-letter-case`), and a port that is the default port of the scheme is the same as no port
+  (`routing-default-port-omitted`, `routing-default-port-given`).
+- A slash at the end must be in the target and in the URL of the service, or in neither, and a slash at the
+  start of the target lets no service match (DEV-51, `routing-trailing-slash`,
+  `routing-url-with-trailing-slash`, `routing-leading-slash`).
+- The target is decoded before it is compared, so that `%2F` is a slash and `%20` a space
+  (`routing-encoded-slash`, `routing-encoded-space`). It is decoded as form data: a `+` is a space as well
+  (DEV-52, `routing-plus-sign`), and only `%2B` is a plus sign (`routing-encoded-plus-sign`).
+- The URL of a service is not decoded. A request for a URL that holds an escape therefore does not find the
+  service with that URL (DEV-53, `routing-escape-in-url`), and each request to an unknown target with an
+  escape registers one more service (`routing-unknown-target-with-escape-registered`).
 - With a tag filter, a service is found when it or one of its scenarios carries the tag
   (`routing-tag-visible`, `routing-tag-scenario`). A service that does not is treated as unknown, so legacy
   registers a second service for its URL (DEV-04). For an absolute URL the request is forwarded

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="plain" request_inspector_name="null" service_response_type="1" tag="" url="norm.invalid/plain">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[plain]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="space" request_inspector_name="null" service_response_type="1" tag="" url="norm.invalid/a b">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[space]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="plus sign" request_inspector_name="null" service_response_type="1" tag="" url="norm.invalid/a+b">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[plus sign]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="slash at the end" request_inspector_name="null" service_response_type="1" tag="" url="norm.invalid/slash/">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[slash at the end]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="escape in the url" request_inspector_name="null" service_response_type="1" tag="" url="norm.invalid/a%20c">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[escape in the url]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="default port" request_inspector_name="null" service_response_type="1" tag="" url="http://norm.invalid:80/port">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[default port]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+	<service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0" name="secure" request_inspector_name="null" service_response_type="1" tag="" url="https://norm.invalid/secure">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario http_method_type="GET" http_resp_status_code="200" id="1" name="answer" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[secure]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>
