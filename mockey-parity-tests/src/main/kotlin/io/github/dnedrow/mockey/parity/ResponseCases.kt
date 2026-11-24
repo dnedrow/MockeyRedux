@@ -46,6 +46,15 @@ object ResponseCases {
                 get("response-text-literal-path", "/service/text/orders/list")
                 get("response-text-template-value", "/service/text-customer/%7B123%7D")
             },
+            parityCaseGroup("responses-parameters") {
+                get("response-text-param-empty-value", "/service/parameters/evaluate?debug=")
+                get("response-text-param-repeated", "/service/parameters/evaluate?a=1&a=2")
+                get("response-text-param-without-value", "/service/parameters/evaluate?wsdl")
+                get("response-text-param-encoded-plus", "/service/parameters/evaluate?phone=%2B15551234")
+                get("response-text-param-empty-piece", "/service/parameters/evaluate?a=1&&b=2")
+                post("response-text-param-then-body", "/service/parameters/evaluate?q=abc", "def")
+                post("response-text-body-escape", "/service/parameters/evaluate", "jane%20doe")
+            },
             parityCaseGroup("responses-rules") {
                 get("response-rules-parameter-satisfied", "/service/rules/parameter?ticker=GOOG")
                 get("response-rules-parameter-unsatisfied", "/service/rules/parameter?ticker=FB")
@@ -97,6 +106,9 @@ object ResponseCases {
                 get("response-delay-dynamic-match", "/service/delay/dynamic?q=slow", timing = ParityTiming(atLeastMillis = 400))
                 get("response-delay-error-scenario", "/service/delay/dynamic?q=other", timing = ParityTiming(lessThanMillis = 1000))
                 get("response-delay-fallback-service", "/service/delay/fallback?q=other", timing = ParityTiming(atLeastMillis = 300))
+            },
+            parityCaseGroup("responses-builtin-delay") {
+                get("response-delay-builtin", "/service/delay/builtin?q=other", timing = ParityTiming(atLeastMillis = 300))
             },
         )
 

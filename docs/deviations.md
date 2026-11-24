@@ -18,7 +18,7 @@ DEV-01 to DEV-30 come from the design of the rewrite. Task 2.9 confirmed them an
 legacy behaved otherwise, and added DEV-31 to DEV-50 for the differences that the review of the recordings found.
 DEV-51 to DEV-53 were found when the routing was implemented (task 4.1), and recordings were added for them.
 DEV-54 to DEV-57 were found when the request rules were implemented (tasks 5.1 and 5.2), and recordings were added
-for them as well.
+for them as well. DEV-58 was found when dynamic mode was implemented (task 6.2), and it has its recordings too.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
@@ -27,8 +27,8 @@ for them as well.
 | DEV-03 | The target is parsed from the first `http` substring. Otherwise the first path segment becomes a host: an unknown relative target registers a service for that host and proxies to it. | A target is absolute only if it starts with `http://` or `https://`. An unknown relative target gets a 404 with an explanation. | run: `routing-embedded-absolute-target`, `routing-relative-target-as-host`, `routing-unknown-relative-target` |
 | DEV-04 | A matching service that lacks the filter tag causes a second service to be registered for the same URL. For a relative URL, that service proxies to the first path segment as a host. | No second service. The request is handled as unmatched: an absolute target is forwarded, and a relative target gets a 404. | run: `routing-tag-hidden-absolute-registered`, `routing-tag-hidden`, `routing-tag-untagged` |
 | DEV-05 | Twisting checks the origination as literal text but replaces it as a regular expression. | Literal replacement. | run: `routing-twist-regular-expression` |
-| DEV-06 | A platform line separator is appended to every static or dynamic response body. | The body is sent exactly as stored. | run: 138 recordings, such as `response-body-trailing-newline` and `response-body-empty` |
-| DEV-07 | With no matching scenario and no error scenario, an explanation is sent with status 200: legacy sets the invalid status -1, which the container ignores. | 404 with an explanation. | run: `response-fallback-builtin` |
+| DEV-06 | A platform line separator is appended to every static or dynamic response body. | The body is sent exactly as stored. | run: 145 recordings, such as `response-body-trailing-newline` and `response-body-empty` |
+| DEV-07 | With no matching scenario and no error scenario, an explanation is sent with status 200: legacy sets the invalid status -1, which the container ignores. | 404 with an explanation. | run: `response-fallback-builtin`, `response-delay-builtin` |
 | DEV-08 | A scenario response is encoded as UTF-8 only if some response header value contains `utf-8`. Otherwise it is encoded as ISO-8859-1, and a character outside that charset becomes `?`. | UTF-8 unless the scenario's `Content-Type` declares another charset. | run: `response-charset-none`, `response-charset-json` |
 | DEV-09 | A scenario without response header text answers with `Accept-Language: en-US` and `Accept: text/plain`, the default headers of every new scenario. | New scenarios have no default headers. | run: `response-headers-default` |
 | DEV-10 | Proxy mode sends GET as GET and every other method as POST, HEAD included. A HEAD request therefore gets a redirect back and does not follow it. | The method is forwarded unchanged. | run: `proxy-method-put`, `proxy-method-patch`, `proxy-method-delete`, `proxy-method-options`, `proxy-method-trace`, `proxy-redirect-head-302` |
@@ -79,3 +79,4 @@ for them as well.
 | DEV-55 | An optional rule with the key `*` fails when the request has no parameter at all. | The rule is satisfied, as every optional rule is that has nothing to evaluate. | run: `rule-key-wildcard-optional-without-parameters` |
 | DEV-56 | When a request writes the name of a parameter in several letter cases, a rule for that parameter is evaluated once for each spelling, and every spelling must satisfy it. | The rule is evaluated once, against the values of all spellings together. | run: `rule-key-two-letter-cases` |
 | DEV-57 | A request body is read as text in the default charset of the JVM, whatever charset the request declares. | The body is read in the charset that the `Content-Type` of the request declares, and as UTF-8 when it declares none. | run: `rule-input-body-declared-charset` |
+| DEV-58 | The evaluation text of a text criterion writes a parameter whose value is blank without its `=`. It writes the values of a parameter that the request repeats one after the other without a separator, as `a=1a=2`. | Every parameter of the query string is written as the request has it, and `&` separates each one from the next: `a=` and `a=1&a=2`. | run: `response-text-param-empty-value`, `response-text-param-repeated` |

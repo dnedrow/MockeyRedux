@@ -72,11 +72,12 @@ A file states the body in exactly one of the five ways.
 
 ## Review of the recordings (task 2.9)
 
-Every recording was reviewed against the specifications of the change and labeled. Of the 259 recordings, 36
-are `same` and 223 name deviations, 138 of them DEV-06, the line break that legacy appends to every scenario
+Every recording was reviewed against the specifications of the change and labeled. Of the 267 recordings, 36
+are `same` and 231 name deviations, 145 of them DEV-06, the line break that legacy appends to every scenario
 response. `docs/deviations.md` describes each deviation and names recordings that show it. The 13 recordings
-of the group `routing-normalization` were added and reviewed with task 4.1, and the 13 recordings of the groups
-`rules-malformed` and `rules-values` with tasks 5.1 and 5.2.
+of the group `routing-normalization` were added and reviewed with task 4.1, the 13 recordings of the groups
+`rules-malformed` and `rules-values` with tasks 5.1 and 5.2, and the 8 recordings of the groups
+`responses-parameters` and `responses-builtin-delay` with tasks 6.2 and 6.3.
 
 `ParityReviewTest.everyRecordingIsReviewed` is the check. It fails when a recording is `unreviewed`, when a
 label names an ID that `docs/deviations.md` does not list, when a recording that deviates states no new
@@ -98,6 +99,10 @@ which the specifications should settle:
 - Import trims the whitespace around a response body, as the legacy loader does (`response-body-whitespace`).
 - The evaluation text is form-decoded, so that a `+` becomes a space (`response-text-body-plus`). The
   specification says "percent-decode". A target is not read that way: there a `+` is a `+` (DEV-52).
+- Nothing stands between the parameters and the body in the evaluation text (`response-text-param-then-body`),
+  and a query string is read without the parameters that are empty (`response-text-param-empty-piece`).
+- The built-in response for a request that no scenario matches waits for the delay of the service
+  (`response-delay-builtin`).
 - Imported scenarios count as created in the order of their legacy IDs, which decides a tie between scenarios
   of the same name (`response-tie-id-order`).
 - A rule argument that is a JSON number is read as the text of that number (`rule-number-argument`).
@@ -244,8 +249,8 @@ Not recorded:
 
 ## Response cases (task 2.5)
 
-Sixty-seven `response-*` recordings cover static and dynamic responses. `ResponseCases`
-defines them in ten fixture groups, one per `parity-fixtures/responses-*.xml` fixture:
+Seventy-five `response-*` recordings cover static and dynamic responses. `ResponseCases`
+defines them in twelve fixture groups, one per `parity-fixtures/responses-*.xml` fixture:
 
 | Fixture group | Cases | Coverage |
 |---|---|---|
@@ -253,12 +258,14 @@ defines them in ten fixture groups, one per `parity-fixtures/responses-*.xml` fi
 | `responses-status-headers` | 7 | Status 201, 302, and 503. Several headers, repeated header names, a missing header element, and malformed header text. |
 | `responses-body-charset` | 10 | Body bytes: the trailing line break, an empty body, surrounding whitespace, and markup. Encoding with and without a declared charset. |
 | `responses-text` | 10 | Text criteria against query parameters and the body, decoding, literal path text, and the value of a template variable. |
+| `responses-parameters` | 7 | Text criteria against the query string in detail: an empty value, a repeated parameter, a parameter without a value, an encoded plus sign, and an empty parameter. Parameters followed by a body, and an escape in a body. |
 | `responses-rules` | 13 | Rule criteria for parameters, headers, the body, and the URL, each satisfied and unsatisfied. The rule score, rule groups, and a malformed rule set. |
 | `responses-methods` | 6 | Method restrictions: the same method, another method, `*`, no restriction, and lower case. |
 | `responses-ties` | 6 | The higher score wins. Equal scores go to the scenario name that sorts first, and then to the lower scenario ID. |
 | `responses-fallback` | 3 | No match: the service error scenario and the built-in response. A scenario without a match criterion. |
 | `responses-universal-error` | 2 | No match with a universal error scenario: the service error scenario comes first, the universal one second. |
 | `responses-delays` | 6 | The service delay, a scenario delay longer or shorter than the service delay, and delays when no scenario matches. |
+| `responses-builtin-delay` | 1 | The service delay before the built-in response. |
 
 Re-record with `scripts/record-cases.sh <legacy-dir> responses`, or name one group instead
 of `responses`. The script runs one legacy instance in a scratch directory.
@@ -286,6 +293,13 @@ Legacy behaviors captured (each is visible in the named recording):
   The whole text is then form-decoded: a `+` in a body matches a space
   (`response-text-body-plus`), and a `%` that does not start an escape fails the request
   with status 500 (`response-text-body-percent`).
+- A parameter whose value is blank is written without its `=`, and the values of a
+  repeated parameter follow each other without a separator (DEV-58):
+  `response-text-param-empty-value` and `response-text-param-repeated`. A parameter is
+  decoded once, so an encoded plus sign stays a plus sign
+  (`response-text-param-encoded-plus`). The body follows the parameters without a
+  separator (`response-text-param-then-body`), and an escape in a body is decoded
+  (`response-text-body-escape`).
 - The value of a template variable is evaluated only when the braces arrive unencoded.
   For `%7B123%7D` the service is found but the value is not evaluated
   (`response-text-template-value`).
@@ -293,6 +307,7 @@ Legacy behaviors captured (each is visible in the named recording):
   order of the scenarios in the document (`response-tie-id-order`).
 - When no scenario matches, the delay of the error scenario is ignored and the service
   delay applies (`response-delay-error-scenario`, `response-delay-fallback-service`).
+  The service delay also comes before the built-in response (`response-delay-builtin`).
 - A default scenario ID that refers to no scenario gives `NO SCENARIO SELECTED` with
   status 200 (`response-static-dangling-default`).
 

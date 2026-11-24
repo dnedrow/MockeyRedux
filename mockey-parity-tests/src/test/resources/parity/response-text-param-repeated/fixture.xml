@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mockservice version="1.0" xml:lang="en-US">
+	<proxy_settings proxy_enabled="false" proxy_url=""/>
+	<service default_real_url_index="0" default_scenario_id="1" description="Text criteria that tell how the evaluation text writes the parameters of the query string." error_scenario_id="10" hang_time="0" name="parameters evaluate" request_inspector_name="null" service_response_type="2" tag="" url="parameters/evaluate">
+		<request_inspector_json_rules enable_flag="false"/>
+		<response_schema enable_flag="false"/>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="bare name" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[debug]]></scenario_match>
+			<scenario_response><![CDATA[name without an equals sign]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="2" name="name and equals sign" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[debug=]]></scenario_match>
+			<scenario_response><![CDATA[name with an equals sign]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="3" name="unseparated" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[a=1a=2]]></scenario_match>
+			<scenario_response><![CDATA[repeated values without a separator]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="4" name="separated" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[a=1&a=2]]></scenario_match>
+			<scenario_response><![CDATA[repeated values with a separator]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="5" name="without value" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[wsdl]]></scenario_match>
+			<scenario_response><![CDATA[parameter without a value]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="6" name="plus sign" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[+1555]]></scenario_match>
+			<scenario_response><![CDATA[encoded plus sign kept]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="7" name="parameter and body" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[q=abcdef]]></scenario_match>
+			<scenario_response><![CDATA[parameters and body without a separator]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="8" name="escape in body" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[jane doe]]></scenario_match>
+			<scenario_response><![CDATA[escape in the body decoded]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="9" name="two parameters" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[a=1&b=2]]></scenario_match>
+			<scenario_response><![CDATA[empty parameter left out]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+		<scenario hang_time="0" http_method_type="" http_resp_status_code="404" id="10" name="no match" tag="">
+			<scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+			<scenario_response><![CDATA[no scenario matched]]></scenario_response>
+			<scenario_response_header/>
+		</scenario>
+	</service>
+</mockservice>
