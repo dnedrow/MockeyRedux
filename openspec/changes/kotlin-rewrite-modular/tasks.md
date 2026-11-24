@@ -49,7 +49,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 5.2 Implement rule evaluation: group inputs, keyed and wildcard rules, the three rule types, group and rule-set satisfaction, and the satisfied-rule count (DEV-15, DEV-16, DEV-17). Verify with unit tests for each scenario of those requirements.
 - [x] 5.3 Implement service-level inspection messages and the handling of stored rule sets that cannot be read. Verify with unit tests that messages name the group, key, requirement, and description, and that the response is unaffected.
 - [x] 5.4 Implement the inspector interface, discovery at startup, global and named inspectors, failure isolation, and listing. Give the names of the installed inspectors to the definition diagnostics. Verify with tests that use a sample inspector in the test sources, including the intent of the legacy `TestPluginStore`, and record the legacy `TestPackageInfoPeerClassFinder` as obsolete in the traceability table.
-- [ ] 5.5 Write `docs/rules.md` and `docs/inspectors.md`, including how to port a legacy `IRequestInspector`. Verify that the documented sample inspector compiles and is discovered in a test.
+- [x] 5.5 Write `docs/rules.md` and `docs/inspectors.md`, including how to port a legacy `IRequestInspector`. Verify that the documented sample inspector compiles and is discovered in a test.
 
 ## 6. Core: scenario responses (spec: scenario-responses)
 

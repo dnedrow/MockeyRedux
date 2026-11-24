@@ -4,14 +4,13 @@ import io.github.dnedrow.mockey.core.inspection.Inspector
 import io.github.dnedrow.mockey.core.request.MockRequest
 
 /**
- * The sample inspector of Mockey 2.x as an inspector of this system. It reports every request that carries the
- * parameter `foobarKey`.
+ * The sample inspector of Mockey 2.x, ported. It reports every request that carries the parameter `foobarKey`.
  */
 class SampleRequestInspector : Inspector {
-    /** The class name of the legacy inspector, so that services which were imported with that name still name it. */
+    /** The class name of the inspector in Mockey 2.x, so that the services that named it there still name it. */
     override val name: String = "com.mockey.plugin.SampleRequestInspector"
 
-    /** The legacy inspector inspected the requests of every service. */
+    /** The inspector inspects the requests of every service, as it did in Mockey 2.x. */
     override val isGlobal: Boolean = true
 
     override fun inspect(request: MockRequest): String? =
