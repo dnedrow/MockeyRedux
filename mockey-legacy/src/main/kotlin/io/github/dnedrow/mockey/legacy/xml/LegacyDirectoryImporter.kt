@@ -24,26 +24,33 @@ public class LegacyDirectoryImporter(
             if (services.isEmpty()) {
                 LegacyXmlDefinitions.map(main.document)
             } else {
-                services.mapIndexedNotNull { index, reference ->
-                    val fileName = reference.getAttribute("file").takeUnless(String::isBlank)
-                    if (fileName == null) {
-                        issues += LegacyXmlIssue(mainFile, LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference has no file.")
-                        null
-                    } else {
-                        val file = normalizedRoot.resolve(fileName).normalize()
-                        if (!file.startsWith(normalizedRoot)) {
-                            issues += LegacyXmlIssue(file, LegacyXmlIssueKind.OUTSIDE_IMPORT_ROOT, "A service reference points outside the import root.")
+                services
+                    .mapIndexedNotNull { index, reference ->
+                        val fileName = reference.getAttribute("file").takeUnless(String::isBlank)
+                        if (fileName == null) {
+                            issues += LegacyXmlIssue(mainFile, LegacyXmlIssueKind.UNREADABLE_FILE, "A service reference has no file.")
                             null
                         } else {
-                            val result = reader.read(file)
-                            issues += result.issues
-                            result.document?.let { document ->
-                                val responseFiles = responseFiles(document, file.parent, issues)
-                                LegacyXmlDefinitions.mapServiceFiles(document, responseFiles).services
+                            val file = normalizedRoot.resolve(fileName).normalize()
+                            if (!file.startsWith(normalizedRoot)) {
+                                issues +=
+                                    LegacyXmlIssue(
+                                        file,
+                                        LegacyXmlIssueKind.OUTSIDE_IMPORT_ROOT,
+                                        "A service reference points outside the import root.",
+                                    )
+                                null
+                            } else {
+                                val result = reader.read(file)
+                                issues += result.issues
+                                result.document?.let { document ->
+                                    val responseFiles = responseFiles(document, file.parent, issues)
+                                    LegacyXmlDefinitions.mapServiceFiles(document, responseFiles).services
+                                }
                             }
                         }
-                    }
-                }.flatten().let { Definitions(services = it) }
+                    }.flatten()
+                    .let { Definitions(services = it) }
             }
         return LegacyDirectoryImportResult(definitions, issues)
     }
@@ -78,11 +85,15 @@ public class LegacyDirectoryImporter(
                 try {
                     scenario.getAttribute("id") to Files.readString(file)
                 } catch (e: Exception) {
-                    issues += LegacyXmlIssue(file, LegacyXmlIssueKind.UNREADABLE_FILE, e.message ?: "The scenario response file could not be read.")
+                    issues +=
+                        LegacyXmlIssue(
+                            file,
+                            LegacyXmlIssueKind.UNREADABLE_FILE,
+                            e.message ?: "The scenario response file could not be read.",
+                        )
                     null
                 }
-            }
-            .toMap()
+            }.toMap()
     }
 }
 

@@ -101,8 +101,7 @@ public object LegacyXmlDefinitions {
             else -> ResponseMode.PROXY
         }
 
-    private fun String?.legacyValue(): String? =
-        this?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+    private fun String?.legacyValue(): String? = this?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
 
     private fun Element.attribute(name: String): String? = getAttribute(name).takeUnless { !hasAttribute(name) }
 
@@ -118,13 +117,7 @@ public object LegacyXmlDefinitions {
 
     private fun Element.booleanAttribute(name: String): Boolean = attribute(name)?.equals("true", ignoreCase = true) == true
 
-    internal fun Element.childElement(name: String): Element? = childElements(name).firstOrNull()
-
-    internal fun Element.childElements(name: String): List<Element> =
-        (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }.filter { it.localName == name || it.nodeName == name }
-
-    private fun Document.childElements(name: String): List<Element> =
-        documentElement.childElements(name)
+    private fun Document.childElements(name: String): List<Element> = documentElement.childElements(name)
 
     private fun Document.services(): List<Element> =
         if (documentElement.localName == "service" || documentElement.nodeName == "service") {
@@ -136,3 +129,8 @@ public object LegacyXmlDefinitions {
     private fun Document.findScenario(id: String): Element? =
         services().asSequence().flatMap { it.childElements("scenario").asSequence() }.firstOrNull { it.attribute("id") == id }
 }
+
+internal fun Element.childElement(name: String): Element? = childElements(name).firstOrNull()
+
+internal fun Element.childElements(name: String): List<Element> =
+    (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }.filter { it.localName == name || it.nodeName == name }

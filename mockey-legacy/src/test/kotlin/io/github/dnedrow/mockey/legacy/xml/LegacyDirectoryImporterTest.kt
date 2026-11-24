@@ -28,7 +28,19 @@ class LegacyDirectoryImporterTest {
         val result = LegacyDirectoryImporter(root).import()
 
         assertEquals(emptyList(), result.issues)
-        assertEquals("Orders", result.definitions.services.single().name)
-        assertEquals("""{"created":true}""", result.definitions.services.single().scenarios.single().responseBody)
+        assertEquals(
+            "Orders",
+            result.definitions.services
+                .single()
+                .name,
+        )
+        assertEquals(
+            """{"created":true}""",
+            result.definitions.services
+                .single()
+                .scenarios
+                .single()
+                .responseBody,
+        )
     }
 }
