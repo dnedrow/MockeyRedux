@@ -17,11 +17,18 @@ public object LegacyXmlDefinitions {
     /** Maps the services and scenarios in [document]. */
     public fun map(document: Document): Definitions =
         Definitions(
-            services =
-                document.documentElement.childElements("service").mapIndexed { index, element ->
-                    service(element, index)
-                },
+            services = document.services().mapIndexed { index, element -> service(element, index) },
         )
+
+    internal fun mapServiceFiles(
+        document: Document,
+        responseFiles: Map<String, String>,
+    ): Definitions {
+        responseFiles.forEach { (scenarioId, body) ->
+            document.findScenario(scenarioId)?.childElement("scenario_response")?.textContent = body
+        }
+        return map(document)
+    }
 
     private fun service(
         element: Element,
@@ -111,11 +118,21 @@ public object LegacyXmlDefinitions {
 
     private fun Element.booleanAttribute(name: String): Boolean = attribute(name)?.equals("true", ignoreCase = true) == true
 
-    private fun Element.childElement(name: String): Element? = childElements(name).firstOrNull()
+    internal fun Element.childElement(name: String): Element? = childElements(name).firstOrNull()
 
-    private fun Element.childElements(name: String): List<Element> =
+    internal fun Element.childElements(name: String): List<Element> =
         (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }.filter { it.localName == name || it.nodeName == name }
 
     private fun Document.childElements(name: String): List<Element> =
         documentElement.childElements(name)
+
+    private fun Document.services(): List<Element> =
+        if (documentElement.localName == "service" || documentElement.nodeName == "service") {
+            listOf(documentElement)
+        } else {
+            childElements("service")
+        }
+
+    private fun Document.findScenario(id: String): Element? =
+        services().asSequence().flatMap { it.childElements("scenario").asSequence() }.firstOrNull { it.attribute("id") == id }
 }
