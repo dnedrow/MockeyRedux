@@ -50,6 +50,14 @@ tasks.register("checkModuleDependencies") {
     }
 }
 
+tasks.register("printJavaVersion") {
+    description = "Prints the Java version used by Gradle and the JAVA_HOME path."
+    doLast {
+        println("Java version used by Gradle: ${System.getProperty("java.version")}")
+        println("JAVA_HOME: " + System.getProperty("java.home"))
+    }
+}
+
 tasks.register("check") {
     dependsOn("checkModuleDependencies")
     dependsOn(subprojects.map { "${it.path}:check" })
