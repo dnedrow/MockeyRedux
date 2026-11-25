@@ -14,6 +14,9 @@ import kotlin.io.path.readText
  */
 internal object ServerProgram {
     private const val MAIN_CLASS = "io.github.dnedrow.mockey.server.MainKt"
+
+    /** The command of the Java runtime of this test. */
+    val java: String = Path(System.getProperty("java.home"), "bin", "java").toString()
     private const val TIME_LIMIT_SECONDS = 60L
     private const val POLL_MILLIS = 20L
     private val LISTENING = Regex("""The (mock|admin) listener accepts connections on (\S+):(\d+)\.""")
@@ -139,16 +142,44 @@ internal object ServerProgram {
         runtimeOptions: List<String> = emptyList(),
         prepare: (Path) -> Unit = {},
     ): Running {
-        val java = Path(System.getProperty("java.home"), "bin", "java").toString()
+        val program = listOf(java) + runtimeOptions + listOf("-cp", System.getProperty("java.class.path"), MAIN_CLASS)
+        return start(starter + program + arguments, prepare) { environment ->
+            environment.keys.removeIf { it.startsWith("MOCKEY_") }
+            environment.putAll(variables)
+        }
+    }
+
+    /**
+     * Starts [command], which is the program as the build delivers it, with [arguments] in a directory of
+     * its own. Of the environment of this test it gets nothing but where the commands of the system are,
+     * and it gets [variables]: nothing tells a Java runtime which classes or which options to take.
+     * [starter] is a command that starts the program which follows it, see [withSignals].
+     */
+    fun startDelivered(
+        command: List<String>,
+        vararg arguments: String,
+        variables: Map<String, String> = emptyMap(),
+        starter: List<String> = emptyList(),
+    ): Running =
+        start(starter + command + arguments, prepare = {}) { environment ->
+            environment.keys.retainAll(setOf("PATH"))
+            environment.putAll(variables)
+        }
+
+    /** Starts [command] in a directory of its own, which [prepare] fills first, with the environment that [environment] leaves. */
+    private fun start(
+        command: List<String>,
+        prepare: (Path) -> Unit,
+        environment: (MutableMap<String, String>) -> Unit,
+    ): Running {
         val directory = Files.createTempDirectory("mockey-server-program")
         prepare(directory)
         val builder =
-            ProcessBuilder(starter + java + runtimeOptions + listOf("-cp", System.getProperty("java.class.path"), MAIN_CLASS) + arguments)
+            ProcessBuilder(command)
                 .directory(directory.toFile())
                 .redirectOutput(directory.resolve(OUTPUT).toFile())
                 .redirectError(directory.resolve(ERRORS).toFile())
-        builder.environment().keys.removeIf { it.startsWith("MOCKEY_") }
-        builder.environment().putAll(variables)
+        environment(builder.environment())
         return Running(builder.start(), directory)
     }
 

@@ -105,7 +105,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 11.6 Implement the legacy import command. Verify with a test that runs it on a legacy directory and checks the definitions location, the printed report, and exit status 0.
 - [x] 11.7 Implement graceful shutdown. Verify with a test that sends a termination signal during a save and finds the save complete.
 - [x] 11.8 Run the parity suite against the new server, loading fixtures through the importer, and fix differences. Verify that every case labeled `same` passes and every deviation case returns its stated new response.
-- [ ] 11.9 Package the server as a distribution with start scripts and as a runnable jar. Verify by starting it from the built distribution on a plain JDK 21 and receiving `running` from `/status`.
+- [x] 11.9 Package the server as a distribution with start scripts and as a runnable jar. Verify by starting it from the built distribution on a plain JDK 21 and receiving `running` from `/status`.
 - [ ] 11.10 Write `docs/server.md` (settings, listeners, and the security notes on the open forward proxy and admin exposure) and `docs/migrating-from-2x.md` (import, deviations, removed features). Verify that every command in both documents runs as written against fixture data.
 
 ## 12. Server: admin API (spec: admin-api)

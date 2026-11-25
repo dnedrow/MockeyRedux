@@ -1,7 +1,11 @@
 plugins {
-    id("mockey.kotlin-jvm")
+    id("mockey.application")
     // What the tests of another module need to run a server beside them, see ServerUnderTest.
     `java-test-fixtures`
+}
+
+application {
+    mainClass = "io.github.dnedrow.mockey.server.MainKt"
 }
 
 dependencies {
@@ -40,6 +44,17 @@ tasks.processResources {
 tasks.test {
     // What the version resource has to hold.
     systemProperty("mockey.version", project.version.toString())
+
+    // The tests of the distribution start the program from what the build delivers.
+    val distribution = tasks.installDist.map { it.destinationDir }
+    val runnableJar = tasks.named<Jar>("runnableJar").flatMap { it.archiveFile }
+    inputs.files(tasks.installDist).withPropertyName("distribution").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(runnableJar).withPropertyName("runnableJar").withPathSensitivity(PathSensitivity.NONE)
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf("-Dmockey.distribution=${distribution.get()}", "-Dmockey.runnableJar=${runnableJar.get().asFile}")
+        },
+    )
 
     // The spike test of the HTTP stack sends the request targets of the recorded routing cases, which are
     // files of the parity module.

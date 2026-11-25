@@ -17,6 +17,8 @@ Mockey Redux is a Kotlin rewrite of Mockey, organized as six Gradle modules:
 - Keep `mockey-core` independent of the other project modules.
 - Keep `mockey-ui` dependent on `mockey-api` only; it must not depend on `mockey-core`.
 - Use the existing convention plugin in `build-logic` for JVM modules.
+- Use the `mockey.application` convention plugin for a module that is delivered as a program. It adds the
+  distribution with start scripts and the runnable jar.
 - Use explicit API mode in `mockey-core` and `mockey-api`.
 - Use JUnit 5 and `kotlin.test` for tests.
 - Run ktlint through the existing Gradle convention.
