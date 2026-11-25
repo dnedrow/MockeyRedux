@@ -1,0 +1,121 @@
+package io.github.dnedrow.mockey.ui
+
+import io.github.dnedrow.mockey.api.SystemStatusDto
+import io.ktor.http.HttpStatusCode
+import kotlinx.html.FlowContent
+import kotlinx.html.a
+import kotlinx.html.body
+import kotlinx.html.footer
+import kotlinx.html.h1
+import kotlinx.html.head
+import kotlinx.html.header
+import kotlinx.html.html
+import kotlinx.html.lang
+import kotlinx.html.li
+import kotlinx.html.link
+import kotlinx.html.main
+import kotlinx.html.meta
+import kotlinx.html.nav
+import kotlinx.html.p
+import kotlinx.html.stream.appendHTML
+import kotlinx.html.title
+import kotlinx.html.ul
+
+/**
+ * A page of the UI: its [title], the [status] that it is answered with, and what it shows below its
+ * heading, in [content].
+ *
+ * A page is written with the builders of kotlinx.html, which write every text and every value of an
+ * attribute so that a browser reads it as text. So what a page shows of the server, such as a name or a
+ * body, is never read as markup.
+ */
+internal class Page(
+    val title: String,
+    val status: HttpStatusCode = HttpStatusCode.OK,
+    val content: FlowContent.() -> Unit,
+)
+
+/** A section of the UI that the navigation of every page leads to: the [path] of its first page, and what the link says. */
+internal class Section(
+    val path: String,
+    val label: String,
+)
+
+/**
+ * The frame of every page: the head, with the stylesheet and the icon of the UI, the navigation, and the
+ * foot, which names the server that the UI manages.
+ *
+ * Everything that a page refers to is a path of the UI itself, so a browser that shows a page asks no other
+ * place for anything.
+ */
+internal object Html {
+    /** The sections of the UI, in the order of the navigation. */
+    val sections: List<Section> = listOf(Section("/system", "Server"))
+
+    /**
+     * Returns [page] as an HTML document. [path] is the path at which the page is shown, by which the
+     * navigation marks the section of the page. [adminUrl] is where the server is that the UI manages, and
+     * [system] is what that server states of itself, or `null` when it stated nothing.
+     */
+    fun document(
+        page: Page,
+        path: String,
+        adminUrl: AdminUrl,
+        system: SystemStatusDto?,
+    ): String =
+        buildString {
+            append("<!DOCTYPE html>\n")
+            appendHTML(prettyPrint = false).html {
+                lang = "en"
+                head {
+                    meta(charset = "utf-8")
+                    meta(name = "viewport", content = "width=device-width, initial-scale=1")
+                    title("${page.title} - Mockey")
+                    link(rel = "stylesheet", href = Assets.path("mockey.css"))
+                    link(rel = "icon", href = Assets.path("favicon.svg"), type = "image/svg+xml")
+                }
+                body {
+                    header {
+                        a(href = "/", classes = "brand") { +"Mockey" }
+                        navigation(path)
+                    }
+                    main {
+                        h1 { +page.title }
+                        page.content(this)
+                    }
+                    footer {
+                        p { +serverLine(adminUrl, system) }
+                        p { +"Mockey UI ${UiVersion.text}" }
+                    }
+                }
+            }
+        }
+
+    /** The links to the sections of the UI. The link to the section of the page at [path] says that it is the current one. */
+    private fun FlowContent.navigation(path: String) {
+        nav {
+            attributes["aria-label"] = "Sections"
+            ul {
+                for (section in sections) {
+                    val current = path == section.path || path.startsWith("${section.path}/")
+                    li {
+                        a(href = section.path) {
+                            if (current) attributes["aria-current"] = "page"
+                            +section.label
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Returns what the foot of a page says of the server at [adminUrl], which stated [system] of itself. */
+    private fun serverLine(
+        adminUrl: AdminUrl,
+        system: SystemStatusDto?,
+    ): String {
+        if (system == null) return "Server at $adminUrl"
+        val mode = if (system.readOnly) "read-only mode" else "writable mode"
+        return "Server at $adminUrl, version ${system.version}, in $mode"
+    }
+}

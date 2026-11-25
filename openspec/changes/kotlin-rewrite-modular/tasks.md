@@ -123,7 +123,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 ## 13. Web UI (spec: admin-ui)
 
-- [ ] 13.1 Implement the UI application skeleton: settings for the admin API address, token, and bind address, the typed admin API client, the page layout, and self-hosted assets. Verify with tests against a fake admin API that the token never reaches the browser and that the default bind is loopback.
+- [x] 13.1 Implement the UI application skeleton: settings for the admin API address, token, and bind address, the typed admin API client, the page layout, and self-hosted assets. Verify with tests against a fake admin API that the token never reaches the browser and that the default bind is loopback.
 - [ ] 13.2 Implement the pages for an unreachable server, a rejected token, and an incompatible server. Verify with tests for each case and for recovery when the server returns.
 - [ ] 13.3 Implement the form infrastructure: the anti-forgery token, redirect after success, result and report display, validation feedback with preserved input, and confirmation pages. Verify with tests, including a forged post and a reload after saving.
 - [ ] 13.4 Implement text-only rendering of stored content across the page helpers. Verify with tests that render names, headers, and bodies containing markup and find them escaped.

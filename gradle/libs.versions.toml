@@ -2,8 +2,10 @@
 clikt = "5.2.1"
 jmail = "2.1.0"
 json-schema = "1.9.1"
+jsoup = "1.24.1"
 kotlin = "2.4.21"
 kotlinx-coroutines = "1.11.0"
+kotlinx-html = "0.12.0"
 kotlinx-serialization = "1.13.0"
 ktlint = "14.2.0"
 ktor = "3.6.1"
@@ -13,10 +15,12 @@ logback = "1.6.8"
 clikt-core = { module = "com.github.ajalt.clikt:clikt-core", version.ref = "clikt" }
 jmail = { module = "com.sanctionco.jmail:jmail", version.ref = "jmail" }
 json-schema = { module = "dev.harrel:json-schema", version.ref = "json-schema" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-serialization-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-html = { module = "org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref = "kotlinx-html" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
