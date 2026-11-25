@@ -3,8 +3,6 @@ package io.github.dnedrow.mockey.server
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.ResponseMode
 import kotlinx.coroutines.runBlocking
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -71,21 +69,17 @@ class RequestHostTest {
         assertEquals(0, requestsThatTheEngineGot())
     }
 
-    /** Nothing else of the server sees a request that is refused, so nothing fails over it, and the log stays as it is. */
+    /** Nothing else of the server sees a request that is refused, so nothing fails over it, and the server logs nothing. */
     @Test
     fun aRequestThatIsRefusedGoesNoFurther() {
-        val before = System.out
-        val captured = ByteArrayOutputStream()
-        System.setOut(PrintStream(captured, true))
-        val answers =
-            try {
-                listOf("/service/customer/7", "/status", "/no/such/path").map { answerTo("POST $it HTTP/1.1", body = "a body") }
-            } finally {
-                System.setOut(before)
+        var answers = emptyList<RawHttp.Answer>()
+        val log =
+            TestLog.of {
+                answers = listOf("/service/customer/7", "/status", "/no/such/path").map { answerTo("POST $it HTTP/1.1", body = "a body") }
             }
 
         assertEquals(List(3) { "HTTP/1.1 400 Bad Request" to REFUSAL }, answers.map { it.statusLine to it.body })
-        assertEquals("", captured.toString())
+        assertEquals(emptyList(), TestLog.messages(log))
         assertEquals(0, requestsThatTheEngineGot())
     }
 
