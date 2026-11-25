@@ -565,7 +565,7 @@ class AdminHistoryTest {
             val headers = listOf(HeaderDto("content-type", "application/json"), HeaderDto("x-rate", "7"))
             assertEquals(ScenarioDto(scenario.id, "recorded order", """{"order":7}""", 200, headers, MatchCriterionDto.None), scenario)
             val saved = engine.definitions.services.single { it.id == service.id }
-            assertEquals(listOf(scenario), saved.scenarios.map(Scenario::toAdminDto))
+            assertEquals(listOf(scenario), saved.scenarios.map { it.toAdminDto(engine.lastUsedTimes) })
             assertEquals(scenario.id, saved.defaultScenarioId?.value)
         }
     }

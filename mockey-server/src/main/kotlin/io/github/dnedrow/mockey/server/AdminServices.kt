@@ -28,10 +28,10 @@ internal class AdminServices(
     val routes: List<AdminRoute> =
         listOf(
             AdminRoute(HttpMethod.Get, "services", query = setOf(TAG, NAME)) {
-                AdminResponse.json(listed(Tags.of(queryValues(TAG)), queryValue(NAME)).map(Service::toAdminDto))
+                AdminResponse.json(listed(Tags.of(queryValues(TAG)), queryValue(NAME)).map { it.toAdminDto(engine.lastUsedTimes) })
             },
             AdminRoute(HttpMethod.Post, "services") { create() },
-            AdminRoute(HttpMethod.Get, "services/{serviceId}") { AdminResponse.json(service(parameter("serviceId")).toAdminDto()) },
+            AdminRoute(HttpMethod.Get, "services/{serviceId}") { read() },
             AdminRoute(HttpMethod.Patch, "services/{serviceId}") { update() },
             AdminRoute(HttpMethod.Delete, "services/{serviceId}") {
                 engine.services.delete(service(parameter("serviceId")).id).orProblem()
@@ -39,7 +39,7 @@ internal class AdminServices(
             },
             AdminRoute(HttpMethod.Post, "services/{serviceId}/duplicate") {
                 val copy = engine.services.duplicate(service(parameter("serviceId")).id).orProblem()
-                AdminResponse.created(copy.toAdminDto(), "services", copy.id.value)
+                AdminResponse.created(copy.toAdminDto(engine.lastUsedTimes), "services", copy.id.value)
             },
             AdminRoute(HttpMethod.Post, "services/{serviceId}/merge") { merge() },
             AdminRoute(HttpMethod.Get, "services/{serviceId}/schema-report") { schemaReport() },
@@ -63,11 +63,14 @@ internal class AdminServices(
             tagged && (name == null || service.name.trim().equals(name.trim(), ignoreCase = true))
         }
 
+    /** Answers with the service of the request. */
+    private fun AdminRequest.read(): AdminResponse = AdminResponse.json(service(parameter("serviceId")).toAdminDto(engine.lastUsedTimes))
+
     /** Creates a service with the attributes that the request states, and answers with the service and where it is. */
     private suspend fun AdminRequest.create(): AdminResponse {
         val stated = statedAttributes()
         val service = engine.services.create { blank -> blank.with(stated.on(blank.attributes())) }.orProblem()
-        return AdminResponse.created(service.toAdminDto(), "services", service.id.value)
+        return AdminResponse.created(service.toAdminDto(engine.lastUsedTimes), "services", service.id.value)
     }
 
     /** Gives the service of the request the attributes that the request states, and answers with the service. */
@@ -75,7 +78,7 @@ internal class AdminServices(
         val id = service(parameter("serviceId")).id
         val stated = statedAttributes()
         val service = engine.services.update(id) { current -> current.with(stated.on(current.attributes())) }.orProblem()
-        return AdminResponse.json(service.toAdminDto())
+        return AdminResponse.json(service.toAdminDto(engine.lastUsedTimes))
     }
 
     /**

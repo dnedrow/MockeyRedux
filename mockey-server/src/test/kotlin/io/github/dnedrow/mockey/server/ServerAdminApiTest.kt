@@ -40,6 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The admin API of a server in the process of the test: the scenarios of the admin API as a whole server
@@ -396,7 +397,7 @@ class ServerAdminApiTest {
         assertEquals("HTTP/1.1 201 Created", created.statusLine)
         val service = created.decoded<ServiceDto>()
         assertEquals(ServiceDto(service.id, "Clients", "client/{id}"), service)
-        assertEquals(service, read(server).last().toAdminDto())
+        assertEquals(service, read(server).last().toAdminDto(server.engine.lastUsedTimes))
     }
 
     /** The scenario "Request without the token", for a request that would change something: nothing is changed for it. */
@@ -462,10 +463,49 @@ class ServerAdminApiTest {
         assertEquals(listOf<Int?>(201, 201, 200), listOf(saved.status, lost.status, selected.status))
         assertEquals(410 to "lost", ofLost.status to ofLost.body)
         assertEquals("HTTP/1.1 200 OK", applied.statusLine)
-        assertEquals(PlanApplyReportDto(saved.decoded<PlanDto>(), emptyList(), emptyList()), applied.decoded<PlanApplyReportDto>())
+        val times = server.engine.lastUsedTimes
+        val plan = saved.decoded<PlanDto>().copy(lastUsedTime = "${times.plans.values.single()}")
+        assertEquals(PlanApplyReportDto(plan, emptyList(), emptyList()), applied.decoded<PlanApplyReportDto>())
         assertEquals(listOf(PlanItemDto("Customers", "found", ResponseModeDto.STATIC, 0)), saved.decoded<PlanDto>().items)
         assertEquals(200 to StoredDefinitions.CUSTOMER, ofThePlan.status to ofThePlan.body)
         assertEquals(0L, read(server).single().delayMillis)
+    }
+
+    /**
+     * The requirement "Last-used times" of the history, as the API states them: a service and a scenario
+     * state when they last answered a request, and a plan states when it was last applied. Each of them
+     * states no time before that, and none after the times were cleared.
+     */
+    @Test
+    fun aServiceAScenarioAndAPlanStateWhenTheyWereLastUsed() {
+        val server = start(settings())
+        val mock = server.listeners.mock.address
+        val id = read(server).single().id.value
+        val second = server.asked("POST", "services/$id/scenarios", """{"name":"lost","responseBody":"lost","statusCode":410}""")
+        val plan = server.asked("POST", "plans", """{"name":"Found","serviceIds":["$id"]}""").decoded<PlanDto>()
+        val stated = {
+            val service = server.asked("GET", "services/$id").decoded<ServiceDto>()
+            val alone = server.asked("GET", "services/$id/scenarios/${service.scenarios.first().id}").decoded<ScenarioDto>()
+            val plans = server.asked("GET", "plans").decoded<List<PlanDto>>()
+            val ofScenarios = service.scenarios.associate { it.name to it.lastUsedTime }
+            listOf(service.lastUsedTime, ofScenarios, alone.lastUsedTime, plans.single().lastUsedTime)
+        }
+
+        val before = stated()
+        val answered = RawHttp.get(mock, "/service/customer/7")
+        val entry = server.asked("GET", "history").decoded<List<HistoryEntryDto>>().single()
+        val applied = server.asked("POST", "plans/${plan.id}/apply").decoded<PlanApplyReportDto>()
+        val used = stated()
+        val cleared = server.asked("DELETE", "system/last-used-times")
+        val after = stated()
+
+        assertEquals(201 to 200, second.status to answered.status)
+        assertEquals(listOf(null, mapOf("found" to null, "lost" to null), null, null), before)
+        val whenApplied = applied.plan.lastUsedTime
+        assertEquals(listOf(entry.time, mapOf("found" to entry.time, "lost" to null), entry.time, whenApplied), used)
+        assertTrue(Instant.parse(whenApplied) >= Instant.parse(entry.time), "$whenApplied")
+        assertEquals(204, cleared.status)
+        assertEquals(before, after)
     }
 
     /**
@@ -707,7 +747,7 @@ class ServerAdminApiTest {
         val ofTheName = RawHttp.get(admin, "/api/v1/services/Customers")
 
         assertEquals(200 to "Customers", ofCustomers.status to ofCustomers.decoded<ServiceDto>().name)
-        assertEquals(customers.toAdminDto(), ofCustomers.decoded<ServiceDto>())
+        assertEquals(customers.toAdminDto(server.engine.lastUsedTimes), ofCustomers.decoded<ServiceDto>())
         for ((answer, id) in listOf(ofNoService to "no-such-service", ofTheName to "Customers")) {
             assertEquals("HTTP/1.1 404 Not Found", answer.statusLine)
             assertEquals(listOf("application/problem+json"), answer.headerValues("Content-Type"))

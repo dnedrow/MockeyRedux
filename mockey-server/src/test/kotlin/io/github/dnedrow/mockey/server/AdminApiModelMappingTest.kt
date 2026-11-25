@@ -24,6 +24,7 @@ import io.github.dnedrow.mockey.core.definitions.ImportItemKind
 import io.github.dnedrow.mockey.core.definitions.ImportReport
 import io.github.dnedrow.mockey.core.definitions.SearchResult
 import io.github.dnedrow.mockey.core.definitions.SearchResultType
+import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.history.HistoryEntryId
 import io.github.dnedrow.mockey.core.history.Outcome
@@ -53,14 +54,26 @@ import io.github.dnedrow.mockey.core.model.TwistId
 import io.github.dnedrow.mockey.core.model.TwistPair
 import io.github.dnedrow.mockey.core.request.Cookie
 import io.github.dnedrow.mockey.core.request.Parameter
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import java.time.Instant
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 class AdminApiModelMappingTest {
+    private val engine: MockeyEngine = runBlocking { MockeyEngine.create() }
+
+    /** The times of an engine that has handled no request and applied no plan. */
+    private val unused = engine.lastUsedTimes
+
+    @AfterTest
+    fun closeTheEngine() {
+        engine.close()
+    }
+
     @Test
     fun plansAndTwistConfigurationsMapBothWays() {
         val definitions = definitions()
@@ -68,8 +81,8 @@ class AdminApiModelMappingTest {
         val twist = definitions.twists.single()
 
         val items = listOf(PlanItemDto("orders", "created", ResponseModeDto.DYNAMIC))
-        assertEquals(PlanDto("plan-1", "all orders", items = items), plan.toAdminDto())
-        assertEquals(plan, plan.toAdminDto().toModel())
+        assertEquals(PlanDto("plan-1", "all orders", items = items), plan.toAdminDto(unused))
+        assertEquals(plan, plan.toAdminDto(unused).toModel())
         val pairs = listOf(TwistPairDto("orders.example", "test.example"))
         assertEquals(TwistConfigurationDto("twist-1", "to test", pairs), twist.toAdminDto())
         assertEquals(twist, twist.toAdminDto().toModel())
@@ -79,7 +92,7 @@ class AdminApiModelMappingTest {
     fun servicesMapBothWaysAndDeriveTheirEffectiveResponseMode() {
         val service = definitions().services.single()
 
-        val dto = service.toAdminDto()
+        val dto = service.toAdminDto(unused)
 
         assertEquals(ResponseModeDto.DYNAMIC, dto.effectiveResponseMode)
         assertEquals(service, dto.toModel())
@@ -191,7 +204,9 @@ class AdminApiModelMappingTest {
         val service = ServiceId("service-1")
         val ofDiagnostics = DiagnosticKind.entries.associateWith { Diagnostic(it, service, "Orders", "A message.").toAdminDto().kind }
         val ofResults = SearchResultType.entries.associateWith { SearchResult(it, "id-1", "Orders").toAdminDto().type }
-        val reportOf = { kind: ImportItemKind -> ImportReport(listOf(ImportItem(kind, "Orders", "A message.")), emptyList()).toAdminDto() }
+        val reportOf = { kind: ImportItemKind ->
+            ImportReport(listOf(ImportItem(kind, "Orders", "A message.")), emptyList()).toAdminDto(unused)
+        }
         val ofItems = ImportItemKind.entries.associateWith(reportOf)
 
         assertEquals(

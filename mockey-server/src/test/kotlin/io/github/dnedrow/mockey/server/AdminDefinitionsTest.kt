@@ -332,7 +332,7 @@ class AdminDefinitionsTest {
         assertEquals(additions, report.additions)
         assertEquals(emptyList(), report.conflicts.map { it.message } + report.issues + report.unreadableRuleSets.map { it.message })
         val plan = engine.definitions.plans.single()
-        assertEquals(plan.toAdminDto(), report.appliedDefaultPlan?.plan)
+        assertEquals(plan.toAdminDto(engine.lastUsedTimes), report.appliedDefaultPlan?.plan)
         val service = engine.definitions.services.single()
         val migrated = listOf("migrated")
         val tags = listOf(service.tags.toList(), plan.tags.toList()) + service.scenarios.map { it.tags.toList() }

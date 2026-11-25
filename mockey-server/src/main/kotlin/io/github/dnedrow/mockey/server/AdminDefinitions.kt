@@ -58,7 +58,7 @@ internal class AdminDefinitions(
     private suspend fun importedOfThisSystem(
         document: Document,
         tags: Tags,
-    ): ImportReportDto = engine.importDocument(document.text(), tags).orProblem().toAdminDto()
+    ): ImportReportDto = engine.importDocument(document.text(), tags).orProblem().toAdminDto(engine.lastUsedTimes)
 
     /**
      * Imports [document] as an export document of Mockey 2.x, and returns the report. A document of which
@@ -79,7 +79,7 @@ internal class AdminDefinitions(
             val why = unread.joinToString(" ") { it.message }
             throw AdminProblem.invalid(listOf(FieldErrorDto(DOCUMENT, "The document cannot be imported: $why")))
         }
-        return read.importInto(engine, tags).toAdminDto()
+        return read.importInto(engine, tags).toAdminDto(engine.lastUsedTimes)
     }
 
     /**

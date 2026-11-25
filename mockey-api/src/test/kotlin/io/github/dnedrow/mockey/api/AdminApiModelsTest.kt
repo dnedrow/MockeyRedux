@@ -22,9 +22,10 @@ class AdminApiModelsTest {
         assertDiscriminator(MatchCriterionDto.Text("needle"), "text")
         assertDiscriminator(MatchCriterionDto.Rules("{}"), "rules")
         assertShape(HeaderDto("X-Test", "yes"), setOf("name", "value"))
+        val ofAnAnswer = setOf("responseBody", "statusCode", "headers", "matchCriterion", "methodRestriction", "delayMillis")
         assertShape(
             ScenarioDto("s1", "scenario", "body", 201, listOf(HeaderDto("X-Test", "yes")), MatchCriterionDto.None),
-            setOf("id", "name", "responseBody", "statusCode", "headers", "matchCriterion", "methodRestriction", "delayMillis", "tags"),
+            setOf("id", "name", "tags", "lastUsedTime") + ofAnAnswer,
         )
         assertShape(
             ServiceDto("svc1", "service", "/service/example"),
@@ -47,6 +48,7 @@ class AdminApiModelsTest {
                 "inspectorName",
                 "responseSchema",
                 "responseSchemaEnabled",
+                "lastUsedTime",
             ),
         )
         assertShape(
@@ -78,7 +80,7 @@ class AdminApiModelsTest {
         assertShape(RealUrlDerivationRequestDto("qa1", listOf("qa2")), setOf("expression", "replacements"))
         assertShape(DerivedRealUrlDto("svc1", "service", "http://qa2.example.com"), setOf("serviceId", "serviceName", "realUrl"))
         assertShape(PlanItemDto("service"), setOf("serviceName", "scenarioName", "responseMode", "delayMillis"))
-        assertShape(PlanDto("p1", "plan"), setOf("id", "name", "description", "tags", "items"))
+        assertShape(PlanDto("p1", "plan"), setOf("id", "name", "description", "tags", "items", "lastUsedTime"))
         assertShape(PlanAttributesDto(), setOf("name", "description", "tags", "items"))
         assertShape(PlanSaveRequestDto(listOf("svc1")), setOf("serviceIds", "name", "description", "tags"))
         assertShape(PlanReferenceDto("p1"), setOf("planId"))

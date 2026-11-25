@@ -132,7 +132,8 @@ internal class AdminHistory(
         val saved = engine.history.saveAsScenario(entry.id) { given -> stated?.let { given.with(it.on(given.attributes())) } ?: given }
         val scenario = saved.orProblem()
         val service = checkNotNull(entry.service) { "The engine makes a scenario only of an entry with a service." }
-        return AdminResponse.created(scenario.toAdminDto(), "services", service.id.value, "scenarios", scenario.id.value)
+        val created = scenario.toAdminDto(engine.lastUsedTimes)
+        return AdminResponse.created(created, "services", service.id.value, "scenarios", scenario.id.value)
     }
 
     /**

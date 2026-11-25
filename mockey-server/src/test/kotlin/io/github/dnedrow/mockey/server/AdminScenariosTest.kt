@@ -130,7 +130,7 @@ class AdminScenariosTest {
             ),
             created,
         )
-        assertEquals(listOf(created, second), current().scenarios.map(Scenario::toAdminDto))
+        assertEquals(listOf(created, second), current().scenarios.map { it.toAdminDto(engine.lastUsedTimes) })
         assertEquals(created.id, current().defaultScenarioId?.value)
         assertEquals(created, send("GET", scenarios(scenarioId = created.id)).decoded<ScenarioDto>())
     }
@@ -194,8 +194,9 @@ class AdminScenariosTest {
         val one = send("GET", path(lost))
         val none = send("GET", scenarios(service("Billing", "billing")))
 
-        assertEquals(200 to listOf(found, lost).map(Scenario::toAdminDto), listed.status to listed.decoded<List<ScenarioDto>>())
-        assertEquals(200 to lost.toAdminDto(), one.status to one.decoded<ScenarioDto>())
+        val times = engine.lastUsedTimes
+        assertEquals(200 to listOf(found, lost).map { it.toAdminDto(times) }, listed.status to listed.decoded<List<ScenarioDto>>())
+        assertEquals(200 to lost.toAdminDto(times), one.status to one.decoded<ScenarioDto>())
         assertEquals(200 to "[]", none.status to none.body)
     }
 
@@ -222,10 +223,10 @@ class AdminScenariosTest {
         val several = send("PATCH", path(defined), changes)
 
         assertEquals(200 to defined.copy(responseBody = """{"id": 2}"""), body.status to afterBody)
-        assertEquals(afterBody.toAdminDto(), body.decoded<ScenarioDto>())
+        assertEquals(afterBody.toAdminDto(engine.lastUsedTimes), body.decoded<ScenarioDto>())
         val expected = afterBody.copy(methodRestriction = null, headers = emptyList(), matchCriterion = MatchCriterion.None, name = "lost")
         assertEquals(200 to expected, several.status to current().scenarios.single())
-        assertEquals(expected.toAdminDto(), several.decoded<ScenarioDto>())
+        assertEquals(expected.toAdminDto(engine.lastUsedTimes), several.decoded<ScenarioDto>())
     }
 
     /** The whole scenario is checked after an update, and one that breaks a rule stays as it was. */

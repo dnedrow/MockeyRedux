@@ -189,7 +189,7 @@ class AdminServicesTest {
             created,
         )
         assertTrue(created.id.isNotBlank())
-        assertEquals(listOf(created), services.map(Service::toAdminDto))
+        assertEquals(listOf(created), services.map { it.toAdminDto(engine.lastUsedTimes) })
         assertEquals(created, send("GET", "services/${created.id}").decoded<ServiceDto>())
     }
 
@@ -298,7 +298,7 @@ class AdminServicesTest {
         assertEquals("HTTP/1.1 200 OK", answer.statusLine)
         assertEquals(before.copy(delayMillis = 250), current(defined))
         assertEquals(ResponseMode.DYNAMIC to gold.id, current(defined).let { it.responseMode to it.defaultScenarioId })
-        assertEquals(current(defined).toAdminDto(), answer.decoded<ServiceDto>())
+        assertEquals(current(defined).toAdminDto(engine.lastUsedTimes), answer.decoded<ServiceDto>())
     }
 
     @Test
@@ -332,7 +332,7 @@ class AdminServicesTest {
                 responseSchemaEnabled = true,
             )
         assertEquals(200 to expected, answer.status to current(defined))
-        assertEquals(expected.toAdminDto(), answer.decoded<ServiceDto>())
+        assertEquals(expected.toAdminDto(engine.lastUsedTimes), answer.decoded<ServiceDto>())
     }
 
     /** An update that states nothing changes nothing, and answers with the service as it is. */
@@ -342,7 +342,7 @@ class AdminServicesTest {
 
         val answer = send("PATCH", "services/${defined.id.value}", "{}")
 
-        assertEquals(200 to defined.toAdminDto(), answer.status to answer.decoded<ServiceDto>())
+        assertEquals(200 to defined.toAdminDto(engine.lastUsedTimes), answer.status to answer.decoded<ServiceDto>())
         assertEquals(defined, current(defined))
     }
 
@@ -451,7 +451,7 @@ class AdminServicesTest {
         assertEquals(listOf("found", "failed"), copy.scenarios.map { it.name })
         assertEquals(emptySet(), copy.scenarios.map { it.id }.toSet() intersect original.scenarios.map { it.id.value }.toSet())
         assertEquals(copy.scenarios.first().id to copy.scenarios.last().id, copy.defaultScenarioId to copy.errorScenarioId)
-        assertEquals(listOf(original.toAdminDto(), copy, second), services.map(Service::toAdminDto))
+        assertEquals(listOf(original.toAdminDto(engine.lastUsedTimes), copy, second), services.map { it.toAdminDto(engine.lastUsedTimes) })
     }
 
     // Merging

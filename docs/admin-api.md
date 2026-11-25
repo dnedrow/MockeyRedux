@@ -126,7 +126,7 @@ In this version the admin API has these operations:
 | `GET`, `PATCH /system` | States the status of the server, and switches the read-only mode on and off. |
 | `POST /system/reload` | Puts the definitions of the definitions location in the place of those in memory. |
 | `POST /system/reset` | Removes all definitions, the tag filter, the history, and the last-used times. |
-| `DELETE /system/last-used-times` | Clears the times at which services, scenarios, and plans were last used. |
+| `DELETE /system/last-used-times` | Clears the times at which services, scenarios, and plans were last used. Each of them states that time as `lastUsedTime`. |
 | `GET /definitions/export` | Gives all definitions as one document, which a server takes as its initial definitions. |
 | `POST /definitions/import` | Imports a definitions document, or an export document of Mockey 2.x. `?tag=` gives tags to what the import adds. The answer is the report of the import. |
 | `GET /diagnostics` | States what deserves attention in the definitions and blocks nothing, such as a service that names an inspector which is not installed. |
@@ -189,13 +189,16 @@ curl -s -X POST http://localhost:8081/api/v1/services \
   "requestRulesEnabled": false,
   "inspectorName": null,
   "responseSchema": null,
-  "responseSchemaEnabled": false
+  "responseSchemaEnabled": false,
+  "lastUsedTime": null
 }
 ```
 
 The service is in static mode and has no scenario to answer with yet, so it forwards requests for now, as
-`effectiveResponseMode` says. The scenarios of a service are resources below it. The first scenario of a
-service becomes its default scenario, which answers in static mode:
+`effectiveResponseMode` says. `lastUsedTime` is the time at which the service last answered a request. It is
+`null` here, because the service has answered none since the server started. The server keeps these times in
+memory only. The scenarios of a service are resources below it. The first scenario of a service becomes its
+default scenario, which answers in static mode:
 
 ```shell
 api=http://localhost:8081/api/v1
@@ -293,7 +296,8 @@ curl -s -X POST "$api/plans" \
       "responseMode": "static",
       "delayMillis": 0
     }
-  ]
+  ],
+  "lastUsedTime": null
 }
 ```
 

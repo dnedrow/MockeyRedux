@@ -27,9 +27,9 @@ internal class AdminPlans(
     /** The routes of the operations. */
     val routes: List<AdminRoute> =
         listOf(
-            AdminRoute(HttpMethod.Get, PLANS) { AdminResponse.json(engine.definitions.plans.map(Plan::toAdminDto)) },
+            AdminRoute(HttpMethod.Get, PLANS) { AdminResponse.json(engine.definitions.plans.map { it.toAdminDto(engine.lastUsedTimes) }) },
             AdminRoute(HttpMethod.Post, PLANS) { save(into = null) },
-            AdminRoute(HttpMethod.Get, PLAN) { AdminResponse.json(plan().toAdminDto()) },
+            AdminRoute(HttpMethod.Get, PLAN) { AdminResponse.json(plan().toAdminDto(engine.lastUsedTimes)) },
             AdminRoute(HttpMethod.Patch, PLAN) { update() },
             AdminRoute(HttpMethod.Delete, PLAN) {
                 engine.plans.delete(plan().id).orProblem()
@@ -38,7 +38,7 @@ internal class AdminPlans(
             AdminRoute(HttpMethod.Post, "$PLAN/save") { save(into = plan()) },
             AdminRoute(HttpMethod.Post, "$PLAN/apply") {
                 val report = engine.plans.apply(plan().id).orProblem()
-                AdminResponse.json(report.toAdminDto())
+                AdminResponse.json(report.toAdminDto(engine.lastUsedTimes))
             },
             AdminRoute(HttpMethod.Get, DEFAULT_PLAN) {
                 val designated = defaultPlan() ?: throw AdminProblem(HttpStatusCode.NotFound, NOT_DESIGNATED)
@@ -75,7 +75,8 @@ internal class AdminPlans(
                 plan.copy(description = request.description ?: plan.description, tags = request.tags?.let(Tags::of) ?: plan.tags)
             }
         val saved = result.orProblem()
-        return if (isNew) AdminResponse.created(saved.toAdminDto(), PLANS, saved.id.value) else AdminResponse.json(saved.toAdminDto())
+        val stated = saved.toAdminDto(engine.lastUsedTimes)
+        return if (isNew) AdminResponse.created(stated, PLANS, saved.id.value) else AdminResponse.json(stated)
     }
 
     /** Gives the plan of the request the attributes that the request states, and answers with the plan. */
@@ -83,7 +84,7 @@ internal class AdminPlans(
         val id = plan().id
         val stated = attributes(PlanAttributesDto.serializer())
         val plan = engine.plans.update(id) { current -> current.with(stated.on(current.attributes())) }.orProblem()
-        return AdminResponse.json(plan.toAdminDto())
+        return AdminResponse.json(plan.toAdminDto(engine.lastUsedTimes))
     }
 
     /**

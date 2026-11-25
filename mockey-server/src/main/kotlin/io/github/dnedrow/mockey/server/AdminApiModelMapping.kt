@@ -50,6 +50,7 @@ import io.github.dnedrow.mockey.core.definitions.SearchResult
 import io.github.dnedrow.mockey.core.definitions.SearchResultType
 import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.history.HistoryStatistics
+import io.github.dnedrow.mockey.core.history.LastUsedTimes
 import io.github.dnedrow.mockey.core.history.Outcome
 import io.github.dnedrow.mockey.core.history.RecordedBody
 import io.github.dnedrow.mockey.core.model.Header
@@ -72,7 +73,11 @@ import io.github.dnedrow.mockey.core.model.TwistPair
 import io.github.dnedrow.mockey.legacy.xml.LegacyImportReport
 import java.util.Base64
 
-internal fun Service.toAdminDto(): ServiceDto =
+/**
+ * Returns the service as the admin API states it, with its scenarios. [times] say when the service and its
+ * scenarios were last used.
+ */
+internal fun Service.toAdminDto(times: LastUsedTimes): ServiceDto =
     ServiceDto(
         id = id.value,
         name = name,
@@ -84,7 +89,7 @@ internal fun Service.toAdminDto(): ServiceDto =
         effectiveResponseMode = effectiveResponseMode.toDto(),
         delayMillis = delayMillis,
         tags = tags.toList(),
-        scenarios = scenarios.map(Scenario::toAdminDto),
+        scenarios = scenarios.map { it.toAdminDto(times) },
         defaultScenarioId = defaultScenarioId?.value,
         errorScenarioId = errorScenarioId?.value,
         requestRules = requestRules,
@@ -92,6 +97,7 @@ internal fun Service.toAdminDto(): ServiceDto =
         inspectorName = inspectorName,
         responseSchema = responseSchema,
         responseSchemaEnabled = responseSchemaEnabled,
+        lastUsedTime = times.ofService(id)?.toString(),
     )
 
 internal fun ServiceDto.toModel(): Service =
@@ -158,7 +164,8 @@ internal fun Service.with(attributes: ServiceAttributesDto): Service =
         responseSchemaEnabled = attributes.responseSchemaEnabled,
     )
 
-internal fun Scenario.toAdminDto(): ScenarioDto =
+/** Returns the scenario as the admin API states it. [times] say when the scenario was last used. */
+internal fun Scenario.toAdminDto(times: LastUsedTimes): ScenarioDto =
     ScenarioDto(
         id = id.value,
         name = name,
@@ -169,6 +176,7 @@ internal fun Scenario.toAdminDto(): ScenarioDto =
         methodRestriction = methodRestriction,
         delayMillis = delayMillis,
         tags = tags.toList(),
+        lastUsedTime = times.ofScenario(id)?.toString(),
     )
 
 internal fun ScenarioDto.toModel(): Scenario =
@@ -224,13 +232,15 @@ internal fun MergeReport.toAdminDto(): MergeReportDto =
 
 internal fun DerivedRealUrl.toAdminDto(): DerivedRealUrlDto = DerivedRealUrlDto(serviceId.value, serviceName, realUrl)
 
-internal fun Plan.toAdminDto(): PlanDto =
+/** Returns the plan as the admin API states it. [times] say when the plan was last applied. */
+internal fun Plan.toAdminDto(times: LastUsedTimes): PlanDto =
     PlanDto(
         id = id.value,
         name = name,
         description = description,
         tags = tags.toList(),
         items = items.map(PlanItem::toAdminDto),
+        lastUsedTime = times.ofPlan(id)?.toString(),
     )
 
 internal fun PlanDto.toModel(): Plan =
@@ -254,9 +264,9 @@ internal fun Plan.with(attributes: PlanAttributesDto): Plan =
         items = attributes.items.map(PlanItemDto::toModel),
     )
 
-internal fun PlanApplyReport.toAdminDto(): PlanApplyReportDto =
+internal fun PlanApplyReport.toAdminDto(times: LastUsedTimes): PlanApplyReportDto =
     PlanApplyReportDto(
-        plan = plan.toAdminDto(),
+        plan = plan.toAdminDto(times),
         skippedItems = skippedItems.map(PlanItem::toAdminDto),
         unresolvedScenarios = unresolvedScenarios.map { UnresolvedPlanScenarioDto(it.serviceName, it.scenarioName) },
     )
@@ -369,11 +379,11 @@ internal fun Diagnostic.toAdminDto(): DiagnosticDto =
 internal fun SearchResult.toAdminDto(): SearchResultDto = SearchResultDto(type.toDto(), id, name, serviceId?.value, serviceName)
 
 /** Returns the report of an import of a definitions document of this system as the admin API states it. */
-internal fun ImportReport.toAdminDto(): ImportReportDto =
+internal fun ImportReport.toAdminDto(times: LastUsedTimes): ImportReportDto =
     ImportReportDto(
         additions = additions.map(ImportItem::toAdminDto),
         conflicts = conflicts.map(ImportItem::toAdminDto),
-        appliedDefaultPlan = appliedDefaultPlan?.toAdminDto(),
+        appliedDefaultPlan = appliedDefaultPlan?.toAdminDto(times),
     )
 
 /**
@@ -381,8 +391,8 @@ internal fun ImportReport.toAdminDto(): ImportReportDto =
  * engine, and besides what the import could not read of the document, and the rule sets that are not well
  * formed among what it added.
  */
-internal fun LegacyImportReport.toAdminDto(): ImportReportDto =
-    imported.toAdminDto().copy(issues = issues.map { it.message }, unreadableRuleSets = unreadableRuleSets.map(Diagnostic::toAdminDto))
+internal fun LegacyImportReport.toAdminDto(times: LastUsedTimes): ImportReportDto =
+    imported.toAdminDto(times).copy(issues = issues.map { it.message }, unreadableRuleSets = unreadableRuleSets.map(Diagnostic::toAdminDto))
 
 /** Returns what the response schema of a service says of its scenarios, as the admin API states it. */
 internal fun SchemaReport.toAdminDto(): SchemaReportDto =

@@ -148,6 +148,23 @@ The admin API SHALL allow history entries to be listed with filter tokens, a ser
 - **WHEN** a client lists history with the token `orders` and a maximum of 5
 - **THEN** the response contains the 5 newest of those 12 entries
 
+### Requirement: Last-used times in the resources
+A service and a scenario that the admin API returns SHALL state the time at which they last answered a request, and a plan SHALL state the time at which it was last applied. Each of them SHALL state no time while it has not been used since the server started, and after the last-used times were cleared.
+
+#### Scenario: A service that answered a request
+- **GIVEN** a service answered a request with one of its scenarios
+- **WHEN** a client reads the service
+- **THEN** the service and that scenario each state the time of the history entry of that request, and the other scenarios of the service state no time
+
+#### Scenario: A plan that was applied
+- **WHEN** a client applies a plan
+- **THEN** the plan in the apply report and in a later list of plans states the time of that apply
+
+#### Scenario: After the times are cleared
+- **GIVEN** a service answered a request, and a plan was applied
+- **WHEN** a client clears the last-used times and reads the service and the plan
+- **THEN** neither of them, and no scenario of the service, states a time
+
 ### Requirement: System status
 The admin API SHALL report the server's version, its start time, the definitions location, the read-only setting, the active tag filter, the enabled twist configuration, the base URL of the mock endpoint, and whether the legacy shim is enabled.
 

@@ -55,6 +55,8 @@ public data class ScenarioDto(
     public val methodRestriction: String? = null,
     public val delayMillis: Long = 0,
     public val tags: List<String> = emptyList(),
+    /** When the scenario last gave the response to a request, as ISO 8601 writes it, or `null` when it has given none. */
+    public val lastUsedTime: String? = null,
 )
 
 /** A service definition and its scenarios. */
@@ -78,6 +80,8 @@ public data class ServiceDto(
     public val inspectorName: String? = null,
     public val responseSchema: String? = null,
     public val responseSchemaEnabled: Boolean = false,
+    /** When the service last handled a request, as ISO 8601 writes it, or `null` when it has handled none. */
+    public val lastUsedTime: String? = null,
 )
 
 /**
@@ -168,6 +172,8 @@ public data class PlanDto(
     public val description: String? = null,
     public val tags: List<String> = emptyList(),
     public val items: List<PlanItemDto> = emptyList(),
+    /** When the plan was last applied, as ISO 8601 writes it, or `null` when it has not been applied. */
+    public val lastUsedTime: String? = null,
 )
 
 /**

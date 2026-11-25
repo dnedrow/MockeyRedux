@@ -313,7 +313,7 @@ class ServerAdminApiConcurrencyTest {
                         """{"responseMode":"${mode.name.lowercase()}"}""",
                     )
                 val answers = atTheSameTime(updates.size) { server.asked("PATCH", "services/${service.id}", updates[it]) }
-                val held = server.services.single().toAdminDto()
+                val held = server.services.single().toAdminDto(server.engine.lastUsedTimes)
                 val seen = listOf(answers.map { it.status }, held.delayMillis, held.description, held.tags, held.responseMode)
                 val expected = listOf(List(updates.size) { 200 }, round.toLong(), "round $round", listOf("round-$round"), mode)
                 if (seen == expected) null else "In round $round the server holds $seen, and not $expected."

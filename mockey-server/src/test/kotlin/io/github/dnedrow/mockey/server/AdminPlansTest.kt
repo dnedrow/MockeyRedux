@@ -148,7 +148,7 @@ class AdminPlansTest {
         val expected =
             PlanDto(saved.id, "Gold path", "The best customers.", listOf("nightly", "team-a"), listOf(itemOfCustomers, itemOfOrders))
         assertEquals(expected, saved)
-        assertEquals(listOf(saved), plans.map(Plan::toAdminDto))
+        assertEquals(listOf(saved), plans.map { it.toAdminDto(engine.lastUsedTimes) })
         assertEquals(before, services)
     }
 
@@ -192,7 +192,8 @@ class AdminPlansTest {
         assertEquals(PlanDto(existing.id.value, "gold PATH", "The best customers.", listOf("nightly"), ofBoth), saved.decoded<PlanDto>())
         assertEquals(200, withAttributes.status)
         assertEquals(PlanDto(existing.id.value, "GOLD path", null, listOf("team-b")), withAttributes.decoded<PlanDto>())
-        assertEquals(listOf(withAttributes.decoded(), other.toAdminDto()), plans.map(Plan::toAdminDto))
+        val times = engine.lastUsedTimes
+        assertEquals(listOf(withAttributes.decoded(), other.toAdminDto(times)), plans.map { it.toAdminDto(times) })
     }
 
     /** A save that addresses a plan updates that plan, whatever it is called, and gives it the name of the request when there is one. */
@@ -209,7 +210,7 @@ class AdminPlansTest {
         assertEquals(PlanDto(night.id.value, "Night", null, listOf("nightly"), listOf(itemOfCustomers)), saved.decoded<PlanDto>())
         assertEquals(200, renamed.status)
         assertEquals(PlanDto(night.id.value, "Day", null, listOf("nightly")), renamed.decoded<PlanDto>())
-        assertEquals(listOf(renamed.decoded(), day.toAdminDto()), plans.map(Plan::toAdminDto))
+        assertEquals(listOf(renamed.decoded(), day.toAdminDto(engine.lastUsedTimes)), plans.map { it.toAdminDto(engine.lastUsedTimes) })
     }
 
     /** A service that is not there is an invalid member of the request, with a plan in the path and without one. */
@@ -260,8 +261,9 @@ class AdminPlansTest {
             }
 
         assertEquals(listOf<Int?>(201) + List(SAVES - 1) { 200 }, answers.map { it.status }.sortedByDescending { it })
-        assertEquals(listOf(PlanDto(plans.single().id.value, "Gold path", items = listOf(itemOfCustomers))), plans.map(Plan::toAdminDto))
-        assertEquals(setOf(plans.single().toAdminDto()), answers.map { it.decoded<PlanDto>() }.toSet())
+        val saved = PlanDto(plans.single().id.value, "Gold path", items = listOf(itemOfCustomers))
+        assertEquals(listOf(saved), plans.map { it.toAdminDto(engine.lastUsedTimes) })
+        assertEquals(setOf(saved), answers.map { it.decoded<PlanDto>() }.toSet())
     }
 
     // Updating
@@ -279,9 +281,9 @@ class AdminPlansTest {
 
         assertEquals(listOf<Int?>(200, 200, 200), listOf(renamed.status, tagged.status, unchanged.status))
         assertEquals(night.copy(name = "Late night"), afterTheName)
-        assertEquals(afterTheName.toAdminDto(), renamed.decoded<PlanDto>())
+        assertEquals(afterTheName.toAdminDto(engine.lastUsedTimes), renamed.decoded<PlanDto>())
         assertEquals(night.copy(name = "Late night", tags = Tags.of("team-a")), plans.single())
-        assertEquals(plans.single().toAdminDto(), unchanged.decoded<PlanDto>())
+        assertEquals(plans.single().toAdminDto(engine.lastUsedTimes), unchanged.decoded<PlanDto>())
     }
 
     /**
@@ -308,7 +310,7 @@ class AdminPlansTest {
         assertEquals(200, answer.status, "$answer")
         val stored = listOf(PlanItemDto("Customers", "silver", ResponseModeDto.STATIC, 30), PlanItemDto("No such service"))
         assertEquals(PlanDto(night.id.value, "Plan (auto-generated-name)", items = stored), answer.decoded<PlanDto>())
-        assertEquals(listOf(answer.decoded()), plans.map(Plan::toAdminDto))
+        assertEquals(listOf(answer.decoded()), plans.map { it.toAdminDto(engine.lastUsedTimes) })
         assertEquals(before, services)
     }
 
@@ -355,7 +357,7 @@ class AdminPlansTest {
         assertEquals("HTTP/1.1 200 OK", answer.statusLine, "$answer")
         val skipped = listOf(PlanItemDto("Billing", "paid", ResponseModeDto.STATIC, 5))
         val unresolved = listOf(UnresolvedPlanScenarioDto("Orders", "platinum"))
-        assertEquals(PlanApplyReportDto(night.toAdminDto(), skipped, unresolved), answer.decoded<PlanApplyReportDto>())
+        assertEquals(PlanApplyReportDto(night.toAdminDto(engine.lastUsedTimes), skipped, unresolved), answer.decoded<PlanApplyReportDto>())
         val silver = customers.scenarios.single { it.name == "silver" }
         val applied =
             listOf(

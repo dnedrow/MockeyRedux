@@ -27,9 +27,9 @@ internal class AdminScenarios(
     /** The routes of the operations. */
     val routes: List<AdminRoute> =
         listOf(
-            AdminRoute(HttpMethod.Get, SCENARIOS) { AdminResponse.json(service().scenarios.map(Scenario::toAdminDto)) },
+            AdminRoute(HttpMethod.Get, SCENARIOS) { AdminResponse.json(service().scenarios.map { it.toAdminDto(engine.lastUsedTimes) }) },
             AdminRoute(HttpMethod.Post, SCENARIOS) { create() },
-            AdminRoute(HttpMethod.Get, SCENARIO) { AdminResponse.json(scenario(service()).toAdminDto()) },
+            AdminRoute(HttpMethod.Get, SCENARIO) { AdminResponse.json(scenario(service()).toAdminDto(engine.lastUsedTimes)) },
             AdminRoute(HttpMethod.Patch, SCENARIO) { update() },
             AdminRoute(HttpMethod.Delete, SCENARIO) {
                 val service = service()
@@ -52,7 +52,8 @@ internal class AdminScenarios(
         val service = service()
         val stated = statedScenarioAttributes()
         val scenario = engine.scenarios.create(service.id) { blank -> blank.with(stated.on(blank.attributes())) }.orProblem()
-        return AdminResponse.created(scenario.toAdminDto(), "services", service.id.value, "scenarios", scenario.id.value)
+        val created = scenario.toAdminDto(engine.lastUsedTimes)
+        return AdminResponse.created(created, "services", service.id.value, "scenarios", scenario.id.value)
     }
 
     /** Gives the scenario of the request the attributes that the request states, and answers with the scenario. */
@@ -61,7 +62,7 @@ internal class AdminScenarios(
         val id = scenario(service).id
         val stated = statedScenarioAttributes()
         val scenario = engine.scenarios.update(service.id, id) { current -> current.with(stated.on(current.attributes())) }.orProblem()
-        return AdminResponse.json(scenario.toAdminDto())
+        return AdminResponse.json(scenario.toAdminDto(engine.lastUsedTimes))
     }
 
     /**
