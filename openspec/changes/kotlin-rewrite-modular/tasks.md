@@ -104,7 +104,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 11.5 Implement the startup flow: load definitions, apply initial definitions from a file or URL, protect stored definitions in writable mode (DEV-30), apply the default plan, and set the tag filter. Verify with tests for each source type and for the refusal.
 - [x] 11.6 Implement the legacy import command. Verify with a test that runs it on a legacy directory and checks the definitions location, the printed report, and exit status 0.
 - [x] 11.7 Implement graceful shutdown. Verify with a test that sends a termination signal during a save and finds the save complete.
-- [ ] 11.8 Run the parity suite against the new server, loading fixtures through the importer, and fix differences. Verify that every case labeled `same` passes and every deviation case returns its stated new response.
+- [x] 11.8 Run the parity suite against the new server, loading fixtures through the importer, and fix differences. Verify that every case labeled `same` passes and every deviation case returns its stated new response.
 - [ ] 11.9 Package the server as a distribution with start scripts and as a runnable jar. Verify by starting it from the built distribution on a plain JDK 21 and receiving `running` from `/status`.
 - [ ] 11.10 Write `docs/server.md` (settings, listeners, and the security notes on the open forward proxy and admin exposure) and `docs/migrating-from-2x.md` (import, deviations, removed features). Verify that every command in both documents runs as written against fixture data.
 
@@ -143,6 +143,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [ ] 14.3 Implement `/plan/setup` with its four actions and result, and `/definitions`. Verify with tests against the result shapes recorded in task 2.8.
 - [ ] 14.4 Implement `/home` for `init` and `deleteAllServices`, confined to the definitions location and refusing `url` (DEV-27), and the identifier round trip (DEV-20). Verify with tests for each scenario of those requirements.
 - [ ] 14.5 Add the shim to `docs/migrating-from-2x.md`: how to enable it and how it differs from Mockey 2.x. Verify that the documented requests run in a test.
+- [ ] 14.6 Replay the 44 parity recordings that address the shim's endpoints against the new server with the shim enabled, and fix differences. Task 11.8 replays the other 223. Verify that the parity suite replays every recording and that each one is answered as its label says.
 
 ## 15. Integration and release checks
 

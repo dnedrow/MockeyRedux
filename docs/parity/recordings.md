@@ -122,6 +122,54 @@ A request that uses a legacy number as an identifier finds nothing on the new se
 services of a plan. The specifications do not say what saving a plan for unknown services answers, so these
 recordings state only the result envelope.
 
+## Replaying against the new server (task 11.8)
+
+`NewServerParityTest` replays the recordings against the new server with every run of the tests of
+`mockey-parity-tests`, so it needs no legacy Mockey. A recording that is labeled `same` has to be answered as
+legacy answered it, and one that is labeled with deviations as its stated new response says. The test fails
+with the name of every recording that is answered otherwise, and with what differs.
+
+Every case gets a server of its own, so that it starts from the definitions of its fixture and an empty
+upstream session, as a case does on legacy. The server runs in the process of the test. `ServerUnderTest`, a
+test fixture of `mockey-server`, starts it from the arguments of the program, which it reads as the program
+does: the mock listener on `127.0.0.1` with a free port, read-only mode, and the settings of the group. The
+requests go to the server over HTTP, as they went to legacy.
+
+The fixture of a group gets into its servers through the importer of legacy definitions, and the test replays
+every recording once for each of two ways:
+
+- As initial definitions (`--initial-definitions <fixture>`): every server imports the fixture when it starts
+  and keeps the definitions in memory.
+- Through the import command: `mockey-server import-legacy <fixture> --definitions <directory>` stores the
+  definitions once for the group, and every server loads them from that directory. This is how an
+  installation of Mockey 2.x moves over, and it shows that nothing gets lost on the way through the stored
+  files.
+
+The settings that a fixture cannot carry are applied as `LegacyGroupRecorder` applies them to legacy. The tag
+filter is a setting of the program (`--tag-filter`). The enabled twist configuration of the group
+`routing-twist` and the credentials of the group `proxy-outbound-credentials` are set in the running server.
+The program has no setting for them, and the server has no admin API yet, so `ServerUnderTest` sets them in
+the engine of the server. Once the admin API can set them, the test should use it.
+
+The stub upstream and the two stub outbound proxies run during the replay, on the ports 18091 to 18093 that
+the fixtures name. Run the replay alone with
+`./gradlew :mockey-parity-tests:test --tests '*NewServerParityTest'`.
+
+The result of the first run: the server answered each of the 223 recordings that it can answer as the label
+says, in both ways, so no difference had to be fixed. Of these recordings 30 are `same` and 193 name
+deviations.
+
+44 recordings are not replayed yet. Each of them sends a request to one of the legacy automation endpoints
+`/config/service`, `/plan/setup`, `/definitions`, and `/home`, which the server answers only through the
+legacy shim (`legacy-compatibility`: The legacy shim is opt-in). The shim comes with the tasks of group 14,
+and task 14.6 replays these recordings against a server with the shim enabled. They are 41 of the 43
+`automation-*` recordings and the three routing recordings that read `/definitions` to see which services a
+request left behind: `routing-unknown-target-registered`, `routing-unknown-target-with-escape-registered`,
+and `routing-tag-hidden-absolute-registered`. The other two automation recordings are replayed:
+`automation-status`, and `automation-config-second-path`, whose path gets the status 404 with and without the
+shim (DEV-26). `NewServerParityTest.theRecordingsThatAreNotReplayedAreTheOnesThatNeedTheLegacyShim` names the
+44, so that no recording drops out of the replay unseen.
+
 ## Stub upstream and outbound proxy
 
 `StubHttpServer.upstream()` and `StubHttpServer.outboundProxy()` (in `mockey-parity-tests`) are loopback stubs

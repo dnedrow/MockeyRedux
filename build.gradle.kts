@@ -19,7 +19,9 @@ tasks.register("checkModuleDependencies") {
         project(":$module").configurations
             .flatMap { configuration ->
                 configuration.dependencies.mapNotNull { dependency ->
-                    if (dependency is ProjectDependency) {
+                    // A module with test fixtures depends on itself: its fixtures use its main code, and its
+                    // tests use its fixtures. That is no dependency between modules.
+                    if (dependency is ProjectDependency && dependency.path != ":$module") {
                         dependency.path.removePrefix(":")
                     } else {
                         null

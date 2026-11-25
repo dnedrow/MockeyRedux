@@ -1,5 +1,7 @@
 plugins {
     id("mockey.kotlin-jvm")
+    // What the tests of another module need to run a server beside them, see ServerUnderTest.
+    `java-test-fixtures`
 }
 
 dependencies {
@@ -19,6 +21,11 @@ dependencies {
 
     // The engine that the spike of task 11.0 compared with Netty. Only the spike test uses it.
     testImplementation(libs.ktor.server.cio)
+}
+
+// The test fixtures are a part of the server that only tests use, so they use what the server uses.
+configurations.testFixturesImplementation {
+    extendsFrom(configurations.implementation.get())
 }
 
 tasks.processResources {

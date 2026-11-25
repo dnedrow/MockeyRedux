@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     testImplementation(project(":mockey-server"))
+    testImplementation(testFixtures(project(":mockey-server")))
 }
 
 tasks.withType<Test>().configureEach {
