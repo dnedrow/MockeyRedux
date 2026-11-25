@@ -198,6 +198,19 @@ class AdminApiTest {
         assertEquals(listOf("list", "list", "list", "read 7"), asked)
     }
 
+    /** The listener refuses such a request before the API sees it, see [RequestHost]. Its refusal is plain text and no problem document. */
+    @Test
+    fun aRequestThatNamesNoHostGetsTheRefusalOfTheListenerAndReachesNoOperation() {
+        val api = api(token = TOKEN)
+
+        val answer = api.answerToLines("GET /api/v1/items HTTP/1.1", "Connection: close")
+
+        assertEquals("HTTP/1.1 400 Bad Request" to RequestHost.MISSING, answer.statusLine to answer.body)
+        assertEquals(listOf("text/plain; charset=utf-8"), answer.headerValues("Content-Type"))
+        assertEquals(emptyList(), answer.headerValues("WWW-Authenticate"))
+        assertEquals(emptyList(), asked)
+    }
+
     // How a request comes to its operation
 
     @Test

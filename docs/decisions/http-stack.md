@@ -1,10 +1,15 @@
 # HTTP stack
 
-Decided in task 11.0 of the change `kotlin-rewrite-modular`, on 2026-11-24.
+Decided in task 11.0 of the change `kotlin-rewrite-modular`, on 2026-11-24. Task 12.2 added the decision
+about the admin API and the routing of Ktor, on 2026-11-25.
 
 `mockey-server` runs its listeners on Ktor with the Netty engine. Design decision 19 chose Ktor and left the
 engine to a spike. It also named three things about Ktor that were read in its sources and not yet run. This
 record holds what the spike found, the choice of the engine, and the settings that the engine needs.
+
+Design decision 19 also expected the admin listener to use the routing of Ktor and its plugins. The admin
+API uses neither. The section "The admin API and the routing of Ktor" holds what task 12.2 found, what
+speaks for each way, and what would change the decision.
 
 ## What was needed
 
@@ -67,6 +72,8 @@ On Netty the failed start took about 4 seconds, where CIO failed at once. The en
 threads down before it reports the failure, and Netty waits 2 seconds for each. The time was measured and is
 not asserted, because a faster failure would be no fault.
 
+Task 12.2 ran more of the routing, for the admin API, see "The admin API and the routing of Ktor".
+
 ### Requests
 
 | Question | Netty | CIO |
@@ -113,6 +120,94 @@ The server runs on the Netty engine.
 - What Netty lacks can be set or built. Its limit for a request line is a setting. Its way of stopping ends
   the requests in progress, so the server lets them finish itself, and the spike shows how.
 - Netty costs 20 jars and 4.7 MiB more than CIO.
+
+## The admin API and the routing of Ktor
+
+Decided in task 12.2, on 2026-11-25.
+
+Design decision 19 expected the admin listener to use the routing of Ktor and its plugins, which the mock
+endpoint cannot use. The admin API uses neither. It is one handler, as the mock endpoint is, and it finds
+the operation of a request in a table of routes of its own.
+
+### What the admin API needs
+
+- The admin API is served under `/api/v1` on the admin listener. While the server has an admin token, every
+  request to the API has to present it, and a request that does not gets the status 401 (`admin-api`:
+  Versioned base path and format, Access token).
+- A request that fails gets a problem document (`admin-api`: Error responses).
+- The server never writes the admin token to its log, at any level (`server-runtime`: Logging). The tests of
+  the log present the token in every part of a request, also in the query string, where it does not belong.
+  Since task 11.3 the log holds nothing of a request at all.
+
+### What the routing does
+
+`HttpStackSpikeTest` ran the routing on the Netty server of the program, with the log at the level of
+traces, on the versions that the spike ran on. The last column is what the admin API does in its place,
+which `AdminApiTest` shows.
+
+| Question | The routing of Ktor | The admin API |
+|---|---|---|
+| The path of a request | The routing writes it to the log, at the level of traces. | The log gets nothing of a request, at any level. |
+| A path with a malformed escape, such as `/p/%zz?q=x` | Status 400. The answer repeats the request target with its query string, and the log gets the same, at the level of debug messages. | Status 400 with a problem document where the escape is at a parameter of a route, and status 404 where it is not. Neither the answer nor the log repeats anything of the request. |
+| A path that is written in another way: `/a//b` for the route `/a/b`, and `/%70/x` for the route `/p/{x}` | The request reaches the route. | A path counts as it was sent. `//api/v1` and `/%61pi/v1` are not the prefix of the API, and a segment of a route that stands for itself is not decoded. What a path has at a parameter of its route is decoded, after the path is taken apart at its slashes. |
+| A request target that is a URL, such as `http://mockey.test/p/x` | Status 404 with no body: the request reaches no route. | The request is for the path of the URL, as a request for `/status` or to the mock endpoint is. |
+| A `HEAD` request for a route of `GET` | The request does not reach the route. | The request gets the answer of the operation for `GET`, and the engine leaves the body out. |
+| A path without a route | Status 404 with no body. | Under `/api/v1`, status 404 with a problem document. On every other path of the admin listener, status 404 with no body, from Ktor. |
+
+Two things were read in the sources of Ktor 3.6.1 and not run:
+
+- The routing has no setting for what it writes to the log. It goes by the level of its logger,
+  `io.ktor.server.routing.Routing`, at the moment at which it is installed (`RoutingRoot.kt`). The test
+  shows that the paths are in the log when the level is set before the server starts, which is how the
+  program sets it.
+- The query parameters of a request, as Ktor decodes them, fail over a malformed escape with a message that
+  states the request target with its query string (`encodeParameters` in `PipelineRequest.kt`).
+
+### The two ways
+
+The routing of Ktor would give the routes of the API the form that Ktor has for them, such as
+`get("/services/{id}")`, which everyone knows who knows Ktor. The server would hold less code of its own:
+the table of routes and the lookup in it are under a hundred lines. And it is what design decision 19
+expected. For the API to answer as the specification says, the server would have to put this around the
+routing:
+
+- An interceptor before the routing that answers a path with a malformed escape itself, so that neither the
+  answer nor the log repeats the request target.
+- A limit for the level of the logger of the routing, so that the log gets no paths. The setting of the log
+  level would then no longer hold for every logger of the process.
+- The check of the admin token at the routes, with a route for every other path under `/api/v1`. The
+  routing decides which requests reach the routes of the API, so a check that goes by the path as it was
+  sent would let `//api//v1` pass.
+- An interceptor that makes a request target that is a URL into its path, and a `HEAD` request into a `GET`
+  request, before the routing sees them.
+- Problem documents in the place of the answers that the routing gives itself.
+
+A table of routes of its own is what the admin API has. A route is a method, a path with its parameters in
+braces, and what the operation does. The API checks the token first, looks the route up, and does the rest
+itself as well: it reads the body of a request, and it writes the problem documents.
+
+The plugins of Ktor for bearer tokens, for bodies in JSON, and for answers to failures were not tried. Each
+is a further library, what each writes to the log would have to be found out first, and each would do what
+takes the API a few lines.
+
+### The decision about the routing
+
+The admin API has a table of routes of its own. It uses neither the routing of Ktor nor its plugins.
+
+- The routing writes of a request to the log, and the server would have to work against the routing in five
+  places to answer as the specification says. One of them changes what the log level of the server means.
+- With its own table, the API reads the request target as the client sent it, as `/status` and the mock
+  endpoint do. One rule holds for every request to both listeners: the server tidies no path, and its log
+  gets nothing of a request.
+- What the routing would save is little, because the check of the token, the reading of a body, and the
+  problem documents are code of the server either way.
+- The table is a list of methods with their paths, which is what a test is to compare the description of
+  the API with (task 12.9).
+
+The decision is easy to take back. An operation does not know how its request found it, so giving the
+routes of the table to the routing of Ktor would change how `AdminApi` finds a route, and no operation. The
+routing becomes the better way when the log may hold the paths of the requests to the admin listener, or
+when the operations need what the routing has and the table has not, such as a plugin for single routes.
 
 ## What follows for the server
 
@@ -193,7 +288,7 @@ Task 11.3 found more, and the tests of the mock endpoint show it:
   out, and for a response without a body it gives the engine the length to state.
 - A request that nothing answers gets the status 404 with no body from Ktor. That is the answer to every
   request on the mock listener that is neither mock traffic nor a request for `/status`, and to every
-  request on the admin listener until the admin API is there.
+  request on the admin listener that is not for the admin API.
 
 Stopping (task 11.7):
 
@@ -238,37 +333,38 @@ Stopping (task 11.7):
 
 The admin API (task 12.2):
 
-- Design decision 19 expected the admin listener to use the routing of Ktor and its plugins. It uses
-  neither. The admin API is one interceptor of the call phase of the application, as the mock endpoint is.
-  It reads the target from `call.request.local.uri`, and it finds the operation of a request in a table of
-  routes of its own. A request for a path that is not under `/api/v1` still gets the status 404 with no body
-  from Ktor.
-- What speaks against the routing was run on the Netty engine, and `HttpStackSpikeTest` shows it:
-  - With the log at the level of traces, the routing writes the path of every request to the log. It does
-    so when the level is set before the routing is installed, as it is when the server starts.
-  - It answers a path with a malformed escape with a text that repeats the request target, and it writes
-    that target with its query string to the log, at the level of debug messages. The server never writes
-    the admin token to its log (`server-runtime`: Logging), also when a client sends the token where it
-    does not belong, which the tests of the log do.
-  - It knows no request target that is a URL: a request for `http://mockey.test/p/x` does not reach the
-    route `/p/{x}`. `/status` and the mock endpoint take such a target.
-  - It has no answer to a `HEAD` request for a route of `GET`.
-- The routing takes `/a//b` for `/a/b`, as the spike of task 11.0 showed, and it takes an escaped character
-  of a path for the character. Whether a request is for the admin API decides whether it has to present the
-  admin token, and with the routing that would be for the routing to say, and not for a look at the path.
-  The admin API takes a path as it was sent: `//api/v1` and `/%61pi/v1` are not its prefix, and a segment of
-  a route that stands for itself is not decoded. Only what a path has at a parameter of its route is decoded,
-  after the path is taken apart at its slashes.
-- The admin API hands a `HEAD` request to the operation for `GET`. The engine leaves the body out of the
-  answer and states its length.
+- The API is one interceptor of the call phase of the admin listener, with no routing and no plugin, see
+  "The admin API and the routing of Ktor". It reads the target from `call.request.local.uri`. A request is
+  for the API when its path is `/api/v1` or lies below it, as it was sent. Ktor answers every other request
+  on the admin listener with the status 404 and no body, as before.
+- The API asks for the admin token before it looks for a route, so that a request without the token gets
+  the status 401 whatever it is for.
+- Of two routes that are for one path, the one counts in which a segment stands for itself where the other
+  has a parameter. An API has one operation for a method and the paths of one form, so the order of its
+  routes says nothing.
+- The API hands a `HEAD` request to the operation for `GET`. The engine leaves the body out of the answer
+  and states its length.
 - The API reads the body of a request from `call.request.receiveChannel()`, as the mock endpoint does and
-  for the same reason: the log gets nothing of a request at any level.
+  for the same reason: the log gets nothing of a request at any level. It looks at `Content-Length` first
+  and reads as far as the limit of the server and one byte more, and a longer body gets the status 413.
+- An operation that takes parameters from the query string is to take the query string from the request
+  target and to decode it itself. What Ktor makes of a query string fails over a malformed escape with the
+  request target in its message, see above, and what an operation fails with goes to the log.
 - Netty hands each byte of a header on as one character, as it does with the bytes of a request target. The
   API compares the admin token with the bytes that a client sent, so that a token with a character beyond
   ASCII is found. It reads what a path has at a parameter as UTF-8, for a client that does not escape such
   a character.
-- The plugins of Ktor would compare a token, read a body as JSON, and write a problem document. The API does
-  that itself, and the server needs no further library for it.
+- A request that a listener refuses before the API sees it gets the answer of the listener and no problem
+  document: a request that names no host gets the plain text of `RequestHost`.
+- The engine adds no header of its own, so an answer of the API carries what the API sets: `Cache-Control:
+  no-store`, and with a problem what belongs to it, `WWW-Authenticate` or `Allow`. No answer carries a
+  header that lets a page of another origin read it.
+- When an operation fails, the log names the operation by its route, which is the path as the table has it,
+  and the client gets the status 500 without what the failure says.
+- The admin listener starts after the mock listener, and what makes its module is given the mock listener.
+  The status of the server states the URL of the mock endpoint, with the port that the system picked for
+  port 0.
+- The server needs no further library for the API.
 
 ## What differs from the HTTP server of legacy
 

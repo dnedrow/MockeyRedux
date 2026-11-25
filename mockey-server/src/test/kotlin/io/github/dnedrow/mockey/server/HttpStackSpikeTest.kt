@@ -433,10 +433,11 @@ class HttpStackSpikeTest {
 
     /**
      * What task 12.2 found of the routing, on the engine of the server and with the log at its most verbose
-     * level. The routing writes the path of every request to the log. It answers a path with a malformed
-     * escape with the request target, and it writes that target to the log with its query string. It takes
-     * an escaped character of a path for the character, it knows no request target that is a URL, and it has
-     * no answer to a `HEAD` request for a route of `GET`.
+     * level. The routing writes the path of every request to the log, at the level of traces. It answers a
+     * path with a malformed escape with the request target, and it writes that target to the log with its
+     * query string, at the level of debug messages. It takes an escaped character of a path for the
+     * character. It knows no request target that is a URL, which it answers like a path without a route,
+     * with the status 404 and no body, and it has no answer to a `HEAD` request for a route of `GET`.
      *
      * The routing writes the paths to the log only when the level is set before it is installed, as it is
      * in the server.
@@ -450,6 +451,7 @@ class HttpStackSpikeTest {
                 request("GET", "/p/%zz?q=after-the-escape"),
                 request("GET", "/%70/x"),
                 request("GET", "http://mockey.test/p/x"),
+                request("GET", "/nothing"),
                 request("HEAD", "/p/x"),
             )
         val levelBefore = ServerLogging.level()
@@ -463,11 +465,13 @@ class HttpStackSpikeTest {
                 ServerLogging.configure(levelBefore)
             }
 
-        assertEquals(listOf(OK, "HTTP/1.1 400 Bad Request", OK, NOT_FOUND), answers.take(4).map { it.statusLine })
+        val failure = "BadRequestException: Url decode failed for /p/%zz?q=after-the-escape"
+        assertEquals(listOf(OK, "HTTP/1.1 400 Bad Request", OK, NOT_FOUND, NOT_FOUND), answers.dropLast(1).map { it.statusLine })
         assertNotEquals(OK, answers.last().statusLine, "The answer to the HEAD request")
         assertEquals("Url decode failed for /p/%zz?q=after-the-escape", answers[1].body)
-        assertContains(log, "io.ktor.server.routing.Routing - Trace for [p, in-the-path]")
-        assertContains(log, "BadRequestException: Url decode failed for /p/%zz?q=after-the-escape")
+        assertEquals("" to "", answers[3].body to answers[4].body, "The bodies of the two answers with the status 404")
+        assertTrue(log.lines().any { " TRACE " in it && it.endsWith("io.ktor.server.routing.Routing - Trace for [p, in-the-path]") })
+        assertTrue(log.lines().any { " DEBUG " in it && it.endsWith(failure) }, "The log names the target at the level of debug messages")
         assertFalse("in-the-query" in log, "The routing writes the query string of a request that it takes to the log")
     }
 
