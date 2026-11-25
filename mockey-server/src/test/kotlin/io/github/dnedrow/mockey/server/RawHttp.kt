@@ -124,9 +124,23 @@ internal object RawHttp {
     /** Returns the loopback address with [port]. */
     fun loopback(port: Int): InetSocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), port)
 
-    /** Returns [count] ports that nothing listens on. */
+    /**
+     * Returns [count] ports that nothing on the loopback address holds: no listener, and no connection that
+     * is open or that was closed a moment ago.
+     *
+     * The sockets that find the ports are bound to the loopback address, and they share their address with
+     * nothing. A socket for all addresses that shares its address gets any port that no listener for all
+     * addresses holds, also the port of a connection on the loopback address, and a server cannot listen
+     * there. macOS gives out its ports in turn, and so it gave such a port once in some hundred times.
+     */
     fun freePorts(count: Int): List<Int> {
-        val sockets = List(count) { ServerSocket(0) }
+        val sockets =
+            List(count) {
+                ServerSocket().apply {
+                    reuseAddress = false
+                    bind(loopback(0))
+                }
+            }
         return sockets.map { it.localPort }.also { sockets.forEach(ServerSocket::close) }
     }
 

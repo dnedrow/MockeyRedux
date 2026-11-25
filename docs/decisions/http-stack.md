@@ -204,6 +204,13 @@ Stopping (task 11.7):
   in `ShutdownHook.kt` and `ShutdownHookJvm.kt` of Ktor and not run. The test of task 11.7 shows it.
 - To stop, the server closes the sockets on which it listens, waits for the requests in progress for as long
   as the grace period lasts, and then stops the engines with a grace period of 0.
+- Netty says that a listening channel is closed before the system has closed the socket. The Java runtime
+  closes the socket of a channel that a selector knows when that selector selects again, which the event loop
+  of Netty does a moment later, and later still when its thread has to wait for a processor. A client that
+  comes in between is connected, is not served, and finds its connection reset. So a client that comes after
+  the listening sockets are closed is refused or reset, and it gets no answer either way. The spike test
+  shows it by holding the event loop. It was found when the test that expected a refusal failed in the
+  continuous integration, where other tasks of the build kept the processors busy.
 
 ## What differs from the HTTP server of legacy
 

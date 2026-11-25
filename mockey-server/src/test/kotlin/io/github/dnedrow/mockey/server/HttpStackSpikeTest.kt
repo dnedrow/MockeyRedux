@@ -14,6 +14,7 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -185,12 +186,6 @@ class HttpStackSpikeTest {
             Engine.NETTY -> startOn(Netty, ports, module)
             Engine.CIO -> startOn(CIO, ports, module)
         }
-
-    /** Returns [count] ports that nothing listens on. */
-    private fun freePorts(count: Int): List<Int> {
-        val sockets = List(count) { ServerSocket(0) }
-        return sockets.map { it.localPort }.also { sockets.forEach(ServerSocket::close) }
-    }
 
     /** Sends a GET request for [target] over HTTP, and returns the status and the body of the response. */
     private fun get(
@@ -441,7 +436,7 @@ class HttpStackSpikeTest {
     @Test
     fun aForgedHostHeaderReachesARouteGuardedByPortButNotARouteGuardedByLocalPort() {
         Engine.entries.forEach { engine ->
-            val (mock, admin) = freePorts(2)
+            val (mock, admin) = RawHttp.freePorts(2)
             val module: suspend Application.() -> Unit = {
                 routing {
                     port(admin) { get("/by-port") { call.respondText("admin") } }
@@ -746,27 +741,33 @@ class HttpStackSpikeTest {
         assertEquals(OK to "done", onCio.statusLine to onCio.body)
     }
 
+    /** Returns a setting of Netty that notes in [channels] each channel on which a server listens. */
+    private fun noting(channels: MutableList<Channel>): NettyApplicationEngine.Configuration.() -> Unit =
+        {
+            configureBootstrap = {
+                handler(
+                    object : ChannelInitializer<Channel>() {
+                        override fun initChannel(channel: Channel) {
+                            channels += channel
+                        }
+                    },
+                )
+            }
+        }
+
     /**
      * How a server on Netty lets its requests finish: it closes the socket on which it listens, waits for the
      * requests that it has, and stops the engine after that. The engine gives no way to the socket, so the
      * server takes it from the bootstrap of Netty, which the engine lets it configure.
+     *
+     * A client that comes after that gets no answer. Most often it is refused. It can also be connected for
+     * a moment and find its connection reset, see the next test.
      */
     @Test
     fun aRequestInProgressFinishesOnNettyWhenTheListeningSocketIsClosedBeforeTheEngineIsStopped() {
         val listening = CopyOnWriteArrayList<Channel>()
         val entered = CountDownLatch(1)
-        val server =
-            startOn(Netty, module = slow(entered, millis = 300)) {
-                configureBootstrap = {
-                    handler(
-                        object : ChannelInitializer<Channel>() {
-                            override fun initChannel(channel: Channel) {
-                                listening += channel
-                            }
-                        },
-                    )
-                }
-            }
+        val server = startOn(Netty, module = slow(entered, millis = 300), configure = noting(listening))
 
         server.use {
             val inProgress = CompletableFuture.supplyAsync { exchange(server.port, request("GET", "/service/slow")) }
@@ -774,9 +775,53 @@ class HttpStackSpikeTest {
 
             listening.single().close().sync()
 
-            assertFailsWith<ConnectException> { exchange(server.port, request("GET", "/service/late")) }
+            val late = runCatching { exchange(server.port, request("GET", "/service/late")) }
+            assertTrue(late.fold({ it.nothing }, { it is SocketException }), "A client that came late got ${late.map { it.statusLine }}")
             val answer = inProgress.get(WAIT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
             assertEquals(OK to "done", answer.statusLine to answer.body)
+        }
+    }
+
+    /**
+     * Netty says that a listening channel is closed before the system has closed the socket: the system
+     * closes it when the event loop of the channel selects again. That is a moment later, and longer when
+     * the thread of the event loop has to wait for a processor. A client that comes in between is
+     * connected. It is not served, and it finds its connection ended when the socket is closed.
+     *
+     * Here the event loop closes the channel and is held from then on, until the client is connected.
+     */
+    @Test
+    fun aClientThatComesBeforeTheEventLoopSelectsAgainIsConnectedButNotServed() {
+        val listening = CopyOnWriteArrayList<Channel>()
+        val closed = CountDownLatch(1)
+        val connected = CountDownLatch(1)
+
+        startOn(Netty, configure = noting(listening)).use { server ->
+            val channel = listening.single()
+            channel.eventLoop().execute {
+                channel.close()
+                closed.countDown()
+                connected.await(WAIT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
+            }
+            assertTrue(closed.await(WAIT_MILLIS.toLong(), TimeUnit.MILLISECONDS))
+            assertFalse(channel.isOpen, "Netty says that the channel is closed")
+
+            val got =
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(LOOPBACK, server.port), WAIT_MILLIS)
+                    connected.countDown()
+                    socket.soTimeout = WAIT_MILLIS
+                    try {
+                        socket.getOutputStream().write(request("GET", "/service/late"))
+                        socket.getInputStream().readAllBytes().size
+                    } catch (_: SocketException) {
+                        0
+                    }
+                }
+
+            assertEquals(0, got, "The bytes that the client got")
+            assertEquals(emptyList(), received.toList())
+            assertFailsWith<ConnectException> { exchange(server.port, request("GET", "/service/later")) }
         }
     }
 
