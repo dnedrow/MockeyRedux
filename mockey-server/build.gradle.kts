@@ -56,6 +56,17 @@ tasks.test {
         },
     )
 
+    // The test of the documents runs their commands, with definitions of Mockey 2.x that the tests of the
+    // importer have.
+    inputs
+        .files("../docs/server.md", "../docs/migrating-from-2x.md")
+        .withPropertyName("serverDocuments")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs
+        .dir("../mockey-legacy/src/test/resources/legacy")
+        .withPropertyName("legacyDefinitions")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
     // The spike test of the HTTP stack sends the request targets of the recorded routing cases, which are
     // files of the parity module.
     inputs

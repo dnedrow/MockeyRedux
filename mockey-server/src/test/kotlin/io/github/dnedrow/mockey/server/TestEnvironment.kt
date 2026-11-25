@@ -1,6 +1,10 @@
 package io.github.dnedrow.mockey.server
 
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
@@ -26,6 +30,18 @@ internal object TestEnvironment {
         if (everyTestRuns) assertTrue(available, "This machine has to have $what.")
         assumeTrue(available, "This machine does not have $what.")
     }
+
+    /** Returns whether a socket can be bound to [host] and [port] now. */
+    fun isFree(
+        host: String,
+        port: Int,
+    ): Boolean =
+        try {
+            ServerSocket().use { it.bind(InetSocketAddress(InetAddress.getByName(host), port)) }
+            true
+        } catch (_: IOException) {
+            false
+        }
 
     /**
      * Gives [path] the permissions [permissions], in the notation of `ls`, such as `r-xr-xr-x`. Returns

@@ -44,22 +44,23 @@ internal object ServerProgram {
         val admin: InetSocketAddress = RawHttp.loopback(adminPort)
     }
 
-    /** The program while its process runs. Closing it ends the process. */
+    /**
+     * The program while its process runs. Closing it ends the process, and what the process started, and
+     * deletes [files], the directory of what the program writes to its output streams.
+     */
     class Running(
         private val process: Process,
-        private val directory: Path,
+        private val files: Path,
+        /** The directory in which the program runs. */
+        val workingDirectory: Path = files,
     ) : AutoCloseable {
         /** What the program has written to the standard output so far. */
         val output: String
-            get() = directory.resolve(OUTPUT).readText()
+            get() = files.resolve(OUTPUT).readText()
 
         /** What the program has written to the standard error so far. */
         val errors: String
-            get() = directory.resolve(ERRORS).readText()
-
-        /** The directory in which the program runs, which is its own. */
-        val workingDirectory: Path
-            get() = directory
+            get() = files.resolve(ERRORS).readText()
 
         /** Waits until both listeners accept connections, and returns where they do. */
         fun listening(): Listening {
@@ -78,13 +79,18 @@ internal object ServerProgram {
         }
 
         /**
-         * Sends the program the signal [name], such as `TERM`, as the command `kill` does.
+         * Sends the program the signal [name], such as `TERM`, as the command `kill` does. Where a shell
+         * started the program and waits for it, the signal goes to the program and not to the shell, which
+         * then ends as its script says.
          *
          * A program that was started with [withSignals] takes the signal as the system delivers it. Any
          * other program takes it as the process of the test does, which can be one that ignores it.
          */
         fun signal(name: String) {
-            val kill = ProcessBuilder("kill", "-$name", "${process.pid()}").inheritIO().start()
+            val started = process.descendants().filter { it.isAlive }.toList()
+            check(started.size <= 1) { "The process runs more than one program: ${started.map { it.info().command().orElse("?") }}" }
+            val program = started.singleOrNull()?.pid() ?: process.pid()
+            val kill = ProcessBuilder("kill", "-$name", "$program").inheritIO().start()
             check(kill.waitFor(TIME_LIMIT_SECONDS, TimeUnit.SECONDS) && kill.exitValue() == 0) { "The signal $name was not sent." }
         }
 
@@ -102,8 +108,9 @@ internal object ServerProgram {
         private fun outcome() = Outcome(process.exitValue(), output, errors)
 
         override fun close() {
+            process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly().waitFor(TIME_LIMIT_SECONDS, TimeUnit.SECONDS)
-            directory.toFile().deleteRecursively()
+            files.toFile().deleteRecursively()
         }
     }
 
@@ -166,6 +173,16 @@ internal object ServerProgram {
             environment.putAll(variables)
         }
 
+    /**
+     * Starts [command] in the directory [directory], which stays as the command leaves it when the command
+     * has ended. [environment] makes the environment of the command from the one of this test.
+     */
+    fun startIn(
+        directory: Path,
+        command: List<String>,
+        environment: (MutableMap<String, String>) -> Unit,
+    ): Running = start(command, Files.createTempDirectory("mockey-server-program"), directory, environment)
+
     /** Starts [command] in a directory of its own, which [prepare] fills first, with the environment that [environment] leaves. */
     private fun start(
         command: List<String>,
@@ -174,13 +191,23 @@ internal object ServerProgram {
     ): Running {
         val directory = Files.createTempDirectory("mockey-server-program")
         prepare(directory)
+        return start(command, directory, directory, environment)
+    }
+
+    /** Starts [command] in [workingDirectory]. What it writes to its output streams goes to files in [files]. */
+    private fun start(
+        command: List<String>,
+        files: Path,
+        workingDirectory: Path,
+        environment: (MutableMap<String, String>) -> Unit,
+    ): Running {
         val builder =
             ProcessBuilder(command)
-                .directory(directory.toFile())
-                .redirectOutput(directory.resolve(OUTPUT).toFile())
-                .redirectError(directory.resolve(ERRORS).toFile())
+                .directory(workingDirectory.toFile())
+                .redirectOutput(files.resolve(OUTPUT).toFile())
+                .redirectError(files.resolve(ERRORS).toFile())
         environment(builder.environment())
-        return Running(builder.start(), directory)
+        return Running(builder.start(), files, workingDirectory)
     }
 
     /** Runs the program with [arguments] to its end, as [start] starts it, and returns what it gave. */

@@ -106,7 +106,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 11.7 Implement graceful shutdown. Verify with a test that sends a termination signal during a save and finds the save complete.
 - [x] 11.8 Run the parity suite against the new server, loading fixtures through the importer, and fix differences. Verify that every case labeled `same` passes and every deviation case returns its stated new response.
 - [x] 11.9 Package the server as a distribution with start scripts and as a runnable jar. Verify by starting it from the built distribution on a plain JDK 21 and receiving `running` from `/status`.
-- [ ] 11.10 Write `docs/server.md` (settings, listeners, and the security notes on the open forward proxy and admin exposure) and `docs/migrating-from-2x.md` (import, deviations, removed features). Verify that every command in both documents runs as written against fixture data.
+- [x] 11.10 Write `docs/server.md` (settings, listeners, and the security notes on the open forward proxy and admin exposure) and `docs/migrating-from-2x.md` (import, deviations, removed features). Verify that every command in both documents runs as written against fixture data.
 
 ## 12. Server: admin API (spec: admin-api)
 
@@ -119,6 +119,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [ ] 12.7 Implement the system and definition operations: status, read-only switch, reload, reset, clearing last-used times, export, import of both document types with tags, diagnostics, schema report, and search. Verify with API tests for each operation.
 - [ ] 12.8 Add tests for immediate effect and concurrency: a change is visible to the next mock request, and two simultaneous conflicting creations yield exactly one success. Verify that both tests pass repeatedly in CI.
 - [ ] 12.9 Serve the OpenAPI document and add a test that compares it with the registered routes in both directions. Write `docs/admin-api.md` with request examples. Verify that the comparison test passes and that the documented examples run in a test script.
+- [ ] 12.10 Keep requests that the server forwards as mock traffic from reaching its own admin API. Decide the mechanism, record it in `docs/decisions/`, implement it before the admin API changes anything, and replace the workarounds in the security notes of `docs/server.md`. Verify with tests over real HTTP that a mock request for the admin listener is refused when it names the listener by its address, by a host name, and through a redirect, with and without an admin token.
 
 ## 13. Web UI (spec: admin-ui)
 

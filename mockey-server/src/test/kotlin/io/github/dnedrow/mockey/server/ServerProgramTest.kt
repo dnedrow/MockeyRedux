@@ -1,6 +1,5 @@
 package io.github.dnedrow.mockey.server
 
-import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -16,18 +15,6 @@ import kotlin.test.assertTrue
  * sockets on which it listens.
  */
 class ServerProgramTest {
-    /** Returns whether a socket can be bound to [host] and [port] now. */
-    private fun isFree(
-        host: String,
-        port: Int,
-    ): Boolean =
-        try {
-            ServerSocket().use { it.bind(InetSocketAddress(InetAddress.getByName(host), port)) }
-            true
-        } catch (_: IOException) {
-            false
-        }
-
     /** Returns the messages of the log in [output], each without the time, the level, the thread, and the logger. */
     private fun messages(output: String): List<String> = output.lines().filter { it.isNotEmpty() }.map { it.substringAfter(" - ") }
 
@@ -108,7 +95,10 @@ class ServerProgramTest {
      */
     @Test
     fun theProgramStartedWithoutSettingsServesMockTrafficOnAllAddressesAtPort8080AndListensOnLoopbackAtPort8081() {
-        TestEnvironment.needs(isFree("0.0.0.0", 8080) && isFree("127.0.0.1", 8081), "the ports 8080 and 8081 free")
+        TestEnvironment.needs(
+            TestEnvironment.isFree("0.0.0.0", 8080) && TestEnvironment.isFree("127.0.0.1", 8081),
+            "the ports 8080 and 8081 free",
+        )
 
         ServerProgram.start(prepare = { StoredDefinitions.customers(it.resolve("mockey-definitions")) }).use { program ->
             val listening = program.listening()

@@ -20,6 +20,19 @@ The system SHALL NOT serve any admin API operation on the mock listener.
 - **WHEN** a client sends `GET /api/v1/services` to the mock listener
 - **THEN** the response has status 404, and no admin operation is performed
 
+### Requirement: The admin API is not reachable through the mock endpoint
+The system SHALL NOT perform an admin API operation for a request that the server itself sent to the admin listener while it forwarded mock traffic, whether the target of the mock request named the admin listener by an address or by a host name, or a redirect led to it. It SHALL answer a mock request whose target is the admin listener with status 403.
+
+#### Scenario: Mock request for the admin listener
+- **GIVEN** the default settings, without an admin token
+- **WHEN** a client sends `GET /service/http://127.0.0.1:8081/api/v1/services` to the mock listener
+- **THEN** the response has status 403, and no admin operation is performed
+
+#### Scenario: Redirect to the admin listener
+- **GIVEN** a real service that answers a `GET` request with a redirect to `http://127.0.0.1:8081/api/v1/services`
+- **WHEN** a client sends a mock request that is forwarded to that service
+- **THEN** no admin operation is performed
+
 ### Requirement: Access token
 When an admin token is configured, the system SHALL reject with status 401 every admin API request that does not present that token as a bearer token in the `Authorization` header, and SHALL NOT perform the requested operation.
 
