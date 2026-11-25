@@ -50,7 +50,7 @@ internal class AdminScenarios(
     /** Creates a scenario of the service of the request with the attributes that the request states, and answers with it. */
     private suspend fun AdminRequest.create(): AdminResponse {
         val service = service()
-        val stated = statedAttributes()
+        val stated = statedScenarioAttributes()
         val scenario = engine.scenarios.create(service.id) { blank -> blank.with(stated.on(blank.attributes())) }.orProblem()
         return AdminResponse.created(scenario.toAdminDto(), "services", service.id.value, "scenarios", scenario.id.value)
     }
@@ -59,24 +59,9 @@ internal class AdminScenarios(
     private suspend fun AdminRequest.update(): AdminResponse {
         val service = service()
         val id = scenario(service).id
-        val stated = statedAttributes()
+        val stated = statedScenarioAttributes()
         val scenario = engine.scenarios.update(service.id, id) { current -> current.with(stated.on(current.attributes())) }.orProblem()
         return AdminResponse.json(scenario.toAdminDto())
-    }
-
-    /**
-     * Returns the attributes of a scenario that the request states.
-     *
-     * @throws AdminProblem with the status 422 when the request states a text criterion whose text is blank,
-     *   which no request contains. Besides, it is thrown as [attributes] says.
-     */
-    private suspend fun AdminRequest.statedAttributes(): StatedAttributes<ScenarioAttributesDto> {
-        val stated = attributes(ScenarioAttributesDto.serializer())
-        val criterion = stated.on(ScenarioAttributesDto()).matchCriterion
-        if (criterion is MatchCriterionDto.Text && criterion.text.isBlank()) {
-            throw AdminProblem.invalid(listOf(FieldErrorDto("matchCriterion.text", "The text of a text criterion is not blank.")))
-        }
-        return stated
     }
 
     /**
@@ -124,4 +109,19 @@ internal class AdminScenarios(
         const val UNIVERSAL_ERROR_SCENARIO = "universal-error-scenario"
         const val NOT_DESIGNATED = "No scenario is designated as the universal error scenario."
     }
+}
+
+/**
+ * Returns the attributes of a scenario that the request states.
+ *
+ * @throws AdminProblem with the status 422 when the request states a text criterion whose text is blank,
+ *   which no request contains. Besides, it is thrown as [attributes] says.
+ */
+internal suspend fun AdminRequest.statedScenarioAttributes(): StatedAttributes<ScenarioAttributesDto> {
+    val stated = attributes(ScenarioAttributesDto.serializer())
+    val criterion = stated.on(ScenarioAttributesDto()).matchCriterion
+    if (criterion is MatchCriterionDto.Text && criterion.text.isBlank()) {
+        throw AdminProblem.invalid(listOf(FieldErrorDto("matchCriterion.text", "The text of a text criterion is not blank.")))
+    }
+    return stated
 }

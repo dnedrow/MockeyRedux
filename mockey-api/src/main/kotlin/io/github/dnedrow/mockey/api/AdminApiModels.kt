@@ -377,6 +377,12 @@ public data class HistoryEntryDto(
     public val flagged: Boolean = false,
 )
 
+/** The attributes of a history entry that a request sets. The mark is the only one. */
+@Serializable
+public data class HistoryEntryAttributesDto(
+    public val flagged: Boolean = false,
+)
+
 /** An edit to a history replay; null fields leave the recorded request unchanged. */
 @Serializable
 public data class ReplayRequestDto(

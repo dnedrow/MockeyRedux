@@ -154,6 +154,7 @@ class AdminApiModelsTest {
                 "flagged",
             ),
         )
+        assertShape(HistoryEntryAttributesDto(flagged = true), setOf("flagged"))
         assertShape(ReplayRequestDto(bodyBase64 = "AQI="), setOf("headers", "parameters", "bodyBase64"))
         assertShape(ServiceStatisticsDto("svc1", "service", 1), setOf("serviceId", "serviceName", "count", "earliestEntryTime"))
         assertShape(HistoryStatisticsDto(emptyList()), setOf("services", "oldestEntryTime", "from", "to"))

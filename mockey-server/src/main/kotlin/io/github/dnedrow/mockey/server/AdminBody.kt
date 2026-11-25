@@ -32,6 +32,14 @@ internal suspend fun <T> AdminRequest.body(serializer: KSerializer<T>): T {
 }
 
 /**
+ * Returns the body of the request as the wire type of [serializer], see [body], or `null` for a request
+ * without a body. An operation whose body can be left out takes its body so.
+ *
+ * @throws AdminProblem as [body] says, for a request that has a body.
+ */
+internal suspend fun <T> AdminRequest.bodyOrNull(serializer: KSerializer<T>): T? = if (hasBody) body(serializer) else null
+
+/**
  * Returns the attributes that the body of the request states, which are attributes of the wire type of
  * [serializer]. The body has to be a JSON object whose members are members of that wire type. It can hold
  * any of them, and none.

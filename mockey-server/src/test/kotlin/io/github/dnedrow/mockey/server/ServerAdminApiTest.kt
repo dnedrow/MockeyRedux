@@ -259,6 +259,7 @@ class ServerAdminApiTest {
         val customers = held.services.first().id
         val plan = held.plans.single().id
         val twist = held.twists.single().id
+        val entry = before.history.first().id
         val reads =
             mapOf(
                 "/api/v1/services" to 200,
@@ -275,6 +276,11 @@ class ServerAdminApiTest {
                 "/api/v1/upstream-proxy" to 200,
                 "/api/v1/inspectors" to 200,
                 "/api/v1/history" to 200,
+                "/api/v1/history?token=customer&max=1" to 200,
+                "/api/v1/history/$entry" to 200,
+                "/api/v1/history/0" to 404,
+                "/api/v1/stats" to 200,
+                "/api/v1/stats?format=csv" to 200,
                 "/api/v1/system" to 200,
                 "/api/v1/services?name=customers&tag=team-a" to 200,
                 "/api/v1/services/no-such-service" to 404,
@@ -390,7 +396,6 @@ class ServerAdminApiTest {
     fun aServerWithAnAdminTokenChangesSomethingOnlyForARequestWithTheToken() {
         val definitions = definitionsLocation()
         val server = start(settings(definitions).copy(adminToken = AdminToken(TOKEN), readOnly = false))
-        val before = stateOf(server, definitions)
         val customers = read(server).single()
         val changes =
             listOf(
@@ -404,12 +409,20 @@ class ServerAdminApiTest {
                 Triple("DELETE", "tag-filter", ""),
                 Triple("PATCH", "upstream-proxy", """{"url":"http://proxy.example:3128","enabled":true}"""),
                 Triple("DELETE", "system/upstream-session", ""),
+                Triple("PATCH", "history/1", """{"flagged":true}"""),
+                Triple("POST", "history/1/replay", ""),
+                Triple("POST", "history/1/scenario", ""),
+                Triple("DELETE", "history/1", ""),
+                Triple("DELETE", "history", ""),
             )
 
+        val ofMock = RawHttp.get(server.listeners.mock.address, "/service/customer/7")
+        val before = stateOf(server, definitions)
         val without = changes.map { (method, target, body) -> server.asked(method, target, body) }
         val afterThem = stateOf(server, definitions)
         val with = server.asked("PATCH", "services/${customers.id.value}", """{"delayMillis":250}""", PRESENTING)
 
+        assertEquals(200 to 1, ofMock.status to before.history.size)
         assertEquals(List(changes.size) { 401 }, without.map { it.status })
         assertEquals(before, afterThem)
         assertEquals(200 to 250L, with.status to read(server).single().delayMillis)
@@ -555,6 +568,36 @@ class ServerAdminApiTest {
             assertEquals(listOf<Int?>(201, 200, 200, 204, 200), statuses)
             assertEquals(listOf(emptyList(), listOf("sid=abc"), emptyList()), upstream.requests.map { it.headerValues("Cookie") })
         }
+    }
+
+    /**
+     * The scenario "Replay under changed definitions" of the history, on a server: the replay of a request
+     * that the mock endpoint handled is handled as the mock endpoint handles a request now, and the history
+     * has its entry. The response of the entry that was replayed becomes a scenario of its service.
+     */
+    @Test
+    fun aRequestOfTheMockEndpointIsReplayedAndSavedAsAScenarioThroughTheApi() {
+        val server = start(settings())
+        val customers = read(server).single().id.value
+        val first = RawHttp.get(server.listeners.mock.address, "/service/customer/7?verbose=true")
+        val entry = server.asked("GET", "history").decoded<List<HistoryEntryDto>>().single()
+        val lost = server.asked("POST", "services/$customers/scenarios", """{"name":"lost","responseBody":"lost","statusCode":410}""")
+        val selected = server.asked("PATCH", "services/$customers", """{"defaultScenarioId":"${lost.decoded<ScenarioDto>().id}"}""")
+
+        val replayed = server.asked("POST", "history/${entry.id}/replay")
+        val saved = server.asked("POST", "history/${entry.id}/scenario", """{"name":"recorded"}""")
+        val listed = server.asked("GET", "history?token=verbose").decoded<List<HistoryEntryDto>>()
+
+        assertEquals(listOf<Int?>(200, 201, 200), listOf(first.status, lost.status, selected.status))
+        assertEquals("HTTP/1.1 201 Created", replayed.statusLine)
+        val ofTheReplay = replayed.decoded<HistoryEntryDto>()
+        assertEquals(listOf("/api/v1/history/${ofTheReplay.id}"), replayed.headerValues("Location"))
+        assertEquals(entry.request, ofTheReplay.request)
+        val answered = listOf(entry, ofTheReplay).flatMap { listOf(it.scenario?.name, it.response.status) }
+        assertEquals(listOf("found", 200, "lost", 410), answered)
+        assertEquals(listOf(ofTheReplay, entry), listed)
+        assertEquals(201 to StoredDefinitions.CUSTOMER, saved.status to saved.decoded<ScenarioDto>().responseBody)
+        assertEquals(listOf("found", "lost", "recorded"), read(server).single().scenarios.map { it.name })
     }
 
     /** The scenario "Unknown resource". */

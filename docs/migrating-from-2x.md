@@ -4,10 +4,10 @@ Mockey Redux 3 takes the definitions of Mockey 2.x as they are: its services, sc
 configurations, and settings. This document describes how they move over, what the startup options of
 Mockey 2.x have become, what behaves differently, and what is gone.
 
-It describes the server as it is now. The server answers mock traffic, and its admin API states what the
-server holds and changes its services with their scenarios, its plans, its twist configurations, its tag
-filter, its tags, and its outbound proxy. The web UI and the automation endpoints of Mockey 2.x are not part
-of it yet, see "What is gone".
+It describes the server as it is now. The server answers mock traffic, and its admin API states and changes
+what the server holds. The API does not switch the read-only mode yet, and it does not reload, reset, import,
+or export the definitions. The web UI and the automation endpoints of Mockey 2.x are not part of the server
+yet, see "What is gone".
 
 ## Importing the definitions
 
@@ -183,8 +183,7 @@ of a migrated installation meet first:
 
 - The admin pages and the automation endpoints on the port of the mock traffic. Administration has a
   listener of its own, which only programs on the same machine reach by default (DEV-26). In this version the
-  admin API changes services, scenarios, plans, twist configurations, the tag filter, tags, and the
-  outbound proxy, and nothing else yet. The server has no web UI, and the automation endpoints
+  admin API does not import or export definitions yet, the server has no web UI, and the automation endpoints
   `/config/service`, `/plan/setup`, `/definitions`, and `/home` answer with the status 404.
 - Opening a browser when the server starts, and the option `-H` with it (DEV-25).
 - Loading definitions from any file or URL of the server's machine while the server runs, as `/home?action=init`

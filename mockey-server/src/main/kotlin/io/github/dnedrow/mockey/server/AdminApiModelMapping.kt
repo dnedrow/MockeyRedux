@@ -5,6 +5,7 @@ import io.github.dnedrow.mockey.api.DefinitionSettingsDto
 import io.github.dnedrow.mockey.api.DerivedRealUrlDto
 import io.github.dnedrow.mockey.api.HeaderDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
+import io.github.dnedrow.mockey.api.HistoryStatisticsDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.MergeReportDto
 import io.github.dnedrow.mockey.api.MergedScenarioDto
@@ -28,6 +29,7 @@ import io.github.dnedrow.mockey.api.ScenarioReferenceDto
 import io.github.dnedrow.mockey.api.ServiceAttributesDto
 import io.github.dnedrow.mockey.api.ServiceDefinitionDto
 import io.github.dnedrow.mockey.api.ServiceDto
+import io.github.dnedrow.mockey.api.ServiceStatisticsDto
 import io.github.dnedrow.mockey.api.TwistAttributesDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
 import io.github.dnedrow.mockey.api.TwistPairDto
@@ -36,6 +38,7 @@ import io.github.dnedrow.mockey.core.definitions.DerivedRealUrl
 import io.github.dnedrow.mockey.core.definitions.MergeReport
 import io.github.dnedrow.mockey.core.definitions.PlanApplyReport
 import io.github.dnedrow.mockey.core.history.HistoryEntry
+import io.github.dnedrow.mockey.core.history.HistoryStatistics
 import io.github.dnedrow.mockey.core.history.Outcome
 import io.github.dnedrow.mockey.core.history.RecordedBody
 import io.github.dnedrow.mockey.core.model.Definitions
@@ -392,6 +395,15 @@ internal fun HistoryEntry.toAdminDto(): HistoryEntryDto =
         inspectionMessages = inspectionMessages,
         explanation = explanation,
         flagged = flagged,
+    )
+
+/** Returns the statistics of the history as the admin API states them, with every time in ISO 8601. */
+internal fun HistoryStatistics.toAdminDto(): HistoryStatisticsDto =
+    HistoryStatisticsDto(
+        services = services.map { ServiceStatisticsDto(it.serviceId.value, it.serviceName, it.count, it.earliestEntryTime?.toString()) },
+        oldestEntryTime = oldestEntryTime?.toString(),
+        from = from?.toString(),
+        to = to?.toString(),
     )
 
 private fun Settings.toDefinitionSettingsDto(): DefinitionSettingsDto =

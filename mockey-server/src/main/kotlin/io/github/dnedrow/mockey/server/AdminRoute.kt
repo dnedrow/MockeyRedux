@@ -110,6 +110,25 @@ internal class AdminRequest(
             return host.ifEmpty { if (':' in arrivedAt) "[$arrivedAt]" else arrivedAt }
         }
 
+    /**
+     * The address that the request came from, as the history states the address of a client. It is the
+     * address of the other end of the connection, which is that of a proxy in front of the listener where
+     * there is one.
+     */
+    val clientAddress: String
+        get() = call.request.local.remoteAddress
+
+    /**
+     * Whether the request has a body: it states a length other than 0, or it states that the body comes in
+     * chunks. An operation whose body can be left out asks this before it reads a body.
+     */
+    val hasBody: Boolean
+        get() {
+            val headers = call.request.headers
+            val length = headers[HttpHeaders.ContentLength]?.trim()
+            return headers.contains(HttpHeaders.TransferEncoding) || (length != null && length != "0")
+        }
+
     /** Returns what the path of the request has at the parameter [name] of the route, decoded. It is never empty. */
     fun parameter(name: String): String = parameters.getValue(name)
 
@@ -178,10 +197,8 @@ internal class AdminRequest(
      * @throws AdminProblem with the status 415 when the request has a body and does not declare it so.
      */
     private fun requireJson() {
-        val headers = call.request.headers
-        val length = headers[HttpHeaders.ContentLength]?.trim()
-        val hasBody = headers.contains(HttpHeaders.TransferEncoding) || (length != null && length != "0")
-        if (hasBody && !declaresJson(headers.getAll(HttpHeaders.ContentType).orEmpty())) {
+        val contentTypes = call.request.headers.getAll(HttpHeaders.ContentType)
+        if (hasBody && !declaresJson(contentTypes.orEmpty())) {
             throw AdminProblem(HttpStatusCode.UnsupportedMediaType, NOT_DECLARED_AS_JSON)
         }
     }

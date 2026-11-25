@@ -9,8 +9,9 @@ serves the admin API, which states what the server holds and is to change what t
 
 This document describes the server as it is now. The admin API is under way, and the web UI is not part of
 the server yet. The API states and changes the services with their scenarios, the plans, the twist
-configurations, the tag filter, the tags, and the outbound proxy, and it empties the upstream session. It
-states the history, the inspectors, and the status of the server, and it changes nothing else yet.
+configurations, the tag filter, the tags, the outbound proxy, and the history, and it empties the upstream
+session. It states the inspectors and the status of the server. It does not switch the read-only mode yet,
+and it does not reload, reset, import, or export the definitions.
 
 ## Running the server
 
@@ -157,7 +158,13 @@ In this version the admin API has these operations:
 | `GET`, `PATCH /upstream-proxy` | Reads and sets the outbound proxy: its URL, whether it is enabled, and its credentials. No answer holds the password. |
 | `DELETE /system/upstream-session` | Empties the upstream session, which holds the cookies that real services have set. |
 | `GET /inspectors` | Lists the installed inspectors, each with its name and whether it is global. |
-| `GET /history`, `GET /system` | State the history and the status of the server. |
+| `GET /history` | Lists the history entries, the newest one first. `?token=` leaves the entries that satisfy every token, `?serviceId=` the ones of a service, `?after=` the ones that were recorded after an entry, and `?max=` the newest ones up to that number. |
+| `DELETE /history` | Deletes all history entries, and with `?serviceId=` the ones of a service. |
+| `GET`, `PATCH`, `DELETE /history/{id}` | Reads a history entry, sets and removes its mark, and deletes it. |
+| `POST /history/{id}/replay` | Lets the server handle the request of an entry again, with the headers, the parameters, and the body that the request states in the place of those of the entry. The answer is the entry of the replay. |
+| `POST /history/{id}/scenario` | Creates a scenario that gives the response of an entry, for the service that handled the request of the entry. |
+| `GET /stats` | States for every service how many entries the history keeps of it, and when the earliest of them arrived. `?from=` and `?to=` limit the entries that count to a time range, and `?format=csv` gives the statistics as CSV. |
+| `GET /system` | States the status of the server. |
 
 Bodies are JSON in UTF-8. A request that creates or updates something states attributes in a JSON object:
 a creation takes a default for every attribute that it does not state, and an update changes only the
@@ -461,9 +468,10 @@ does it this way.
 
 ### The admin listener beyond the loopback address
 
-Whoever reaches the admin API can change the definitions and make the server send requests. Leave the admin
-listener on the loopback address where the programs that use it run on the same machine. Where they do not,
-give the server an admin token:
+Whoever reaches the admin API can change the definitions and make the server send requests. They can also
+read the history, which holds the requests that the mock endpoint handled with their headers and their
+bodies, and so the credentials that a client sent with them. Leave the admin listener on the loopback address
+where the programs that use it run on the same machine. Where they do not, give the server an admin token:
 
 ```shell
 export MOCKEY_ADMIN_TOKEN=a-long-text-that-nobody-guesses
