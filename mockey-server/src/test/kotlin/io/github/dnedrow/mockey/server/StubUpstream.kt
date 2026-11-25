@@ -15,11 +15,15 @@ import kotlin.concurrent.thread
  * A real service for tests: an HTTP server on a free port of the loopback address that keeps every request
  * exactly as it arrived and answers each one with the same response. It reads from a socket itself, so that
  * no server in between changes what a request target or a header looks like.
+ *
+ * [beforeAnswer] runs when a request has arrived, before the answer to it is written. A test that makes it
+ * wait holds the answer back for as long as it likes.
  */
 internal class StubUpstream(
     private val status: String = "200 OK",
     private val headers: List<String> = listOf("Content-Type: text/plain"),
     private val body: String = "answered by the real service",
+    private val beforeAnswer: () -> Unit = {},
 ) : AutoCloseable {
     /** A request as it arrived: its method, its request target, its header lines, and its body. */
     class Received(
@@ -75,6 +79,7 @@ internal class StubUpstream(
                 val received = Received(method, target, lines.drop(1), ByteArray(0))
                 val length = received.headerValues("Content-Length").firstOrNull()?.toInt() ?: 0
                 requests += Received(method, target, received.headers, input.readNBytes(length))
+                beforeAnswer()
                 val answer = if (method == "HEAD") "" else body
                 val response = listOf("HTTP/1.1 $status") + headers + listOf("Content-Length: ${body.length}", "", answer)
                 connection.getOutputStream().write(response.joinToString(RawHttp.CRLF).toByteArray(StandardCharsets.ISO_8859_1))

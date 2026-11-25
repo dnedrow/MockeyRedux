@@ -1,12 +1,9 @@
 package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
-import io.github.dnedrow.mockey.core.storage.FileDefinitionStorage
-import io.github.dnedrow.mockey.core.storage.StorageException
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Instant
@@ -36,14 +33,17 @@ internal class MockeyServer private constructor(
 
         /**
          * Starts the server with [settings]: it sets the level of the log, writes the settings in effect to
-         * the log, creates the engine with the definitions of the definitions location, and starts the two
-         * listeners. [clock] tells the time.
+         * the log, creates the engine with the definitions that the server starts with, see [ServerEngine],
+         * and starts the two listeners. [clock] tells the time.
          *
          * The listeners are started last, when the engine has its definitions. So a client that gets an
          * answer from the server gets it from a server that is ready, also from `/status`.
          *
+         * The server looks at the ports of its listeners before it does anything else, so that a port in
+         * use ends the start before any definition is read or stored.
+         *
          * @throws StartupFailure when the settings do not let the server start, when the definitions cannot
-         *   be loaded, or when a listener cannot be bound.
+         *   be loaded, when the initial definitions cannot be taken, or when a listener cannot be bound.
          */
         fun start(
             settings: ServerSettings,
@@ -55,7 +55,7 @@ internal class MockeyServer private constructor(
 
             val addresses = ListenerAddresses.of(settings)
             Listeners.requireFree(addresses)
-            val engine = engineWith(settings)
+            val engine = ServerEngine.start(settings)
             val since = clock.instant()
             val mockModule = mockListenerModule(MockEndpoint(engine, settings.maxRequestBody, clock), StatusEndpoint(since))
             val listeners =
@@ -91,30 +91,6 @@ internal class MockeyServer private constructor(
                 intercept(ApplicationCallPipeline.Call) {
                     if (!status.handle(call)) mock.handle(call)
                 }
-            }
-
-        /**
-         * Creates the engine that [settings] ask for. It starts with the definitions that the definitions
-         * location holds.
-         *
-         * @throws StartupFailure when the definitions cannot be loaded.
-         */
-        private fun engineWith(settings: ServerSettings): MockeyEngine =
-            try {
-                runBlocking {
-                    MockeyEngine.create {
-                        storage = FileDefinitionStorage(settings.definitions)
-                        readOnly = settings.readOnly
-                        tagFilter = settings.tagFilter
-                        forwardUnknownTargets = settings.forwardUnknownTargets
-                        historyLimit = settings.historyLimit
-                        bodyCaptureLimit = settings.bodyCaptureLimit
-                        connectTimeout = settings.upstreamConnectTimeout
-                        responseTimeout = settings.upstreamResponseTimeout
-                    }
-                }
-            } catch (failure: StorageException) {
-                throw StartupFailure("The definitions cannot be loaded. ${failure.message}", failure)
             }
     }
 }

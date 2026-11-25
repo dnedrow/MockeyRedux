@@ -102,6 +102,63 @@ class LegacyDocumentImporterTest {
         assertEquals(listOf(3, 2, 0), result.definitions.services.map { it.scenarios.size })
     }
 
+    /** Returns an export document with one service, whose name is [name], and with the XML declaration [declaration]. */
+    private fun documentNaming(
+        name: String,
+        declaration: String,
+    ): String = """$declaration<mockservice><service name="$name" url="orders"><scenario id="1" name="ok"/></service></mockservice>"""
+
+    @Test
+    fun theBytesOfADocumentAreReadInTheCharsetThatTheDocumentDeclares() {
+        val name = "Grüße aus Zürich"
+        val latin1 = documentNaming(name, """<?xml version="1.0" encoding="ISO-8859-1"?>""").toByteArray(Charsets.ISO_8859_1)
+        val utf8 = documentNaming(name, """<?xml version="1.0" encoding="UTF-8"?>""").toByteArray(Charsets.UTF_8)
+        val undeclared = documentNaming(name, "").toByteArray(Charsets.UTF_8)
+        val withByteOrderMark = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + undeclared
+        val utf16 = documentNaming(name, """<?xml version="1.0" encoding="UTF-16"?>""").toByteArray(Charsets.UTF_16)
+
+        val results = listOf(latin1, utf8, undeclared, withByteOrderMark, utf16).map { LegacyDocumentImporter.import(it) }
+
+        assertEquals(List(5) { emptyList<LegacyXmlIssue>() }, results.map { it.issues })
+        assertEquals(List(5) { listOf(name) }, results.map { result -> result.definitions.services.map { it.name } })
+        val oneByteOfLatin1 = 0xFC.toByte()
+        assertTrue(oneByteOfLatin1 in latin1 && oneByteOfLatin1 !in utf8, "The letter ü is one byte in ISO-8859-1 and two bytes in UTF-8")
+    }
+
+    @Test
+    fun theBytesOfADocumentHoldWhatItsTextHolds() {
+        val ofText = LegacyDocumentImporter.import(LegacyFixtures.export)
+        val ofBytes = LegacyDocumentImporter.import(LegacyFixtures.export.toByteArray(Charsets.UTF_8))
+
+        assertEquals(ofText.issues, ofBytes.issues)
+        assertEquals(ofText.definitions.withPlacesAsIdentifiers(), ofBytes.definitions.withPlacesAsIdentifiers())
+        assertEquals(3, ofBytes.definitions.services.size)
+    }
+
+    @Test
+    fun bytesThatAreNoTextInTheCharsetOfTheDocumentAreReported() {
+        val document = documentNaming("Grüße", """<?xml version="1.0" encoding="UTF-8"?>""").toByteArray(Charsets.ISO_8859_1)
+
+        val result = LegacyDocumentImporter.import(document)
+
+        val message = result.issues.single().message
+        assertEquals(Definitions.EMPTY, result.definitions)
+        assertEquals(listOf(LegacyXmlIssueKind.MALFORMED_XML), result.kinds())
+        assertTrue(message.startsWith("The document is not well-formed XML in line 1: "), message)
+    }
+
+    @Test
+    fun theBytesOfADocumentReadNoFileEither() {
+        val document = """<mockservice><serviceref file="${LegacyFixtures.directory.resolve(
+            "mockey_def_depot/orders/orders.xml",
+        )}"/></mockservice>"""
+
+        val result = LegacyDocumentImporter.import(document.toByteArray(Charsets.UTF_8))
+
+        assertEquals(listOf(LegacyXmlIssueKind.OUTSIDE_IMPORT_ROOT), result.kinds())
+        assertEquals(Definitions.EMPTY, result.definitions)
+    }
+
     @Test
     fun aDocumentWithAnotherRootElementHoldsNoDefinitions() {
         val result = LegacyDocumentImporter.import("""<scenario id="1" name="alone"/>""")

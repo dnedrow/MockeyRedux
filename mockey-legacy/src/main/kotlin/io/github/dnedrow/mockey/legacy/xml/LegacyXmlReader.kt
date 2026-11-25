@@ -72,6 +72,16 @@ public class LegacyXmlReader(
         return LegacyXmlReadResult(reading.given(document), reading.issues)
     }
 
+    /**
+     * Reads the XML document with the bytes [document], which is no file. The document says in which charset
+     * it is written, as the document of a file does, and one that says nothing is in UTF-8. A relative
+     * reference of it starts at the import root.
+     */
+    public fun readBytes(document: ByteArray): LegacyXmlReadResult {
+        val reading = Reading()
+        return LegacyXmlReadResult(reading.given(document), reading.issues)
+    }
+
     /** One reading of a document with everything that it includes. It collects the [issues] of all of it. */
     private inner class Reading {
         val issues = ArrayList<LegacyXmlIssue>()
@@ -107,6 +117,9 @@ public class LegacyXmlReader(
 
         /** Reads the XML document [text], which is no file. */
         fun given(text: String): Document? = parsed(InputSource(StringReader(text)), null)?.withInclusionsResolved(root, null)
+
+        /** Reads the XML document with the bytes [bytes], which is no file. */
+        fun given(bytes: ByteArray): Document? = parsed(InputSource(ByteArrayInputStream(bytes)), null)?.withInclusionsResolved(root, null)
 
         /** Reads the XML document in [file], whose relative references start at [base]. */
         private fun document(

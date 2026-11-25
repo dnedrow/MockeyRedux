@@ -22,8 +22,8 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
- * The server is ready before it serves: it answers nothing before it has its definitions, so that the first
- * status that a client gets means that the services answer.
+ * The server is ready before it serves: it answers nothing before it has its definitions, the stored ones
+ * and the initial ones, so that the first status that a client gets means that the services answer.
  */
 class ReadinessTest {
     private val levelBefore = ServerLogging.level()
@@ -115,17 +115,21 @@ class ReadinessTest {
             fail("The client got no status within $TIME_LIMIT_SECONDS seconds. ${context()}")
         }
 
-    /** Checks that [answers] are the status of a running server, started between [before] and now, and the answer of the service. */
+    /**
+     * Checks that [answers] are the status of a running server, started between [before] and now, and the
+     * answer of a service with the body [ofService].
+     */
     private fun assertReady(
         answers: FirstAnswers,
         before: Instant,
+        ofService: String = StoredDefinitions.CUSTOMER,
     ) {
         assertEquals("HTTP/1.1 200 OK", answers.status.statusLine, "The first answer to the question for the status")
         val status = Json.parseToJsonElement(answers.status.body) as JsonObject
         assertEquals(JsonPrimitive("running"), status["status"])
         val since = Instant.parse((status.getValue("since") as JsonPrimitive).content)
         assertTrue(since in before.truncatedTo(ChronoUnit.MILLIS)..Instant.now(), "The server runs since $since, started after $before")
-        assertEquals(200 to StoredDefinitions.CUSTOMER, answers.next.status to answers.next.body, "The answer of the service")
+        assertEquals(200 to ofService, answers.next.status to answers.next.body, "The answer of the service")
         assertTrue(answers.inVain > 0, "The client asked before the server answered")
     }
 
@@ -153,6 +157,70 @@ class ReadinessTest {
         ServerProgram.start(*arguments, prepare = { StoredDefinitions.customers(it.resolve("mockey-definitions")) }).use { program ->
             assertReady(whatItGot(client) { "The program wrote: ${program.output}${program.errors}" }, before)
             assertEquals("", program.errors)
+        }
+    }
+
+    /** The scenario "Status means ready", for a server that starts with initial definitions, and with their default plan. */
+    @Test
+    fun aClientThatGetsTheFirstStatusGetsTheAnswerOfAServiceOfTheInitialDefinitions() {
+        val (mockPort, adminPort) = RawHttp.freePortsThatNoClientGets(2)
+        val definitions = definitionsLocation()
+        val source =
+            Files.writeString(
+                definitions.resolveSibling("${definitions.fileName}.xml"),
+                LegacySources.export(withDefaultPlan = true),
+            )
+        directories.add(source)
+        val client = askFromNowOn(RawHttp.loopback(mockPort), RawHttp.request("GET", "/service/legacy/orders"))
+        val before = Instant.now()
+
+        servers += MockeyServer.start(settings(mockPort, adminPort, definitions).copy(initialDefinitions = source.toString()))
+
+        assertReady(whatItGot(client), before, LegacySources.GOLD_ORDERS)
+    }
+
+    /**
+     * The server asks another server for its initial definitions, and that server holds its answer back. So
+     * the server is held at the moment at which it has loaded its stored definitions and does not have the
+     * initial ones. In that moment nothing accepts a connection, and no stored service answers.
+     */
+    @Test
+    fun noListenerAcceptsAConnectionWhileTheInitialDefinitionsAreRead() {
+        val (mockPort, adminPort) = RawHttp.freePortsThatNoClientGets(2)
+        val asked = CountDownLatch(1)
+        val released = CountDownLatch(1)
+        val source =
+            StubUpstream(body = LegacySources.export()) {
+                asked.countDown()
+                released.await()
+            }
+        val settings = settings(mockPort, adminPort, definitionsLocation()).copy(initialDefinitions = "${source.origin}/export")
+        val starting = CompletableFuture<MockeyServer>()
+        thread(isDaemon = true, name = "starting-server") {
+            try {
+                starting.complete(MockeyServer.start(settings))
+            } catch (failure: Exception) {
+                starting.completeExceptionally(failure)
+            }
+        }
+
+        try {
+            assertTrue(asked.await(TIME_LIMIT_SECONDS, TimeUnit.SECONDS), "The server asked for its initial definitions")
+            assertNull(RawHttp.getIfReached(RawHttp.loopback(mockPort), WAIT_MILLIS, "/status"), "The status")
+            assertNull(RawHttp.getIfReached(RawHttp.loopback(mockPort), WAIT_MILLIS, "/service/customer/7"), "Mock traffic")
+            assertNull(RawHttp.getIfReached(RawHttp.loopback(adminPort), WAIT_MILLIS), "The admin listener")
+            assertFalse(starting.isDone, "The server has started without its initial definitions")
+            released.countDown()
+            val server = starting.get(TIME_LIMIT_SECONDS, TimeUnit.SECONDS)
+
+            val ofService = RawHttp.get(server.listeners.mock.address, "/service/legacy/orders")
+            assertEquals(200, RawHttp.get(server.listeners.mock.address, "/status").status)
+            assertEquals(200 to LegacySources.SILVER_ORDERS, ofService.status to ofService.body)
+            assertEquals(404, RawHttp.get(server.listeners.mock.address, "/service/customer/7").status)
+        } finally {
+            released.countDown()
+            source.close()
+            starting.whenComplete { server, _ -> server?.close() }
         }
     }
 
