@@ -10,6 +10,7 @@ serves the admin API, which states what the server holds and is to change what t
 This document describes the server as it is now. The web UI is not part of the server yet. The admin API
 states and changes what the server holds: the services with their scenarios, the plans, the twist
 configurations, the tag filter, the tags, the outbound proxy, the history, and the definitions as a whole.
+[admin-api.md](admin-api.md) describes it.
 
 ## Running the server
 
@@ -129,71 +130,8 @@ every other path with the status 404, and the mock listener serves nothing of th
 admin listener accepts connections on port 8081 on the loopback address `127.0.0.1`, so that only programs
 on the same machine reach it.
 
-In this version the admin API has these operations:
-
-| Method and path below `/api/v1` | What it does |
-|---|---|
-| `GET /services` | Lists the services with their scenarios. `?tag=` leaves the services that carry one of the tags, and `?name=` the ones with that name, without regard to letter case. |
-| `POST /services` | Creates a service. |
-| `GET`, `PATCH`, `DELETE /services/{id}` | Reads, updates, and deletes a service. An update also designates its default scenario and its error scenario. |
-| `POST /services/{id}/duplicate` | Creates a copy of a service. |
-| `POST /services/{id}/merge` | Merges the services that the request names into the service. |
-| `POST /services/real-urls/derive` | Derives real URLs for all services. |
-| `GET`, `POST /services/{id}/scenarios` | Lists the scenarios of a service, and creates one. |
-| `GET`, `PATCH`, `DELETE /services/{id}/scenarios/{scenarioId}` | Reads, updates, and deletes a scenario. |
-| `GET`, `PUT`, `DELETE /universal-error-scenario` | Reads, designates, and clears the universal error scenario. |
-| `GET`, `POST /plans` | Lists the plans, and saves the settings that services have now as a plan. A save under the name of a plan updates that plan. |
-| `GET`, `PATCH`, `DELETE /plans/{id}` | Reads, updates, and deletes a plan. |
-| `POST /plans/{id}/save` | Saves the settings that services have now as the items of the plan. |
-| `POST /plans/{id}/apply` | Applies a plan, and answers with the items that it skipped and the scenario names that named no scenario. |
-| `GET`, `PUT`, `DELETE /default-plan` | Reads, designates, and clears the default plan. |
-| `GET`, `POST /twists` | Lists the twist configurations, and creates one. |
-| `GET`, `PATCH`, `DELETE /twists/{id}` | Reads, updates, and deletes a twist configuration. |
-| `POST /twists/{id}/enable`, `POST /twists/{id}/disable` | Enables and disables a twist configuration. The status of the server states the one that is enabled. |
-| `GET`, `PUT`, `DELETE /tag-filter` | Reads, sets, and clears the tag filter. |
-| `GET /tags` | Lists the tags that services, scenarios, and plans carry. |
-| `DELETE /tags/{tag}` | Removes a tag from every service, scenario, and plan. |
-| `GET`, `PATCH /upstream-proxy` | Reads and sets the outbound proxy: its URL, whether it is enabled, and its credentials. No answer holds the password. |
-| `DELETE /system/upstream-session` | Empties the upstream session, which holds the cookies that real services have set. |
-| `GET /inspectors` | Lists the installed inspectors, each with its name and whether it is global. |
-| `GET /history` | Lists the history entries, the newest one first. `?token=` leaves the entries that satisfy every token, `?serviceId=` the ones of a service, `?after=` the ones that were recorded after an entry, and `?max=` the newest ones up to that number. |
-| `DELETE /history` | Deletes all history entries, and with `?serviceId=` the ones of a service. |
-| `GET`, `PATCH`, `DELETE /history/{id}` | Reads a history entry, sets and removes its mark, and deletes it. |
-| `POST /history/{id}/replay` | Lets the server handle the request of an entry again, with the headers, the parameters, and the body that the request states in the place of those of the entry. The answer is the entry of the replay. |
-| `POST /history/{id}/scenario` | Creates a scenario that gives the response of an entry, for the service that handled the request of the entry. |
-| `GET /stats` | States for every service how many entries the history keeps of it, and when the earliest of them arrived. `?from=` and `?to=` limit the entries that count to a time range, and `?format=csv` gives the statistics as CSV. |
-| `GET`, `PATCH /system` | States the status of the server, and switches the read-only mode on and off. |
-| `POST /system/reload` | Puts the definitions of the definitions location in the place of those in memory. |
-| `POST /system/reset` | Removes all definitions, the tag filter, the history, and the last-used times. |
-| `DELETE /system/last-used-times` | Clears the times at which services, scenarios, and plans were last used. |
-| `GET /definitions/export` | Gives all definitions as one document, which a server takes as its initial definitions. |
-| `POST /definitions/import` | Imports a definitions document, or an export document of Mockey 2.x. `?tag=` gives tags to what the import adds. The answer is the report of the import. |
-| `GET /diagnostics` | States what deserves attention in the definitions and blocks nothing, such as a service that names an inspector which is not installed. |
-| `GET /services/{id}/schema-report` | States which scenarios of a service conform to its response schema. |
-| `GET /search` | Finds the services, scenarios, and plans that hold the text of `?term=`, without regard to letter case. |
-
-Bodies are JSON in UTF-8. A request that creates or updates something states attributes in a JSON object:
-a creation takes a default for every attribute that it does not state, and an update changes only the
-attributes that it states. A creation is answered with the status 201, with what was created and its
-identifier, and with its path in the `Location` header. A save of a plan is a creation when no plan has its
-name, and it is answered with the status 200 when it updates a plan. A deletion is answered with the status
-204.
-
-The import takes its document as the body of the request. The request says which document that is: a
-definitions document of this server is JSON, and an export document of Mockey 2.x is XML, which a request
-declares with the header `Content-Type: application/xml`.
-
-An answer that reports a failure is a problem document: a JSON object that states the status and says what
-is wrong. The status is 400 for a body that is no JSON object and for a query string that the operation
-does not take, 404 for what is not there, and 422 for a request that is not valid, where the document names
-every invalid member with a message. A request that fails because the definitions location cannot be read
-or written gets the status 500, and the document says what the server could not do there.
-
-A change takes effect before its request is answered: the next request to the mock endpoint and the next
-read of the API show it. In read-only mode, which is the default, a change is kept in memory, and in
-writable mode it is stored in the definitions location. Changes that arrive at the same time are made one
-after another, and each is checked against what the ones before it left. Of two requests that create a
-service with one mock URL, one succeeds, and the other gets the status 422.
+[admin-api.md](admin-api.md) describes the admin API: what a request and an answer are, its operations, and
+examples of requests. The API also describes itself, in a document that it serves at `/api/v1/openapi.json`.
 
 While the server has an admin token, the API takes a request only when it presents the token in the header
 `Authorization: Bearer <token>`, and it answers every other request with the status 401.

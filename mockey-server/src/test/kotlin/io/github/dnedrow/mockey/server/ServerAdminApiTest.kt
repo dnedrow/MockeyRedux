@@ -218,6 +218,7 @@ class ServerAdminApiTest {
                 "/api/v1/plans",
                 "/api/v1/history",
                 "/api/v1/system",
+                "/api/v1/openapi.json",
             )
         val inTheQueryString = RawHttp.get(admin, "/api/v1/services?token=$TOKEN")
 
@@ -288,6 +289,7 @@ class ServerAdminApiTest {
                 "/api/v1/search?term=customer" to 200,
                 "/api/v1/services/${customers.value}/schema-report" to 404,
                 "/api/v1/system" to 200,
+                "/api/v1/openapi.json" to 200,
                 "/api/v1/services?name=customers&tag=team-a" to 200,
                 "/api/v1/services/no-such-service" to 404,
                 "/api/v1/nothing" to 404,

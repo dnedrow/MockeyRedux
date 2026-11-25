@@ -15,6 +15,7 @@ import kotlin.test.assertTrue
 
 /**
  * Task 11.10: the commands of `docs/server.md` and of `docs/migrating-from-2x.md` run as they are written.
+ * Task 12.9: so do the examples of `docs/admin-api.md`.
  *
  * A reader runs the commands of a document in their order, in one directory, with the start script of the
  * distribution on the path of the shell. So does this test. Every block of a document that is marked
@@ -26,14 +27,16 @@ import kotlin.test.assertTrue
  *   documents name, before the next server starts and at the end of the document. The server has to end
  *   with the status 0.
  * - Every other block has to end by itself with the status 0. Where a block that is marked `text` or `json`
- *   follows it directly, that is what the commands print. A time is taken for any time, and the directory
- *   of the reader is `/srv/mockey` in the documents.
+ *   follows it directly, that is what the commands print. A time is taken for any time, an identifier that
+ *   a server gives a definition for any such identifier, and the directory of the reader is `/srv/mockey`
+ *   in the documents.
  *
  * The documents use the ports of the defaults, so the test needs them free.
  */
 class ServerDocumentsTest {
     private val serverDocument = Path("../docs/server.md")
     private val migrationDocument = Path("../docs/migrating-from-2x.md")
+    private val adminApiDocument = Path("../docs/admin-api.md")
     private val legacyFixtures = Path("../mockey-legacy/src/test/resources/legacy")
     private val distribution = Path(System.getProperty("mockey.distribution"))
     private val runnableJar = Path(System.getProperty("mockey.runnableJar"))
@@ -80,6 +83,21 @@ class ServerDocumentsTest {
         val commands = runningMockey2(Files.readAllBytes(export)) { runCommandsOf(migrationDocument) }
 
         assertEquals(Commands(blocks = 6, servers = 2, compared = 2), commands)
+    }
+
+    /**
+     * The examples of the admin API document are requests to a server that the document starts, and each
+     * builds on the ones before it. They read the answers with `jq`.
+     */
+    @Test
+    fun everyCommandOfTheAdminApiDocumentRunsAsItIsWritten() {
+        needsTheDefaultPorts()
+        val jq = runCatching { ProcessBuilder("jq", "--version").start().waitFor() }.getOrNull() == 0
+        TestEnvironment.needs(jq, "jq, which the document reads the answers with")
+
+        val commands = runCommandsOf(adminApiDocument)
+
+        assertEquals(Commands(blocks = 14, servers = 2, compared = 12), commands)
     }
 
     /** The table of the settings in the server document is what the help of the program says, setting for setting. */
@@ -217,8 +235,11 @@ class ServerDocumentsTest {
         index: Int,
     ): Block? = blocks.getOrNull(index + 1)?.takeIf { it.language in OUTPUT && it.firstLine == blocks[index].lastLine + 2 }
 
-    /** What [text] says without what differs from run to run: the time, and the directory of the reader. */
-    private fun comparable(text: String): String = text.trim().replace("${directory.toRealPath()}", READER).replace(TIME, "<time>")
+    /** What [text] says without what differs from run to run: the time, the identifiers, and the directory of the reader. */
+    private fun comparable(text: String): String {
+        val inTheDirectoryOfTheDocuments = text.trim().replace("${directory.toRealPath()}", READER)
+        return inTheDirectoryOfTheDocuments.replace(TIME, "<time>").replace(IDENTIFIER, "<identifier>")
+    }
 
     /** Returns the fenced blocks of [document]. A block that is indented, as in a list, loses that indentation. */
     private fun blocksOf(document: Path): List<Block> {
@@ -295,6 +316,9 @@ class ServerDocumentsTest {
         val ASSIGNMENT = Regex("[A-Za-z_][A-Za-z0-9_]*=.*")
         val ENDS_BY_ITSELF = setOf("--help", "-h", "--version", "import-legacy")
         val TIME = Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z""")
+
+        /** An identifier that a server gives a service, a scenario, a plan, or a twist configuration. */
+        val IDENTIFIER = Regex("""[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}""")
         val OPTION = Regex("--[a-z-]+")
 
         /** A file of the program with a version in its name, as a document names it. */

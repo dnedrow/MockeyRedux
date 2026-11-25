@@ -63,7 +63,8 @@ internal class AdminApi(
     private val maxRequestBody: Long,
     routes: List<AdminRoute>,
 ) {
-    private val routes = routes.toList()
+    /** The operations of the API. */
+    val routes: List<AdminRoute> = routes.toList()
 
     init {
         val twice = routes.groupBy { it.method to it.form }.filterValues { it.size > 1 }
@@ -280,7 +281,8 @@ internal class AdminApi(
                     AdminUpstream(engine).routes +
                     AdminHistory(engine).routes +
                     AdminDefinitions(engine).routes +
-                    AdminSystem(engine, since, settings.definitions, mock).routes
+                    AdminSystem(engine, since, settings.definitions, mock).routes +
+                    AdminApiDescription.routes
             return AdminApi(settings.adminToken, settings.maxRequestBody, routes)
         }
     }

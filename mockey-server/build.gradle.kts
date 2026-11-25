@@ -25,6 +25,8 @@ dependencies {
 
     // The engine that the spike of task 11.0 compared with Netty. Only the spike test uses it.
     testImplementation(libs.ktor.server.cio)
+    // What checks the answers of the admin API against the schemas of its description. The core library has it already.
+    testImplementation(libs.json.schema)
 }
 
 // The test fixtures are a part of the server that only tests use, so they use what the server uses.
@@ -59,7 +61,7 @@ tasks.test {
     // The test of the documents runs their commands, with definitions of Mockey 2.x that the tests of the
     // importer have.
     inputs
-        .files("../docs/server.md", "../docs/migrating-from-2x.md")
+        .files("../docs/server.md", "../docs/migrating-from-2x.md", "../docs/admin-api.md")
         .withPropertyName("serverDocuments")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs

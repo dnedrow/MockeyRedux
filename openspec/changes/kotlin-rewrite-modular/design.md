@@ -241,6 +241,7 @@ Indicative resource map (the OpenAPI document is the contract):
 | History | `history`, `history/{id}`, `.../replay`, `.../scenario`, `stats` |
 | Extensions | `inspectors` |
 | Definitions | `definitions/export`, `definitions/import` |
+| Description | `openapi.json` |
 
 **Alternatives considered.**
 
