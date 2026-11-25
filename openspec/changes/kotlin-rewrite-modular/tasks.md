@@ -110,7 +110,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 ## 12. Server: admin API (spec: admin-api)
 
-- [ ] 12.1 Define the wire types in `mockey-api` and their mapping to and from the model. Verify with serialization tests that pin the JSON shape of every type.
+- [x] 12.1 Define the wire types in `mockey-api` and their mapping to and from the model. Verify with serialization tests that pin the JSON shape of every type.
 - [ ] 12.2 Implement the API foundation: the `/api/v1` prefix on the admin listener only, the token check, problem documents for 400, 404, and 422, and side-effect-free reads. Verify with tests for each scenario of those requirements.
 - [ ] 12.3 Implement the service and scenario operations: list with filters, read, create, partial update, delete, duplicate, merge, bulk derivation, and the error designations. Verify with API tests for each operation.
 - [ ] 12.4 Implement the plan operations and the routing settings operations for twist configurations, the tag filter, and tags. Verify with API tests for each operation.
