@@ -3,6 +3,12 @@ package io.github.dnedrow.mockey.server
 import io.ktor.server.application.Application
 import io.netty.channel.Channel
 import io.netty.channel.ChannelInitializer
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -10,6 +16,9 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.UnknownHostException
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /** The two listeners of the server, with the names of the settings for the address and the port of each. */
 internal enum class ListenerKind(
@@ -105,6 +114,7 @@ internal class Listener private constructor(
     val kind: ListenerKind,
     private val server: HttpServer,
     private val listening: Channel,
+    private val connections: Connections,
     boundTo: InetAddress,
 ) {
     /**
@@ -117,13 +127,46 @@ internal class Listener private constructor(
     /** The address that the listener was bound to, with the port that its socket has. */
     val address: InetSocketAddress = InetSocketAddress(boundTo, socketAddress.port)
 
-    /** Stops the listener at once: it closes its socket and every connection. */
-    fun stop() {
+    /**
+     * Closes every connection as soon as no request is in progress on it, and the socket on which the
+     * listener accepts connections. The connections with a request in progress stay until [stop].
+     *
+     * A client that comes from now on gets no answer: its connection is refused, or it is reset, see
+     * `docs/decisions/http-stack.md`.
+     */
+    fun takeNoMoreRequests() {
+        connections.closeWhenIdle()
+        listening.close().syncUninterruptibly()
+    }
+
+    /** Waits until no connection is open, for [timeout] at most. */
+    fun awaitNoConnections(timeout: Duration) {
+        connections.awaitClosed(timeout)
+    }
+
+    /**
+     * Stops the listener at once: it closes its socket and every connection, also one with a request in
+     * progress, which gets no answer. Returns the number of connections that had one.
+     *
+     * The handlers of such requests are ended before the engine is stopped, so that none of them goes on
+     * when the listener has stopped: a handler that waits for a real service or for the delay of a scenario
+     * would try to answer on a connection that is no more. Ktor runs every handler in a coroutine of its
+     * application, so the listener ends those and waits until they have ended.
+     */
+    fun stop(): Int {
+        val abandoned = connections.close()
+        val handlers = server.application.coroutineContext.job
+        handlers.cancelChildren(CancellationException("The listener stops."))
+        runBlocking { withTimeoutOrNull(HANDLERS_TIMEOUT) { handlers.children.toList().joinAll() } }
         server.stop(gracePeriodMillis = 0, timeoutMillis = STOP_TIMEOUT_MILLIS)
+        return abandoned
     }
 
     internal companion object {
         private const val STOP_TIMEOUT_MILLIS = 5_000L
+
+        /** The time that the handlers get to end in when they are told to. A handler that is told ends at once. */
+        private val HANDLERS_TIMEOUT = 5.seconds
 
         /**
          * Starts a listener on [address] that runs [module] for the requests that name a host. The listener
@@ -138,6 +181,7 @@ internal class Listener private constructor(
             module: suspend Application.() -> Unit,
         ): Listener {
             val listening = CopyOnWriteArrayList<Channel>()
+            val connections = Connections()
             val guarded: suspend Application.() -> Unit = {
                 RequestHost.require(this)
                 UnreadBody.dropBeforeTheLastAnswer(this)
@@ -154,6 +198,7 @@ internal class Listener private constructor(
                             },
                         )
                     }
+                    channelPipelineConfig = { connections.watch(this) }
                 }
             try {
                 server.start(wait = false)
@@ -162,7 +207,7 @@ internal class Listener private constructor(
                 runCatching { server.stop(gracePeriodMillis = 0, timeoutMillis = 0) }
                 throw cannotListen(kind, address, failure)
             }
-            return Listener(kind, server, listening.single(), address.address)
+            return Listener(kind, server, listening.single(), connections, address.address)
         }
     }
 }
@@ -172,10 +217,17 @@ internal class Listeners private constructor(
     val mock: Listener,
     val admin: Listener,
 ) {
-    /** Stops both listeners at once. */
-    fun stop() {
-        admin.stop()
-        mock.stop()
+    /**
+     * Stops both listeners. They accept no connection from now on, and they let the requests that are in
+     * progress finish, for [gracePeriod] at most. A request that is in progress after that gets no answer.
+     * Returns the number of connections that were open then.
+     */
+    fun stop(gracePeriod: Duration): Int {
+        val both = listOf(admin, mock)
+        both.forEach(Listener::takeNoMoreRequests)
+        val end = TimeSource.Monotonic.markNow() + gracePeriod
+        both.forEach { it.awaitNoConnections(-end.elapsedNow()) }
+        return both.sumOf(Listener::stop)
     }
 
     internal companion object {

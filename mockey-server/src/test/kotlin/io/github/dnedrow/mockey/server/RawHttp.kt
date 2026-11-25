@@ -31,7 +31,8 @@ internal object RawHttp {
         bytes: ByteArray,
         val ended: Boolean,
     ) {
-        private val text = String(bytes, StandardCharsets.ISO_8859_1)
+        /** Everything that the server wrote. */
+        val text = String(bytes, StandardCharsets.ISO_8859_1)
         private val head = text.substringBefore(CRLF + CRLF).split(CRLF)
 
         /** Whether the server wrote nothing at all. */

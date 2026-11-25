@@ -74,6 +74,21 @@ internal object ServerProgram {
             }
         }
 
+        /**
+         * Sends the program the signal [name], such as `TERM`, as the command `kill` does.
+         *
+         * A program that was started with [withSignals] takes the signal as the system delivers it. Any
+         * other program takes it as the process of the test does, which can be one that ignores it.
+         */
+        fun signal(name: String) {
+            val kill = ProcessBuilder("kill", "-$name", "${process.pid()}").inheritIO().start()
+            check(kill.waitFor(TIME_LIMIT_SECONDS, TimeUnit.SECONDS) && kill.exitValue() == 0) { "The signal $name was not sent." }
+        }
+
+        /** Returns whether the process of the program runs. */
+        val isRunning: Boolean
+            get() = process.isAlive
+
         /** Waits until the program has ended by itself, and returns what it gave. */
         fun awaitEnd(): Outcome {
             val ended = process.waitFor(TIME_LIMIT_SECONDS, TimeUnit.SECONDS)
@@ -93,20 +108,42 @@ internal object ServerProgram {
     private const val ERRORS = "errors.txt"
 
     /**
+     * Returns the command that starts a program with what the system does on the signals that end a program,
+     * but for the signals [ignored], which the program is to ignore, as one that `nohup` started ignores
+     * the end of its terminal.
+     *
+     * A process hands on to the programs that it starts which signals they ignore, and the Java runtime
+     * leaves an ignored signal ignored. So a program that a test starts ignores what the process of the test
+     * ignores, which depends on how the build was started. This command sets that right. It needs Perl,
+     * which changes what a signal does and then becomes the program.
+     */
+    fun withSignals(ignored: List<String> = emptyList()): List<String> {
+        val perl = runCatching { ProcessBuilder("perl", "-e", "1").start().waitFor() }.getOrNull() == 0
+        TestEnvironment.needs(perl, "Perl, to start a program with the signals as the system delivers them")
+        val script =
+            "\$SIG{\$_} = 'DEFAULT' for qw(HUP INT TERM); \$SIG{\$_} = 'IGNORE' for qw(${ignored.joinToString(" ")}); " +
+                "exec @ARGV or die \"exec: \$!\";"
+        return listOf("perl", "-e", script)
+    }
+
+    /**
      * Starts the program with [arguments] in a directory of its own, which [prepare] fills first. Of the
      * environment of this test it gets everything but the variables of the program, in whose place it gets
-     * [variables].
+     * [variables]. [starter] is a command that starts the program which follows it, see [withSignals], and
+     * [runtimeOptions] are options for the Java runtime of the program.
      */
     fun start(
         vararg arguments: String,
         variables: Map<String, String> = emptyMap(),
+        starter: List<String> = emptyList(),
+        runtimeOptions: List<String> = emptyList(),
         prepare: (Path) -> Unit = {},
     ): Running {
         val java = Path(System.getProperty("java.home"), "bin", "java").toString()
         val directory = Files.createTempDirectory("mockey-server-program")
         prepare(directory)
         val builder =
-            ProcessBuilder(listOf(java, "-cp", System.getProperty("java.class.path"), MAIN_CLASS) + arguments)
+            ProcessBuilder(starter + java + runtimeOptions + listOf("-cp", System.getProperty("java.class.path"), MAIN_CLASS) + arguments)
                 .directory(directory.toFile())
                 .redirectOutput(directory.resolve(OUTPUT).toFile())
                 .redirectError(directory.resolve(ERRORS).toFile())

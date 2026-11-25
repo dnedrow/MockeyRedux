@@ -4,9 +4,17 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.response.respondText
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -16,6 +24,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.measureTimedValue
 
 /**
@@ -31,7 +40,7 @@ class ListenersTest {
 
     @AfterTest
     fun stopWhatWasStarted() {
-        started.forEach(Listeners::stop)
+        started.forEach { it.stop(Duration.ZERO) }
         blockers.forEach(ServerSocket::close)
     }
 
@@ -240,7 +249,7 @@ class ListenersTest {
             try {
                 assertEquals(MOCK to ADMIN, answerOnLoopback(mockPort) to answerOnLoopback(adminPort), "Round $round")
             } finally {
-                listeners.stop()
+                listeners.stop(Duration.ZERO)
             }
             assertNull(RawHttp.getIfReached(RawHttp.loopback(mockPort), WAIT_MILLIS), "The mock listener after round $round")
             assertNull(RawHttp.getIfReached(RawHttp.loopback(adminPort), WAIT_MILLIS), "The admin listener after round $round")
@@ -344,9 +353,48 @@ class ListenersTest {
         ServerSocket().use { it.bind(RawHttp.loopback(mockPort)) }
     }
 
+    // Stopping
+
+    /**
+     * The listeners end the handler of a request that they do not wait for any longer. A handler can take
+     * a while to end, and the listeners have stopped only when it has: a handler that went on would find
+     * nothing left to answer with.
+     */
+    @Test
+    fun theListenersHaveStoppedOnlyWhenTheHandlersOfTheRequestsInProgressHaveEnded() {
+        val atWork = CountDownLatch(1)
+        val ended = AtomicBoolean(false)
+        val slowToEnd: suspend Application.() -> Unit = {
+            intercept(ApplicationCallPipeline.Call) {
+                try {
+                    atWork.countDown()
+                    awaitCancellation()
+                } finally {
+                    withContext(NonCancellable) { delay(ENDING_MILLIS) }
+                    ended.set(true)
+                }
+            }
+        }
+        val addresses = ListenerAddresses.of(ServerSettings(mockHost = "127.0.0.1", mockPort = 0, adminPort = 0))
+        val listeners = Listeners.start(addresses, slowToEnd, answering(ADMIN))
+        val inProgress = CompletableFuture.supplyAsync { RawHttp.get(listeners.mock.address) }
+        val handlerAtWork = atWork.await(AT_ONCE_MILLIS, TimeUnit.MILLISECONDS)
+
+        val abandoned = listeners.stop(Duration.ZERO)
+        val endedWhenStopped = ended.get()
+
+        assertTrue(handlerAtWork, "The handler got the request")
+        assertEquals(1, abandoned, "The connections with a request in progress")
+        assertTrue(endedWhenStopped, "The handler was at work when the listeners had stopped")
+        assertTrue(inProgress.get(AT_ONCE_MILLIS, TimeUnit.MILLISECONDS).nothing, "The client got an answer")
+    }
+
     private companion object {
         const val MOCK = "the mock listener"
         const val ADMIN = "the admin listener"
+
+        /** The time that the handler of a test takes to end when it is told to. */
+        const val ENDING_MILLIS = 300L
 
         /** How long a test waits for an answer that is not to come. */
         const val WAIT_MILLIS = 500

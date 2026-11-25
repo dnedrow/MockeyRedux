@@ -27,6 +27,8 @@ DEV-63 to DEV-67 were found when the mock endpoint of the server was implemented
 come from the HTTP server that receives a request before Mockey does, which is Jetty 7 in legacy and Ktor on
 Netty in the new server, see `docs/decisions/http-stack.md`. No parity case can hold such a request, so the
 probe shows what legacy does.
+DEV-68 is the graceful shutdown that the specification asks of the server (task 11.7). It concerns the end of
+the process, which no parity case holds either.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
@@ -97,3 +99,4 @@ probe shows what legacy does.
 | DEV-65 | A request body of any length is taken. Jetty limits only the length of a form, and legacy raises that limit to 500 MB. | A body that is longer than the server is set to take, which is 50 MiB unless it is set otherwise, gets the status 413. The request is neither matched nor forwarded, and the history does not record it. | run: probe, which posts 52 MiB. read: `JettyRunner.main` for the limit of a form |
 | DEV-66 | Jetty takes a request whose lines end with a line feed alone. It also takes a request whose `Host` header holds what no name of a host holds, such as `a/b` or `a?b`, or nothing at all, and a request with more than one `Host` header. | Each of them gets the status 400. | run: probe |
 | DEV-67 | A request for `/service`, without a slash after it, is mock traffic with an empty target, as a request for `/service/` is. | Only a path that begins with `/service/` is mock traffic. A request for `/service` gets the status 404, and the history does not record it. | run: probe |
+| DEV-68 | A signal that ends a program, such as `SIGTERM`, ends legacy at once. A request that is in progress gets no answer, and the process ends with the status of the signal, which is 143 for `SIGTERM`. | The server accepts no more connections, lets the requests that are in progress finish within the grace period, which is 10 seconds unless it is set otherwise, completes a save of the definitions that is under way, and ends with the status 0. It does so on `SIGTERM`, `SIGINT`, and `SIGHUP`. | run: probe, which sends `SIGTERM` while a request waits for the delay of its service |

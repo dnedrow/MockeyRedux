@@ -197,13 +197,37 @@ Task 11.3 found more, and the tests of the mock endpoint show it:
 
 Stopping (task 11.7):
 
-- Ktor registers a shutdown hook for every server that it starts. The hook stops the server with a grace
-  period of 1 second, which ends the requests in progress on Netty, and it runs at the same time as any other
-  shutdown hook. The server therefore switches the hook off with the system property
-  `io.ktor.server.engine.ShutdownHook`, which Ktor reads once, when the first server is started. This was read
-  in `ShutdownHook.kt` and `ShutdownHookJvm.kt` of Ktor and not run. The test of task 11.7 shows it.
-- To stop, the server closes the sockets on which it listens, waits for the requests in progress for as long
-  as the grace period lasts, and then stops the engines with a grace period of 0.
+- The program takes the signals that end a program itself: `SIGTERM`, `SIGINT`, and `SIGHUP`. The Java
+  runtime would end the program on them at once, with the status 143 for `SIGTERM`, after the shutdown hooks.
+  With a handler for the signals (`sun.misc.Signal`), the thread of the program stops the server in order and
+  the process ends with the status 0. A signal that is ignored when the program starts stays ignored, as for
+  a program that `nohup` started: the runtime hands no such signal to a handler. Under the option `-Xrs` the
+  runtime allows no handler, and the server runs without one: a signal ends it at once then.
+- Ktor registers a shutdown hook for every server that it starts, which stops the server with a grace period
+  of 1 second and so ends the requests in progress on Netty. The hook does not get to run: no signal starts
+  the shutdown of the runtime any more, and Ktor takes the hook back when a server is stopped, which the
+  program does before it ends. That Ktor takes it back was read in its `ShutdownHookJvm.kt` and not run. So
+  the hook is left as it is, and the system property that switches it off,
+  `io.ktor.server.engine.ShutdownHook`, is not set.
+- To stop, a listener closes the socket on which it listens and every connection without a request in
+  progress. The server waits until no connection is left, for as long as the grace period lasts, and both
+  listeners share that time. Then it closes the connections that are left, ends the handlers of their
+  requests, stops the engines with a grace period of 0, and closes the engine of Mockey, which completes a
+  save that is under way.
+- Ktor does not tell when a request is done in the sense that counts here. Its handler is done, and the job
+  of its call ends, when the response is given to Netty, and Netty hands the bytes to the system later: a
+  large response to a client that reads slowly stays in the buffer of the connection, and closing the
+  connection drops it. So a handler of Netty counts for each connection the requests that arrive and the
+  answers whose last bytes the system has taken (`Connections`). It stands right before the handler of Ktor
+  for HTTP/1.1, which has the name `http1` in the pipeline, and it is put there through `channelPipelineConfig`.
+  A request counts until it has arrived whole as well, because a client that still sends when its connection
+  is closed can lose the answer.
+- The answer to the last request of a connection gets the header `Connection: close` while the listener
+  stops, so that the client sends no further request on a connection that is about to be closed.
+- A request that is in progress when the grace period is over gets no answer. Its handler has to end before
+  the engine is stopped: one that went on would answer when the threads of Netty are gone, and Netty logs an
+  error for each such answer. Ktor runs every handler in a coroutine under the job of its application, so
+  the listener cancels the children of that job and waits for them, with the connections closed already.
 - Netty says that a listening channel is closed before the system has closed the socket. The Java runtime
   closes the socket of a channel that a selector knows when that selector selects again, which the event loop
   of Netty does a moment later, and later still when its thread has to wait for a processor. A client that
@@ -230,6 +254,7 @@ answered, because legacy does not run in it. `scripts/probe-deviations.sh` sends
 | More than one `Host` header | Taken. | Status 400. | DEV-66 |
 | A request of HTTP/1.1 without a `Host` header, whatever it is for | Status 400. | Status 400. | none |
 | A request for `/service` | It is mock traffic with an empty target, as a request for `/service/` is. | Status 404. Only a path that begins with `/service/` is mock traffic. | DEV-67 |
+| A request that is in progress when the signal `SIGTERM` arrives | It gets no answer: legacy ends at once, with the status 143. | It is answered when it finishes within the grace period, and the server ends with the status 0. | DEV-68 |
 
 ## Repeating the spike
 

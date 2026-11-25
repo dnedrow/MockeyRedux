@@ -190,7 +190,18 @@ confirm DEV-67 "a request for /service is answered by Mockey, as a request for /
   same "$(get /service)" "$(get /service/)"
 confirm DEV-67 "and that answer is the one for a target that no service knows" contains "$(get /service)" '"fail"'
 
-stop_legacy
+# DEV-68: the signal that ends a program arrives while a request is in progress, which a delay of the service holds.
+get '/config/service?serviceName=static%20plan&hangTime=3000&transientState=true' >/dev/null
+curl -s -o /dev/null -w '%{http_code}' "$BASE_URL$plan" >"$WORK/request-in-progress" &
+request=$!
+sleep 1
+kill -TERM "$pid"
+ended_with=0
+wait "$pid" || ended_with=$?
+pid=""
+wait "$request" || true
+confirm DEV-68 "legacy ends with the status 143 on the signal SIGTERM" same "$ended_with" 143
+confirm DEV-68 "and the request that was in progress gets no answer" same "$(cat "$WORK/request-in-progress")" 000
 
 # ---- writable instance -------------------------------------------------------------------------------------
 start_legacy false

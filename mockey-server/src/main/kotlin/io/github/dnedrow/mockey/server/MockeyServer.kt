@@ -7,6 +7,7 @@ import io.ktor.server.application.call
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Instant
+import kotlin.time.Duration
 
 /**
  * The server while it runs: its engine, and its two listeners, which accept connections from the moment
@@ -19,10 +20,38 @@ internal class MockeyServer private constructor(
     val listeners: Listeners,
     val since: Instant,
 ) : AutoCloseable {
-    /** Stops the server at once: its listeners first, and then its engine, which completes what it is saving. */
-    override fun close() {
-        listeners.stop()
+    private var stopped = false
+
+    /**
+     * Stops the server, and returns when it has stopped.
+     *
+     * 1. The listeners accept no connection from now on.
+     * 2. The requests that are in progress get [gracePeriod] to finish. A connection is closed as soon as
+     *    none is in progress on it, and the server goes on as soon as no connection is left. A request
+     *    that is in progress when the time is over gets no answer.
+     * 3. The engine is closed, which completes a save of the definitions that is under way, however long
+     *    it takes.
+     *
+     * A server that has stopped stays stopped: a further call does nothing, and one that comes while the
+     * server stops returns when it has stopped.
+     */
+    @Synchronized
+    fun stop(gracePeriod: Duration) {
+        if (stopped) return
+        stopped = true
+        log.info("The server stops. It accepts no more connections, and the requests in progress have {} to finish.", gracePeriod)
+        val abandoned = listeners.stop(gracePeriod)
+        if (abandoned > 0) {
+            val connections = if (abandoned == 1) "1 connection" else "$abandoned connections"
+            log.warn("{} still had a request in progress after {} and got no answer.", connections, gracePeriod)
+        }
         engine.close()
+        log.info("The server has stopped.")
+    }
+
+    /** Stops the server at once: a request that is in progress gets no answer. The engine completes what it is saving. */
+    override fun close() {
+        stop(Duration.ZERO)
     }
 
     internal companion object {
