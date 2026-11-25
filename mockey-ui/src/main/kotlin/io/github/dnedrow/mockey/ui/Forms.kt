@@ -24,29 +24,48 @@ private val BETWEEN_TAGS = Regex("""[\s\p{Z}]+""")
 internal fun tagsIn(text: String): List<String> = text.split(BETWEEN_TAGS).filter { it.isNotEmpty() }
 
 /**
- * What a form says of the values that its page gave its fields, so that the UI finds what a person changed
- * and asks the server to set that, and nothing else. A form that changes a few attributes of something leaves
- * the others as the server holds them, also where they were changed since the page was made.
+ * Returns [text] as a one-line field holds it. A browser removes every line break from the value of such a
+ * field. A form that marks its initial values, see [Shown], fills a one-line field with this text. Otherwise,
+ * the field would count as changed whenever the stored value contains a line break.
+ */
+internal fun inOneLine(text: String): String = text.filterNot { it == '\r' || it == '\n' }
+
+/**
+ * Marks of the initial values of form fields. They let the UI detect which fields a person changed, so that
+ * it asks the server to set only the attributes of those fields. A form that changes a few attributes of an
+ * object leaves the other attributes as the server holds them, even if they changed after the page was
+ * rendered.
  *
- * For each field that it says it of, the form has a hidden field with a mark of the value: the name of the
- * field after [PREFIX]. A browser sends the mark back as it is, beside what the field holds then. A form that
- * is shown again keeps the marks that it was sent with, so that they say what the first page gave its fields.
+ * For each marked field, the form has a hidden field. Its name is [PREFIX] followed by the name of the
+ * marked field, and its value is the mark of the initial value. A browser returns the mark unchanged, next
+ * to the current value of the field. A form that is displayed again after a rejection keeps the marks that
+ * it was submitted with, so the marks still describe the values of the first page.
  *
- * The mark of a text is the same however its lines end. A browser sends every line of a field with a carriage
- * return and a line feed, whatever the page gave the field, so the ends of the lines say nothing of a change.
+ * A browser alters some values without any action by a person, and a mark does not report such an
+ * alteration as a change:
+ *
+ * - A browser submits every line break as a carriage return and a line feed. The mark of a text therefore
+ *   does not depend on its line endings.
+ * - An HTML page cannot contain a NUL character, and a browser reads one as U+FFFD. The mark therefore
+ *   treats the two characters as equal.
+ * - A browser removes the line breaks from the value of a one-line field. A form therefore fills such a
+ *   field with [inOneLine].
  */
 internal object Shown {
-    /** What the name of a hidden field begins with that holds the mark of a field. */
+    /** The prefix of the name of a hidden field that holds a mark. */
     const val PREFIX = "_shown."
 
     private const val MARK_BYTES = 12
+    private const val NUL = '\u0000'
+    private const val REPLACEMENT_CHARACTER = '\uFFFD'
 
-    /** Returns the mark of [values], which are the values of the fields with one name, in the order of the form. */
+    /** Returns the mark of [values], which are the values of the fields that share one name, in form order. */
     fun markOf(values: List<String>): String {
         val digest = MessageDigest.getInstance("SHA-256")
         for (value in values) {
-            val bytes = value.replace("\r\n", "\n").replace('\r', '\n').toByteArray(Charsets.UTF_8)
-            // The length keeps two values apart from one value that is made of both.
+            val text = value.replace("\r\n", "\n").replace('\r', '\n').replace(NUL, REPLACEMENT_CHARACTER)
+            val bytes = text.toByteArray(Charsets.UTF_8)
+            // The length prefix distinguishes two values from one value that is their concatenation.
             digest.update("${bytes.size}:".toByteArray(Charsets.UTF_8))
             digest.update(bytes)
         }

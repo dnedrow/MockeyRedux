@@ -481,6 +481,42 @@ class UiServiceTest {
         assertEquals(emptyList(), api.violations)
     }
 
+    /**
+     * A browser alters some values by itself: it removes the line breaks from the value of a one-line field,
+     * and it replaces every NUL character with U+FFFD. The form does not report such a value as changed, so
+     * the server keeps the stored value until a person edits the field.
+     */
+    @Test
+    fun theFormOfAServiceDoesNotStateAValueThatOnlyTheBrowserAltered() {
+        val odd = "one\ntwo\u0000three\r\nfour"
+        val held =
+            billing.copy(
+                name = odd,
+                mockUrl = odd,
+                description = odd,
+                realUrls = listOf(odd, "http://qa2.example.com/billing"),
+                tags = listOf(odd),
+                requestRules = odd,
+                inspectorName = odd,
+                responseSchema = odd,
+            )
+        val api = holding(listOf(held))
+        val browser = browserFor(api)
+        val form = browser.get("/service/edit?id=svc-billing").form()
+
+        val unchanged = browser.submit(form)
+        val changed = browser.submit(form, mapOf("delay" to "7"))
+
+        val inOneLine = "onetwo\uFFFDthreefour"
+        val inLines = "one\ntwo\uFFFDthree\nfour"
+        val fields = shown(form)
+        assertEquals(listOf(303, 303), listOf(unchanged, changed).map { it.status })
+        assertEquals(listOf("{}", """{"delayMillis":7}"""), changing(api).map { it.second })
+        assertEquals(listOf(inOneLine), listOf("name", "mockUrl", "tags").flatMap(fields::getValue).distinct())
+        assertEquals(listOf(inOneLine, "http://qa2.example.com/billing", "", ""), fields["realUrl"])
+        assertEquals(listOf(inLines), listOf("description", "rules", "schema", "inspector").flatMap(fields::getValue).distinct())
+    }
+
     /** A form that does not say what its page gave its fields states every attribute, as the form of a new service does. */
     @Test
     fun aFormThatDoesNotSayWhatItWasShownWithStatesEveryAttribute() {
@@ -740,9 +776,13 @@ class UiServiceTest {
             val scenarioNames = page.select("main ul.scenarios li").map { it.textNodes().first().wholeText }
             assertEquals(text to setOf("$text ", "due"), page.select("main h1").first()!!.wholeText() to scenarioNames.toSet(), text)
             val fields = shown(edit.form())
-            val ofTexts = listOf("name", "mockUrl", "description", "tags", "defaultScenario", "rules", "inspector", "schema")
-            assertEquals(ofTexts.associateWith { listOf(text) }, fields.filterKeys { it in ofTexts }, text)
-            assertEquals(listOf(text, "", ""), fields["realUrl"], text)
+            val ofLines = listOf("description", "defaultScenario", "rules", "inspector", "schema")
+            assertEquals(ofLines.associateWith { listOf(text) }, fields.filterKeys { it in ofLines }, text)
+            // A one-line field holds its value without line breaks, as a browser holds it.
+            val inOneLine = text.replace("\n", "")
+            val ofOneLine = listOf("name", "mockUrl", "tags")
+            assertEquals(ofOneLine.associateWith { listOf(inOneLine) }, fields.filterKeys { it in ofOneLine }, text)
+            assertEquals(listOf(inOneLine, "", ""), fields["realUrl"], text)
             val headings = listOf(edit.page, asked).map { it.select("main h1").first()!!.wholeText() }
             assertEquals(listOf("Edit the service $text", "Delete the service $text?"), headings, text)
         }

@@ -455,14 +455,14 @@ internal object ServiceForm {
         return FormState(mapOf(MODE to listOf(proxy), DELAY to listOf("0"), REAL_URL to rows, DEFAULT_REAL_URL to listOf("0")))
     }
 
-    /** Returns what the form of [service] is shown with, which is what the server holds of the service. */
+    /** Returns the initial state of the form for [service], which holds the values that the server holds. */
     fun of(service: ServiceDto): FormState {
         val texts =
             mapOf(
-                NAME to service.name,
-                MOCK_URL to service.mockUrl,
+                NAME to inOneLine(service.name),
+                MOCK_URL to inOneLine(service.mockUrl),
                 DESCRIPTION to service.description.orEmpty(),
-                TAGS to service.tags.joinToString(" "),
+                TAGS to inOneLine(service.tags.joinToString(" ")),
                 MODE to Modes.nameOf(service.responseMode),
                 DEFAULT_SCENARIO to service.defaultScenarioId.orEmpty(),
                 DELAY to "${service.delayMillis}",
@@ -473,7 +473,7 @@ internal object ServiceForm {
             )
         val ofRules = RULES_ENABLED.takeIf { service.requestRulesEnabled }
         val checked = listOfNotNull(ofRules, SCHEMA_ENABLED.takeIf { service.responseSchemaEnabled })
-        val rows = service.realUrls + List(FREE_ROWS) { "" }
+        val rows = service.realUrls.map(::inOneLine) + List(FREE_ROWS) { "" }
         return FormState(texts.mapValues { listOf(it.value) } + checked.associateWith { listOf(CHECKED) } + (REAL_URL to rows))
     }
 

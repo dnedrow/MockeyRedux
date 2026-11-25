@@ -149,7 +149,8 @@ internal class Browser(
      * Sends [form], which is a form of a page, as a browser sends it when its button is pressed: to the
      * address of the form, with the fields that the form has and their values, of which [edits] replace the
      * ones that a person changed. A field with the value `null` is not sent, as a check box that is not
-     * checked. A field of several lines is sent with a carriage return before every line feed. [files] are
+     * checked. A field of several lines is sent with a carriage return before every line feed. A one-line
+     * text field is sent without the line breaks of its value, because a browser removes them. [files] are
      * the files that were chosen in the file fields.
      *
      * [pressed] is the button of the form that is pressed, which is its first one unless a test presses
@@ -173,13 +174,17 @@ internal class Browser(
         val kept = ofThePage.filter { (name, _) -> name !in edits && name !in rows }
         val edited = edits.mapNotNull { (name, value) -> value?.let { name to it } }
         val ofRows = rows.flatMap { (name, values) -> values.map { name to it } }
-        val fields = (kept + edited + ofRows).map { (name, value) -> name to asSent(value) }
+        val oneLine = form.select(ONE_LINE_FIELDS).map { it.attr("name") }.toSet()
+        val held = (kept + edited + ofRows).map { (name, value) -> name to if (name in oneLine) withoutLineBreaks(value) else value }
+        val fields = held.map { (name, value) -> name to asSent(value) }
         val action = form.attr("action")
         if (!form.attr("method").equals("post", ignoreCase = true)) return get("$action?${encoded(fields)}")
         if (form.attr("enctype") != "multipart/form-data") return post(action, fields)
         val boundary = "----browser${System.nanoTime()}"
         return request("POST", action, body = parts(fields, files, boundary), contentType = "multipart/form-data; boundary=$boundary")
     }
+
+    private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
 
     private fun asSent(value: String): String = value.replace("\r\n", "\n").replace("\n", "\r\n")
 
@@ -194,6 +199,9 @@ internal class Browser(
 
         /** What finds the buttons that send the form that they are in. */
         const val BUTTONS = "button:not([type=button]):not([type=reset]), input[type=submit]"
+
+        /** The selector of the one-line text fields of a form. */
+        const val ONE_LINE_FIELDS = "input[type=text], input:not([type])"
     }
 
     private fun parts(
