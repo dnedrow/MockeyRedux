@@ -22,7 +22,7 @@ internal object SystemPages {
                 dt { +"Version" }
                 dd { +system.version }
                 dt { +"Running since" }
-                dd { +system.startTime }
+                dd { timeOf(system.startTime) }
                 dt { +"Definitions location" }
                 dd { code { +system.definitionsLocation } }
                 dt { +"Mode" }

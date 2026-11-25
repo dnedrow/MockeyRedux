@@ -57,7 +57,7 @@ class UiPagesTest {
         val expected =
             mapOf(
                 "Version" to "3.0.0",
-                "Running since" to "2026-01-02T03:04:05.678Z",
+                "Running since" to "2026-01-02 03:04:05 UTC",
                 "Definitions location" to "/srv/mockey/mockey-definitions",
                 "Mode" to "Writable: the server stores every change in its definitions location.",
                 "Mock endpoint" to "http://mockey.test:8080/service/",
@@ -69,6 +69,7 @@ class UiPagesTest {
         assertEquals("Server - Mockey" to "Server", page.title() to page.select("main h1").text())
         assertEquals("en", page.select("html").attr("lang"))
         assertEquals(expected, described(page))
+        assertEquals(listOf("2026-01-02T03:04:05.678Z"), page.select("main dl time").map { it.attr("datetime") })
         val foot = listOf("Server at ${api.url}, version 3.0.0, in writable mode", "Mockey UI ${System.getProperty("mockey.version")}")
         assertEquals(foot, page.select("body > footer p").map { it.text() })
         assertEquals(listOf("/system"), page.select("nav a[aria-current=page]").map { it.attr("href") })
@@ -89,7 +90,7 @@ class UiPagesTest {
         assertTrue(ofTheServer.endsWith(", version 3.0.0, in read-only mode"), ofTheServer)
     }
 
-    /** The first page of the UI leads to the page of the server, and a page answers a request with the method HEAD without a body. */
+    /** The first page of the UI leads to the overview of the services, and a page answers a request with the method HEAD without a body. */
     @Test
     fun theFirstPageLeadsOnAndAPageAnswersARequestWithTheMethodHead() {
         val browser = browserFor(fake())
@@ -98,7 +99,7 @@ class UiPagesTest {
         val page = browser.get("/system")
         val ofHead = browser.request("HEAD", "/system")
 
-        assertEquals(302 to "/system", first.status to first.header("location"))
+        assertEquals(302 to "/services", first.status to first.header("location"))
         assertEquals(200 to "", ofHead.status to ofHead.body)
         val ofTheBody = listOf("content-length", "content-type")
         assertEquals(ofTheBody.map(page::header), ofTheBody.map(ofHead::header))
@@ -110,8 +111,11 @@ class UiPagesTest {
         val api = fake()
         val browser = browserFor(api)
 
-        val answers = listOf("/nothing", "/system/more", "/assets", "/assets/", "/SYSTEM").map(browser::get)
+        val ofNoSection = listOf("/nothing", "/assets", "/assets/", "/SYSTEM", "/systems", "/services-of-old")
+        val answers = (ofNoSection + listOf("/system/more", "/diagnostics/1")).map(browser::get)
 
+        val marked = answers.map { answer -> answer.page.select("nav a[aria-current=page]").map { it.attr("href") } }
+        assertEquals(ofNoSection.map { emptyList<String>() } + listOf(listOf("/system"), listOf("/services")), marked)
         for (answer in answers) {
             assertEquals(404, answer.status)
             val said = answer.page.select("main p").text()
@@ -187,13 +191,18 @@ class UiPagesTest {
      * The scenario "No external requests", as far as a test without a browser shows it: everything that a
      * page refers to is a path of the UI, which the UI serves, and a page holds no script and no style of
      * its own, which could load something. Every answer tells the browser to load nothing from elsewhere.
+     *
+     * The pages are the ones that the links of the UI lead to, see [Crawl], with what a server holds in
+     * them, and a page that the UI does not have.
      */
     @Test
     fun everythingThatAPageRefersToIsAFileOfTheUiItself() {
-        val browser = browserFor(fake())
+        val browser = browserFor(fake().also { it.hold(diagnostics = listOf(Samples.diagnostic)) })
 
-        val pages = listOf("/system", "/nothing").map(browser::get)
+        val reached = Crawl.from(browser).pages.values
+        val pages = reached.filter { it.header("location") == null } + browser.get("/nothing")
 
+        assertTrue(pages.size > FEW_PAGES, "The pages of the UI are to be read: ${pages.size}")
         val files = mutableSetOf<String>()
         for (answer in pages) {
             val page = answer.page
@@ -263,6 +272,9 @@ class UiPagesTest {
         const val FAILING_FROM = 2
 
         const val SHOWN = 60
+
+        /** A number of pages that the links of the UI lead to at least. A UI without links is not to pass for one without a fault. */
+        const val FEW_PAGES = 4
 
         /** The attributes with which an element of a page refers to something that a browser loads, or sends a form to. */
         val REFERRING = listOf("href", "src", "srcset", "action", "formaction", "data", "poster", "background", "manifest", "ping", "cite")

@@ -31,18 +31,34 @@ import kotlinx.html.textInput
 
 /**
  * A form of the page of [view] that changes something. A browser sends it to [action], which is a path of
- * the UI, and with the files that were chosen in it when it is [withFiles].
+ * the UI, and with the files that were chosen in it when it is [withFiles]. The form has the classes
+ * [classes], which say how it looks.
  */
 internal fun FlowContent.postForm(
     view: View,
     action: String,
     withFiles: Boolean = false,
+    classes: String? = null,
     block: FORM.() -> Unit,
 ) {
-    form(action = action, method = FormMethod.post, encType = if (withFiles) FormEncType.multipartFormData else null) {
+    val encType = if (withFiles) FormEncType.multipartFormData else null
+    form(action = action, method = FormMethod.post, encType = encType, classes = classes) {
         hiddenInput(name = FormTokens.FIELD) { value = view.formToken }
         block()
     }
+}
+
+/**
+ * A form that asks for a page: a browser sends it to [action], which is a path of the UI, with the method
+ * GET. So what its fields hold is in the address of the page that it leads to, which shows the same
+ * wherever it is opened. The form changes nothing and holds no token.
+ */
+internal fun FlowContent.getForm(
+    action: String,
+    classes: String? = null,
+    block: FORM.() -> Unit,
+) {
+    form(action = action, method = FormMethod.get, classes = classes, block = block)
 }
 
 /** Says at the head of a form that the form was not taken, when [state] is that of such a form. */

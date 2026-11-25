@@ -133,7 +133,7 @@ internal class UiApplication(
             if (!admitted(call)) finish()
         }
         application.routing {
-            get("/") { call.respondRedirect("/system") }
+            get("/") { call.respondRedirect(ServicesPages.OVERVIEW) }
             get("${Assets.PREFIX}/{name}") { if (!Assets.respond(call, call.parameters["name"].orEmpty())) respond(call, notFound()) }
             get("$REPORTS/{id}") { showReport(call, call.parameters["id"].orEmpty()) }
             for (area in areas) area.install(this, this@UiApplication)
@@ -239,7 +239,8 @@ internal class UiApplication(
                 if (again == null || refused.problem.status !in ABOUT_THE_FORM) throw refused
                 return showAgain(call, again, FormState(form.values, refused.problem.errors, refused.problem.detail))
             } catch (invalid: InvalidInput) {
-                if (again == null) throw IllegalStateException("The form at ${call.request.path()} has no page to show it again.", invalid)
+                // A form without a page to show it again has nothing that a person entered, such as a switch of a page.
+                if (again == null) return respond(call, notTaken(invalid))
                 return showAgain(call, again, FormState(form.values, invalid.errors))
             }
         when (outcome) {
@@ -343,9 +344,16 @@ internal class UiApplication(
 
     private fun notFound(): Page = Page("Not there", HttpStatusCode.NotFound) { p { +"The UI has no page at this address." } }
 
+    /** The page for a form that holds what the UI itself does not take, which [invalid] says, and that no page shows again. */
+    private fun notTaken(invalid: InvalidInput): Page =
+        Page("The form was not taken", HttpStatusCode.UnprocessableEntity) {
+            invalid.errors.forEach { p(classes = "problem") { +it.message } }
+            p { +UNCHANGED }
+        }
+
     internal companion object {
         /** The areas of the UI. */
-        val AREAS: List<Area> = listOf(SystemArea)
+        val AREAS: List<Area> = listOf(ServicesArea, DiagnosticsArea, SystemArea)
 
         private val log = LoggerFactory.getLogger(UiApplication::class.java)
 

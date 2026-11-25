@@ -236,39 +236,10 @@ class StoredContentTest {
     }
 
     private companion object {
-        /** Content that a browser would read as more than text if a page wrote it as it is. */
-        val MARKUP =
-            listOf(
-                "<script>alert(1)</script>",
-                "<img src=x onerror=alert(1)>",
-                "\"><svg onload=alert(1)>",
-                "' onmouseover='alert(1)",
-                "\" onfocus=\"alert(1)\" autofocus=\"",
-                "</pre><script>alert(1)</script>",
-                "</textarea><script>alert(1)</script>",
-                "</title><script>alert(1)</script>",
-                "</option></select><script>alert(1)</script>",
-                "--><script>alert(1)</script><!--",
-                "&lt;b&gt; &amp;amp; &#x3C;i&#x3E; &quot;",
-                "<b>bold</b> & <i>italic</i>",
-                "]]><b>",
-                "{{7*7}} \${7*7} <%= 7*7 %>",
-            )
-
-        /** Content that would lead a link elsewhere if an address held it as it is. */
-        val ADDRESSES =
-            listOf(
-                "javascript:alert(1)",
-                "//evil.example/x",
-                "http://evil.example/x",
-                "../../system/reset",
-                "..",
-                "a/b?c=d#e",
-                "\\\\evil.example\\x",
-                "data:text/html,<script>alert(1)</script>",
-                " leading space",
-                "line\nbreak",
-            )
+        val MARKUP = Hostile.MARKUP
+        val ADDRESSES = Hostile.ADDRESSES
+        val UNWRITTEN = Hostile.UNWRITTEN
+        val SAFE_ADDRESS = Hostile.SAFE_ADDRESS
 
         /** The elements of the page of the test, and the ones that hold nothing of the content. */
         val ELEMENTS =
@@ -281,10 +252,6 @@ class StoredContentTest {
             setOf("lang", "charset", "name", "content", "rel", "href", "type", "class", "aria-label", "aria-current", "role", "id")
                 .plus(setOf("action", "method", "value", "for", "rows", "selected", "aria-describedby", "aria-invalid"))
 
-        /** What a document does not hold when every `<` and every `>` of the content is written as text. */
-        val UNWRITTEN = listOf("<script", "<img", "<svg", "<b>", "<i>", "<!--", "-->", "]]>")
-
-        val SAFE_ADDRESS = Regex("/[A-Za-z0-9._~%/-]*(\\?[A-Za-z0-9._~%=&-]*)?")
         val SAFE_ANCHOR = Regex("service-[A-Za-z0-9._~-]*")
 
         /** How a source uses what writes markup as it is given. */

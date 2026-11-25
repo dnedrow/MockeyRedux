@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.ui
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import org.jsoup.nodes.FormElement
 import java.io.ByteArrayOutputStream
 import java.net.Socket
@@ -131,8 +132,11 @@ internal class Browser(
         headers: Map<String, String> = emptyMap(),
     ): Response = request("GET", path, headers)
 
-    /** Asks for the page that [answer] sends the browser to, and returns the answer. */
-    fun follow(answer: Response): Response = get(answer.header("location")!!)
+    /**
+     * Asks for the page that [answer] sends the browser to, and returns the answer. What follows a `#` in
+     * the address is the place of the page that a browser shows, which it does not send.
+     */
+    fun follow(answer: Response): Response = get(answer.header("location")!!.substringBefore('#'))
 
     /** Sends [fields] to [path] as a form of fields, with the method POST, and returns the answer. */
     fun post(
@@ -147,14 +151,21 @@ internal class Browser(
      * ones that a person changed. A field with the value `null` is not sent, as a check box that is not
      * checked. A field of several lines is sent with a carriage return before every line feed. [files] are
      * the files that were chosen in the file fields.
+     *
+     * [pressed] is the button of the form that is pressed, which is its first one unless a test presses
+     * another. Of the buttons of a form, a browser sends the one that was pressed, when it has a name.
      */
     fun submit(
         form: FormElement,
         edits: Map<String, String?> = emptyMap(),
         files: Map<String, Chosen> = emptyMap(),
+        pressed: Element? = form.select(BUTTONS).firstOrNull(),
     ): Response {
         val areas = form.select("textarea").associate { it.attr("name") to it.wholeText() }
-        val ofThePage = form.formData().filter { it.key() !in files }.map { it.key() to (areas[it.key()] ?: it.value()) }
+        val data = form.formData().map { it.key() to it.value() }.toMutableList()
+        form.select(BUTTONS).forEach { data.remove(it.attr("name") to it.attr("value")) }
+        if (pressed != null && pressed.hasAttr("name")) data += pressed.attr("name") to pressed.attr("value")
+        val ofThePage = data.filter { (name, _) -> name !in files }.map { (name, value) -> name to (areas[name] ?: value) }
         val kept = ofThePage.filter { (name, _) -> name !in edits }
         val fields = (kept + edits.mapNotNull { (name, value) -> value?.let { name to it } }).map { (name, value) -> name to asSent(value) }
         val action = form.attr("action")
@@ -174,6 +185,9 @@ internal class Browser(
     private companion object {
         /** For how long a request over a socket waits for its answer. An answer that does not come fails the test. */
         const val RAW_TIMEOUT_MILLIS = 10_000
+
+        /** What finds the buttons that send the form that they are in. */
+        const val BUTTONS = "button:not([type=button]):not([type=reset]), input[type=submit]"
     }
 
     private fun parts(

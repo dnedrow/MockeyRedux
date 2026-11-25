@@ -127,7 +127,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 13.2 Implement the pages for an unreachable server, a rejected token, and an incompatible server. Verify with tests for each case and for recovery when the server returns.
 - [x] 13.3 Implement the form infrastructure: the anti-forgery token, redirect after success, result and report display, validation feedback with preserved input, and confirmation pages. Verify with tests, including a forged post and a reload after saving.
 - [x] 13.4 Implement text-only rendering of stored content across the page helpers. Verify with tests that render names, headers, and bodies containing markup and find them escaped.
-- [ ] 13.5 Implement the services overview with the tag filter in the address, diagnostics markers, the callable mock URL, and the mode and default-scenario switches. Verify with HTML tests for each element and action.
+- [x] 13.5 Implement the services overview with the tag filter in the address, diagnostics markers, the callable mock URL, and the mode and default-scenario switches. Verify with HTML tests for each element and action.
 - [ ] 13.6 Implement the service editor, including real URLs, rule set, inspector, schema, tags, duplicate, and delete. Verify with tests that submit each form and check the admin API calls.
 - [ ] 13.7 Implement the scenario editor, including status, headers, criterion, method, delay, tags, and the error designations. Verify with tests that submit each form and check the admin API calls.
 - [ ] 13.8 Implement the pages for plans, twist configurations, the tag filter, tags, and outbound proxy settings with the session reset. Verify with tests that submit each form and check the admin API calls.

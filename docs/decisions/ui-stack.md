@@ -148,7 +148,8 @@ the pages themselves.
   its clients do. A UI for more than one machine belongs behind a reverse proxy that asks who is there.
 - The settings of a proxy for the requests to the admin API. The JDK client goes by the system properties of
   the runtime, such as `http.proxyHost`, and by nothing of the UI.
-- A browser was not run. What a browser does with the headers above is what the standards say.
+- The tests run no browser. What a browser does with the headers above is what the standards say. Where a
+  page was looked at in a browser, [ui-pages.md](ui-pages.md) says so.
 
 ## Repeating the tests
 

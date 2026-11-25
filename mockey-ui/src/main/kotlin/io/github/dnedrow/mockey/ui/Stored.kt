@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.HeaderDto
+import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.server.application.ApplicationCall
 import kotlinx.html.FlowContent
 import kotlinx.html.FlowOrPhrasingContent
@@ -12,7 +13,11 @@ import kotlinx.html.tbody
 import kotlinx.html.td
 import kotlinx.html.th
 import kotlinx.html.thead
+import kotlinx.html.time
 import kotlinx.html.tr
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /*
  * How the pages show what a server holds and what it recorded: names, tags, URLs, headers, and bodies. All
@@ -44,6 +49,47 @@ internal fun FlowOrPhrasingContent.tagsOf(tags: List<String>) {
 internal fun FlowOrPhrasingContent.urlOf(url: String) {
     code(classes = "url") { +url }
 }
+
+/**
+ * Returns the URL at which a client calls the service with the mock URL pattern [mockUrl]: the URL of the
+ * mock endpoint of the server that states [system] of itself, and the pattern after it. A variable of the
+ * pattern stands in the URL as the pattern writes it.
+ *
+ * A server takes a pattern without the slash at its start, and so does the URL. A pattern that is the URL of
+ * a real service follows the mock endpoint whole, which is how a client calls such a service there.
+ */
+internal fun callableUrlOf(
+    system: SystemStatusDto,
+    mockUrl: String,
+): String = "${system.mockBaseUrl.trimEnd('/')}/service/${mockUrl.trim().removePrefix("/")}"
+
+/**
+ * Shows [instant], which is a time as the admin API states it, to the second and in UTC: a page is made
+ * without knowing where its reader is. The element holds the time as it was stated. A text that is no such
+ * time is shown as it is.
+ */
+internal fun FlowOrPhrasingContent.timeOf(instant: String) {
+    val read = runCatching { Instant.parse(instant) }.getOrNull()
+    if (read == null) {
+        +instant
+        return
+    }
+    time {
+        dateTime = instant
+        +TO_THE_SECOND.format(read)
+    }
+}
+
+private val TO_THE_SECOND = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'").withZone(ZoneOffset.UTC)
+
+/** The number of characters of a name that a sentence of the UI repeats. */
+private const val BRIEF = 80
+
+/**
+ * Returns [name] as a sentence of the UI repeats it, such as the notice of a form that was done: the name
+ * itself, or its start where it is long, so that the sentence stays one.
+ */
+internal fun briefly(name: String): String = if (name.length <= BRIEF) name else name.take(BRIEF - 1) + "\u2026"
 
 /**
  * Shows [headers] in their order, each with its name and its value. A header that is there more than once

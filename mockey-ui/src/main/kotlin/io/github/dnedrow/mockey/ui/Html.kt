@@ -36,11 +36,19 @@ internal class Page(
     val content: FlowContent.() -> Unit,
 )
 
-/** A section of the UI that the navigation of every page leads to: the [path] of its first page, and what the link says. */
+/**
+ * A section of the UI that the navigation of every page leads to: the [path] of its first page, and what the
+ * link says. The pages of the section are the ones whose paths begin as [path] does, and the ones whose
+ * paths begin with one of [others].
+ */
 internal class Section(
     val path: String,
     val label: String,
-)
+    private val others: Set<String> = emptySet(),
+) {
+    /** Returns whether the page at [path] is one of the section. */
+    fun holds(path: String): Boolean = "/${path.removePrefix("/").substringBefore('/')}".let { it == this.path || it in others }
+}
 
 /**
  * The frame of every page: the head, with the stylesheet and the icon of the UI, the navigation, and the
@@ -51,7 +59,11 @@ internal class Section(
  */
 internal object Html {
     /** The sections of the UI, in the order of the navigation. */
-    val sections: List<Section> = listOf(Section("/system", "Server"))
+    val sections: List<Section> =
+        listOf(
+            Section(ServicesPages.OVERVIEW, "Services", setOf(DiagnosticsPages.PATH)),
+            Section("/system", "Server"),
+        )
 
     /**
      * Returns [page] as an HTML document. [path] is the path at which the page is shown, by which the
@@ -140,10 +152,9 @@ internal object Html {
             attributes["aria-label"] = "Sections"
             ul {
                 for (section in sections) {
-                    val current = path == section.path || path.startsWith("${section.path}/")
                     li {
                         a(href = section.path) {
-                            if (current) attributes["aria-current"] = "page"
+                            if (section.holds(path)) attributes["aria-current"] = "page"
                             +section.label
                         }
                     }
