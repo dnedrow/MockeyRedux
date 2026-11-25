@@ -1,6 +1,7 @@
 # The forms of the web UI
 
-Decided in task 13.3 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in task 13.3 of the change `kotlin-rewrite-modular`, on 2026-11-25. The section "What a form asks the
+server for" was added before task 13.7.
 
 A form of the UI holds a token that only this UI makes, for the browser that the page of the form was loaded
 in. The UI answers under an IP address, under `localhost`, and under the names that it is started with, and
@@ -145,6 +146,31 @@ nothing.
   would change with every form that is sent with it.
 - A browser drops a line feed that follows the start of a field of several lines. The UI writes one there, so
   that a text that begins with an empty line keeps it.
+
+## What a form asks the server for
+
+A form that changes something shows what the server holds of it, and a request to the admin API changes only
+the attributes that it states. So a form can ask for all that it holds, or for what was changed in it.
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. The form states every attribute that it has a field for. | It is the least code, and the server holds what the form showed when it is done. | The form sets back what someone else changed since its page was made: a plan that a test applied, a switch of the overview in another window. A text of several lines is stored with other line ends than it had, because a browser sends every line with a carriage return. The body of a scenario would change when the scenario is renamed. |
+| 2. The form states the attributes whose fields hold something else than the server holds when the form is sent. | No attribute is set that is as the server has it. | The UI asks the server once more for every form. What someone else changed in between is still set back, because the field holds what the page showed, which is something else by then. |
+| 3. The form states the attributes whose fields hold something else than its page gave them. The page says what it gave each field. | The form changes what the person changed, and nothing else. It needs no request more. | The form has a hidden field for every field. |
+
+Way 3.
+
+- For each field, the form has a hidden field with a mark of the value that the page gave the field: 12 bytes
+  of the SHA-256 of the value. A mark is no secret and guards nothing. A copy of the value would say the same
+  and make a form with a long body twice as long.
+- The mark of a text is the same however its lines end. So a text that the server holds with carriage returns
+  is not changed by a browser that sends it back, and it is stored as it was as long as nobody edits it.
+- A form that is shown again, because the server did not take it, keeps the marks that it was sent with. They
+  still say what the first page gave the fields.
+- A form that has no marks states every attribute. The form of something new is such a form.
+- What the form checks itself, such as a delay that has to be a number, it checks for the fields that were
+  changed. A value that the server holds and that the form would not take does not keep the form from saving
+  something else.
 
 ## What this does not cover
 

@@ -63,6 +63,17 @@ internal fun FlowContent.getForm(
     form(action = action, method = FormMethod.get, classes = classes, block = block)
 }
 
+/**
+ * Says of the fields [names] of the form what the page gives them, which is what [state] holds, see [Shown].
+ * The UI then asks the server to set only what a person changed in those fields.
+ */
+internal fun FORM.shownOf(
+    state: FormState,
+    names: List<String>,
+) {
+    for (name in names) hiddenInput(name = Shown.PREFIX + name) { value = state.shownMark(name) }
+}
+
 /** Says at the head of a form that the form was not taken, when [state] is that of such a form. */
 internal fun FlowContent.rejectionOf(state: FormState) {
     if (!state.isRejected) return

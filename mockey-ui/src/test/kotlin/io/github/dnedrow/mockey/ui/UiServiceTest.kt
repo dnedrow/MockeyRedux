@@ -103,7 +103,8 @@ class UiServiceTest {
     /** Returns what the fields of [form] hold, by their names, as a browser sends them when nothing is entered. */
     private fun shown(form: FormElement): Map<String, List<String>> {
         val areas = form.select("textarea").associate { it.attr("name") to it.wholeText() }
-        val fields = form.formData().filter { it.key() != "_token" }.map { it.key() to (areas[it.key()] ?: it.value()) }
+        val entered = form.formData().filter { it.key() != "_token" && !it.key().startsWith(Shown.PREFIX) }
+        val fields = entered.map { it.key() to (areas[it.key()] ?: it.value()) }
         return fields.groupBy({ it.first }, { it.second })
     }
 
@@ -295,8 +296,8 @@ class UiServiceTest {
     // The form that changes a service
 
     /**
-     * The form of a service shows what the server holds of the service. Sent as it is shown, it states the
-     * attributes as the server holds them, and nothing that the form has no field for.
+     * The form of a service shows what the server holds of the service. Sent as it is shown, it asks the
+     * server to set nothing: it says of each field what its page gave it, and nothing was changed.
      */
     @Test
     fun theFormOfAServiceShowsWhatTheServerHoldsAndChangesNothingWhenItIsSentAsItIs() {
@@ -337,14 +338,18 @@ class UiServiceTest {
         assertEquals(listOf("Cancel" to "/service?id=svc-billing"), form.select(".actions a").map { it.text() to it.attr("href") })
         assertEquals(303 to "/service?id=svc-billing", sent.status to sent.header("location"))
         assertEquals("The service Billing was saved." to "Billing", shown.notice to shown.page.select("main h1").text())
-        assertEquals(listOf("PATCH services/svc-billing"), changing(api).map { it.first })
-        assertEquals(ATTRIBUTES + "defaultScenarioId" to ofBilling, stated(changing(api).single().second))
+        val hidden = form.select("input[type=hidden]").map { it.attr("name") }
+        assertEquals(listOf("_token") + ServiceForm.FIELDS.map { "_shown.$it" }, hidden)
+        assertEquals(listOf("PATCH services/svc-billing" to "{}"), changing(api))
         val requests = listOf("GET system", "GET services/svc-billing", "GET inspectors", "PATCH services/svc-billing")
         assertEquals(requests, api.requests.map { it.line }.take(requests.size))
         assertEquals(emptyList(), api.violations)
     }
 
-    /** What a user enters into the form of a service is what the server is asked to set, and the page of the service shows it. */
+    /**
+     * What a user changes in the form of a service is what the server is asked to set, and the page of the
+     * service shows it. The fields that are left as they are, here the mock URL and the schema, are not stated.
+     */
     @Test
     fun theFormOfAServiceSetsWhatIsEntered() {
         val api = holding()
@@ -370,7 +375,7 @@ class UiServiceTest {
         val shown = browser.follow(sent)
 
         val expected =
-            ofBilling.copy(
+            ServiceAttributesDto(
                 name = "Invoices",
                 description = null,
                 tags = emptyList(),
@@ -385,7 +390,7 @@ class UiServiceTest {
                 responseSchemaEnabled = true,
             )
         assertEquals(303, sent.status)
-        assertEquals(ATTRIBUTES + "defaultScenarioId" to expected, stated(changing(api).single().second))
+        assertEquals(ATTRIBUTES + "defaultScenarioId" - "mockUrl" - "responseSchema" to expected, stated(changing(api).single().second))
         assertEquals("The service Invoices was saved." to "Invoices", shown.notice to shown.page.select("main h1").text())
         assertEquals("http://qa2.example.com/billing http://qa3.example.com/billing (default)", described(shown.page)["Real URLs"])
         assertEquals(emptyList(), api.violations)
@@ -432,8 +437,63 @@ class UiServiceTest {
         assertEquals(listOf("" to "none", "sc-due" to "due", "sc-paid" to "paid"), scenariosOffered)
         assertEquals(listOf("Of old") to listOf(""), shown(form).let { it.getValue("inspector") to it.getValue("defaultScenario") })
         assertEquals(303, sent.status)
-        val expected = ofBilling.copy(defaultScenarioId = null, inspectorName = "Of old")
-        assertEquals(ATTRIBUTES to expected, stated(changing(api).single().second))
+        assertEquals(listOf("PATCH services/svc-billing" to "{}"), changing(api))
+    }
+
+    /**
+     * The form states what was changed in it and nothing else, so that it leaves alone what someone else
+     * changed since its page was made. The ends of the lines of a text are no change: a browser sends each
+     * with a carriage return, whatever the page gave it.
+     */
+    @Test
+    fun theFormOfAServiceStatesWhatWasChangedAndLeavesTheRestAsTheServerHoldsIt() {
+        val held = billing.copy(description = "One line.\r\nAnother line.\rAnd a third.", delayMillis = -5)
+        val api = holding(listOf(held, Samples.orders))
+        val browser = browserFor(api)
+        val form = browser.get("/service/edit?id=svc-billing").form()
+        val other = Browser(uis.single())
+        val overview = other.get("/services").page
+        val ofOverview = overview.select("#service-svc-billing td.mode form").single() as FormElement
+
+        val switched = other.submit(ofOverview, pressed = ofOverview.select("button[value=static]").single())
+        val answers =
+            listOf(
+                browser.submit(form, mapOf("name" to "Invoices")),
+                browser.submit(form, mapOf("defaultRealUrl" to "0")),
+                browser.submit(form, mapOf("schemaEnabled" to "on")),
+                browser.submit(form, mapOf("rulesEnabled" to null, "tags" to "nightly team-b ")),
+                browser.submit(form, mapOf("description" to "One line.\nAnother line.\nAnd a third.")),
+            )
+
+        assertEquals(listOf(303) + answers.map { 303 }, (listOf(switched) + answers).map { it.status })
+        val asked =
+            listOf(
+                """{"responseMode":"static"}""",
+                """{"name":"Invoices"}""",
+                """{"realUrls":["http://qa1.example.com/billing","http://qa2.example.com/billing"],"defaultRealUrlIndex":0}""",
+                """{"responseSchemaEnabled":true}""",
+                """{"tags":["nightly","team-b"],"requestRulesEnabled":false}""",
+                "{}",
+            )
+        assertEquals(asked, changing(api).map { it.second })
+        val now = browser.get("/service?id=svc-billing").page
+        assertEquals("Static" to "-5 ms", described(now).let { it["Response mode"] to it["Delay"] })
+        assertEquals(emptyList(), api.violations)
+    }
+
+    /** A form that does not say what its page gave its fields states every attribute, as the form of a new service does. */
+    @Test
+    fun aFormThatDoesNotSayWhatItWasShownWithStatesEveryAttribute() {
+        val api = holding()
+        val browser = browserFor(api)
+        val form = browser.get("/service/edit?id=svc-billing").form()
+        val token = form.select("[name=_token]").attr("value")
+
+        val sent = browser.post("/service/edit?id=svc-billing", listOf("_token" to token, "name" to "Bare", "mode" to "static"))
+
+        assertEquals(303, sent.status)
+        val bare = ServiceAttributesDto(name = "Bare", responseMode = ResponseModeDto.STATIC)
+        assertEquals(ATTRIBUTES to bare, stated(changing(api).single().second))
     }
 
     // A form that is not taken
@@ -478,6 +538,7 @@ class UiServiceTest {
         val answer = browser.submit(form, entered, rows = mapOf("realUrl" to urls))
 
         val again = answer.form()
+        val marks = { ofForm: FormElement -> ofForm.select("input[name^=_shown.]").map { it.attr("name") to it.attr("value") } }
         val kept = entered.filterValues { it != null }.mapValues { listOf(it.value!!) } + ("realUrl" to urls)
         assertEquals(422 to "Edit the service Billing", answer.status to answer.page.select("main h1").text())
         assertEquals(kept, shown(again))
@@ -497,6 +558,7 @@ class UiServiceTest {
         assertEquals("true" to "f-mockUrl-hint f-mockUrl-problem", ofMockUrl.attr("aria-invalid") to ofMockUrl.attr("aria-describedby"))
         assertEquals("f-realUrl-hint f-realUrl-problem", again.select("fieldset").attr("aria-describedby"))
         assertEquals(listOf("PATCH services/svc-billing"), changing(api).map { it.first })
+        assertEquals(marks(form) to ServiceForm.FIELDS.size, marks(again) to marks(again).size)
     }
 
     /** A delay that is no number of milliseconds, and a mode that is none, are not sent to the server: the form is shown again. */

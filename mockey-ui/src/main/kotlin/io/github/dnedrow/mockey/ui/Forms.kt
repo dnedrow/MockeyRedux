@@ -15,12 +15,44 @@ import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.readByteArray
 import java.net.URLDecoder
+import java.security.MessageDigest
 
 /** What separates the tags of a text, as a server reads tags: whitespace of any kind. */
 private val BETWEEN_TAGS = Regex("""[\s\p{Z}]+""")
 
 /** Returns the tags that [text] holds, each as it is written. Tags have whitespace between them. */
 internal fun tagsIn(text: String): List<String> = text.split(BETWEEN_TAGS).filter { it.isNotEmpty() }
+
+/**
+ * What a form says of the values that its page gave its fields, so that the UI finds what a person changed
+ * and asks the server to set that, and nothing else. A form that changes a few attributes of something leaves
+ * the others as the server holds them, also where they were changed since the page was made.
+ *
+ * For each field that it says it of, the form has a hidden field with a mark of the value: the name of the
+ * field after [PREFIX]. A browser sends the mark back as it is, beside what the field holds then. A form that
+ * is shown again keeps the marks that it was sent with, so that they say what the first page gave its fields.
+ *
+ * The mark of a text is the same however its lines end. A browser sends every line of a field with a carriage
+ * return and a line feed, whatever the page gave the field, so the ends of the lines say nothing of a change.
+ */
+internal object Shown {
+    /** What the name of a hidden field begins with that holds the mark of a field. */
+    const val PREFIX = "_shown."
+
+    private const val MARK_BYTES = 12
+
+    /** Returns the mark of [values], which are the values of the fields with one name, in the order of the form. */
+    fun markOf(values: List<String>): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        for (value in values) {
+            val bytes = value.replace("\r\n", "\n").replace('\r', '\n').toByteArray(Charsets.UTF_8)
+            // The length keeps two values apart from one value that is made of both.
+            digest.update("${bytes.size}:".toByteArray(Charsets.UTF_8))
+            digest.update(bytes)
+        }
+        return ProcessKey.encoded(digest.digest().copyOf(MARK_BYTES))
+    }
+}
 
 /** What a page needs of the request that it answers: the token for its forms, see [FormTokens]. */
 internal class View(
@@ -58,6 +90,12 @@ internal class FormInput(
 
     /** Returns the values of the fields with the name [name], in the order of the form, such as the rows of a list. */
     fun all(name: String): List<String> = values[name].orEmpty()
+
+    /**
+     * Returns whether one of the fields [names] holds something else than the page of the form gave it, see
+     * [Shown]. A field of which the form does not say what it was given counts as changed.
+     */
+    fun isChanged(vararg names: String): Boolean = names.any { text(Shown.PREFIX + it) != Shown.markOf(all(it)) }
 
     /** Returns the file that came in the field [name], or `null` when no file was chosen for it. */
     fun upload(name: String): Upload? = uploads[name]
@@ -107,6 +145,13 @@ internal class FormState(
 
     /** Returns the values of the fields with the name [name], in their order, such as the rows of a list. */
     fun all(name: String): List<String> = values[name].orEmpty()
+
+    /**
+     * Returns the mark of what the page of the form first gave the fields with the name [name], see [Shown].
+     * A form that is shown for the first time gives them what this state holds, and a form that is shown
+     * again says what it was sent with.
+     */
+    fun shownMark(name: String): String = values[Shown.PREFIX + name]?.firstOrNull() ?: Shown.markOf(all(name))
 
     /**
      * Returns the messages for the field that shows [apiField] of a request to the admin API, and for what

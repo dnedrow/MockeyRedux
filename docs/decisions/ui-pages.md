@@ -143,19 +143,20 @@ long.
 ### The form
 
 - The form has a field for every attribute of a service but the error scenario, which task 13.7 adds with the
-  scenarios. It states each of these attributes in its request, so the server sets every one to what the form
-  holds, and a form that is sent as it is shown changes nothing.
+  scenarios. The form of a new service states each of these attributes in its request. The form of a service
+  that is there states the ones that were changed in it, see [ui-forms.md](ui-forms.md), so a form that is
+  sent as it is shown asks for nothing.
 - A real URL has a row of its own, with a button that makes it the default one. The form has two rows more
   than the service has real URLs, for the URLs that are entered, and a row without a URL is left out. Without
   scripting, a form cannot grow, so a service that needs more rows is saved and edited again. The default
   real URL is the row that is marked, by its place among the rows that have a URL.
 - A text field of several lines would take less code and would take a list that is pasted. It has no place
   for the choice of the default one, which is what changes most often.
-- The delay is checked by the UI: a whole number of milliseconds, 0 or more. The server takes a negative
-  delay and waits as for 0.
+- The delay is checked by the UI where it was changed: a whole number of milliseconds, 0 or more. The server
+  takes a negative delay and waits as for 0.
 - The default scenario and the inspector are choices. What the service names that is not among them stays a
   choice: an inspector that is not installed is offered with a note, and a default scenario that is none of
-  the scenarios leaves the choice at `none`, which is not stated in the request.
+  the scenarios leaves the choice at `none`, which is never stated in a request.
 - The form of a new service says that a service with a real URL can do without a name. That holds for a new
   service only: the server derives a name when it creates a service, and not when it changes one.
 

@@ -294,6 +294,7 @@ internal object ServicePages {
     ) {
         val scenarios = service?.scenarios.orEmpty()
         postForm(view, action) {
+            if (service != null) shownOf(state, ServiceForm.FIELDS)
             rejectionOf(state)
             textField(state, ServiceForm.NAME, "Name", hint = if (service == null) "$NAME_HINT $NAME_OF_NEW_HINT" else NAME_HINT)
             val callable = "$CALLABLE_HINT ${callableUrlOf(system, "")} and goes on as the pattern says."
@@ -412,8 +413,9 @@ internal object ServicePages {
 
 /**
  * The form of a service: the names of its fields, what it shows of a service, and what it asks the admin API
- * for. The form states every attribute of a service that it has a field for, so the server sets each to
- * what the form holds.
+ * for. The form of a new service states every attribute that it has a field for. The form of a service that
+ * is there states what was changed in it, so that it leaves alone what someone else changed since its page
+ * was made.
  */
 internal object ServiceForm {
     const val NAME = "name"
@@ -434,6 +436,11 @@ internal object ServiceForm {
     const val INSPECTOR = "inspector"
     const val SCHEMA = "schema"
     const val SCHEMA_ENABLED = "schemaEnabled"
+
+    /** The fields of the form, of which the form of a service says what its page gave them, see [Shown]. */
+    val FIELDS =
+        listOf(NAME, MOCK_URL, DESCRIPTION, TAGS, MODE, DEFAULT_SCENARIO, DELAY, REAL_URL, DEFAULT_REAL_URL)
+            .plus(listOf(RULES, RULES_ENABLED, INSPECTOR, SCHEMA, SCHEMA_ENABLED))
 
     /** The rows without a URL that the form has after the real URLs of a service, for the URLs that are entered. */
     private const val FREE_ROWS = 2
@@ -471,35 +478,41 @@ internal object ServiceForm {
     }
 
     /**
-     * Returns the attributes of a service as the admin API reads them, from what the form holds.
+     * Returns the attributes of a service that the admin API is asked to set, from what the form holds: the
+     * attributes whose fields were changed, see [Shown], so that the server leaves the others as it holds
+     * them. The form of a new service says of no field what its page gave it, so it states every attribute
+     * that it has a field for.
      *
-     * @throws InvalidInput when the form names no response mode or no delay.
+     * @throws InvalidInput when the form states a response mode that is none, or a delay that is none.
      */
     fun attributesOf(input: FormInput): JsonObject {
         val mode = Modes.named(input.text(MODE))
         val entered = input.text(DELAY).trim()
         val delay = entered.ifEmpty { "0" }.toLongOrNull()?.takeIf { it >= 0 }
-        if (mode == null || delay == null) {
-            val ofMode = FieldErrorDto("responseMode", NO_MODE).takeIf { mode == null }
-            throw InvalidInput(listOfNotNull(ofMode, FieldErrorDto("delayMillis", NO_DELAY).takeIf { delay == null }))
-        }
+        val noMode = FieldErrorDto("responseMode", NO_MODE).takeIf { mode == null && input.isChanged(MODE) }
+        val noDelay = FieldErrorDto("delayMillis", NO_DELAY).takeIf { delay == null && input.isChanged(DELAY) }
+        if (noMode != null || noDelay != null) throw InvalidInput(listOfNotNull(noMode, noDelay))
         val rows = input.all(REAL_URL)
-        val stated = rows.indices.filter { rows[it].isNotBlank() }
+        val urls = rows.indices.filter { rows[it].isNotBlank() }
+        val scenario = input.text(DEFAULT_SCENARIO)
         return buildJsonObject {
-            put("name", input.text(NAME))
-            put("mockUrl", input.text(MOCK_URL))
-            put("description", input.lines(DESCRIPTION).takeIf { it.isNotBlank() })
-            put("tags", JsonArray(tagsIn(input.text(TAGS)).map(::JsonPrimitive)))
-            put("responseMode", Modes.nameOf(mode))
-            if (input.text(DEFAULT_SCENARIO).isNotEmpty()) put("defaultScenarioId", input.text(DEFAULT_SCENARIO))
-            put("delayMillis", delay)
-            put("realUrls", JsonArray(stated.map { JsonPrimitive(rows[it].trim()) }))
-            put("defaultRealUrlIndex", stated.indexOf(input.text(DEFAULT_REAL_URL).toIntOrNull()).coerceAtLeast(0))
-            put("requestRules", input.lines(RULES).takeIf { it.isNotBlank() })
-            put("requestRulesEnabled", input.isChecked(RULES_ENABLED))
-            put("inspectorName", input.text(INSPECTOR).takeIf { it.isNotEmpty() })
-            put("responseSchema", input.lines(SCHEMA).takeIf { it.isNotBlank() })
-            put("responseSchemaEnabled", input.isChecked(SCHEMA_ENABLED))
+            if (input.isChanged(NAME)) put("name", input.text(NAME))
+            if (input.isChanged(MOCK_URL)) put("mockUrl", input.text(MOCK_URL))
+            if (input.isChanged(DESCRIPTION)) put("description", input.lines(DESCRIPTION).takeIf { it.isNotBlank() })
+            if (input.isChanged(TAGS)) put("tags", JsonArray(tagsIn(input.text(TAGS)).map(::JsonPrimitive)))
+            if (mode != null && input.isChanged(MODE)) put("responseMode", Modes.nameOf(mode))
+            if (scenario.isNotEmpty() && input.isChanged(DEFAULT_SCENARIO)) put("defaultScenarioId", scenario)
+            if (delay != null && input.isChanged(DELAY)) put("delayMillis", delay)
+            // The default real URL is a place in the list, so the two are stated together.
+            if (input.isChanged(REAL_URL, DEFAULT_REAL_URL)) {
+                put("realUrls", JsonArray(urls.map { JsonPrimitive(rows[it].trim()) }))
+                put("defaultRealUrlIndex", urls.indexOf(input.text(DEFAULT_REAL_URL).toIntOrNull()).coerceAtLeast(0))
+            }
+            if (input.isChanged(RULES)) put("requestRules", input.lines(RULES).takeIf { it.isNotBlank() })
+            if (input.isChanged(RULES_ENABLED)) put("requestRulesEnabled", input.isChecked(RULES_ENABLED))
+            if (input.isChanged(INSPECTOR)) put("inspectorName", input.text(INSPECTOR).takeIf { it.isNotEmpty() })
+            if (input.isChanged(SCHEMA)) put("responseSchema", input.lines(SCHEMA).takeIf { it.isNotBlank() })
+            if (input.isChanged(SCHEMA_ENABLED)) put("responseSchemaEnabled", input.isChecked(SCHEMA_ENABLED))
         }
     }
 }
