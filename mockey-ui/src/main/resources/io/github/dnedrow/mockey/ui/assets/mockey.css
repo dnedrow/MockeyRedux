@@ -234,3 +234,16 @@ button.danger {
 .actions {
   margin: 1rem 0;
 }
+
+.tag {
+  padding: 0.05rem 0.45rem;
+  font-size: 0.875rem;
+  background: var(--band);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+}
+
+pre.body {
+  max-height: 32rem;
+  overflow: auto;
+}

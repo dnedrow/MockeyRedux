@@ -28,9 +28,9 @@ internal object SystemPages {
                 dt { +"Mode" }
                 dd { +(if (system.readOnly) READ_ONLY else WRITABLE) }
                 dt { +"Mock endpoint" }
-                dd { code { +"${system.mockBaseUrl}/service/" } }
+                dd { urlOf("${system.mockBaseUrl}/service/") }
                 dt { +"Tag filter" }
-                dd { +(system.tagFilter.joinToString(" ").ifEmpty { NONE }) }
+                dd { if (system.tagFilter.isEmpty()) +NONE else tagsOf(system.tagFilter) }
                 dt { +"Enabled twist configuration" }
                 dd { +(system.enabledTwist?.name ?: NONE) }
             }

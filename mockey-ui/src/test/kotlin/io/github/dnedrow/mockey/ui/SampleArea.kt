@@ -20,6 +20,9 @@ import kotlinx.serialization.json.put
  */
 internal object SampleArea : Area {
     const val NEW = "/sample/services/new"
+    const val SERVICE = "/sample/service"
+    const val DELETE = "/sample/service/delete"
+    const val APPLY = "/sample/plan/apply"
 
     override fun install(
         routing: Route,
@@ -30,22 +33,22 @@ internal object SampleArea : Area {
             post("/sample/services") {
                 ui.submit(call, again = { view, _, state -> form(view, state) }) { input ->
                     val created = ui.client.createService(attributesOf(input))
-                    Outcome.Done("/sample/services/${created.id}", "The service ${created.name} was created.")
+                    Outcome.Done(Address.of(SERVICE, "id" to created.id), "The service ${created.name} was created.")
                 }
             }
-            get("/sample/services/{id}") {
-                val id = call.parameters["id"].orEmpty()
+            get(SERVICE) {
+                val id = call.partOfAddress("id")
                 ui.show(call) { _, _ ->
                     val service = ui.client.getService(id)
-                    Page(service.name) { a(href = "/sample/services/$id/delete") { +"Delete" } }
+                    Page(service.name) { a(href = Address.of(DELETE, "id" to id)) { +"Delete" } }
                 }
             }
-            getAndPost("/sample/services/{id}/delete") {
-                val id = call.parameters["id"].orEmpty()
+            getAndPost(DELETE) {
+                val id = call.partOfAddress("id")
                 val ask: suspend (View, Any) -> Page = { view, _ ->
                     val service = ui.client.getService(id)
                     val gone = listOf("The service has ${service.scenarios.size} scenarios, which are deleted with it.")
-                    val action = "/sample/services/$id/delete"
+                    val action = Address.of(DELETE, "id" to id)
                     Confirmation.page(view, "Delete the service ${service.name}?", gone, "Delete the service", action, NEW)
                 }
                 ui.confirm(call, ask) {
@@ -54,8 +57,8 @@ internal object SampleArea : Area {
                 }
             }
             get("/sample/plans") { ui.show(call) { view, _ -> actions(view, FormState.EMPTY) } }
-            post("/sample/plans/{id}/apply") {
-                val id = call.parameters["id"].orEmpty()
+            post(APPLY) {
+                val id = call.partOfAddress("id")
                 ui.submit(call) {
                     val report = ui.client.applyPlan(id)
                     Outcome.Report(reportOf(report), report.skippedItems.size + report.unresolvedScenarios.size)
@@ -114,7 +117,7 @@ internal object SampleArea : Area {
         state: FormState,
     ): Page =
         Page("Plans") {
-            postForm(view, "/sample/plans/plan-night/apply") { submit("Apply the plan Night") }
+            postForm(view, Address.of(APPLY, "id" to "plan-night")) { submit("Apply the plan Night") }
             postForm(view, "/sample/import", withFiles = true) {
                 rejectionOf(state)
                 textField(state, "tags", "Tags")

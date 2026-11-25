@@ -91,7 +91,16 @@ refuses every other token when it starts, and says why.
 
 - A page is written with the builders of kotlinx.html, as design decision 12 says. The builders write every
   text and every value of an attribute so that a browser reads it as text. The UI does not use `unsafe`,
-  which is the one builder that writes markup as it is given.
+  which is the one builder that writes markup as it is given, and a test reads the sources of the UI for it.
+- What a server holds is shown through a few helpers: a tag, a URL, the headers, and a body. A URL that a
+  server holds is text and no link, so a URL that begins with `javascript:` runs nothing.
+- The path of an address says which kind of page it is, in words of the UI, such as `/service`. What the page
+  is about is a parameter of the query string, such as `?id=`, beside what the page filters by. An identifier
+  is any text that is not blank, because a server reads it from its definitions:
+  - As a segment of a path, an identifier of dots would lead a browser to another page. A browser takes such
+    a segment for the directory above, however it is written.
+  - A proxy in front of the UI may take a slash that is written as `%2F` for one of the path, or refuse it.
+  - A parameter holds every text as it is.
 - Every page begins with what the server states of itself, which the UI asks for with `GET system` before it
   asks for anything else. That is the one place at which the UI finds that a server cannot be reached, does
   not take the token, or is no server that the UI can manage. It costs one request more for every page, on

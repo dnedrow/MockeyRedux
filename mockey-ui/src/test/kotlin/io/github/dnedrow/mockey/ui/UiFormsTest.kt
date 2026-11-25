@@ -75,7 +75,7 @@ class UiFormsTest {
         val shown = browser.follow(sent)
         val again = browser.follow(sent)
 
-        assertEquals(Triple(303, "/sample/services/svc-customers", ""), Triple(sent.status, sent.header("location"), sent.body))
+        assertEquals(Triple(303, "/sample/service?id=svc-customers", ""), Triple(sent.status, sent.header("location"), sent.body))
         assertEquals(200 to "The service Customers was created.", shown.status to shown.notice)
         assertEquals("status", shown.page.select("main .notice").attr("role"))
         assertEquals(200 to null, again.status to again.notice)
@@ -128,7 +128,7 @@ class UiFormsTest {
         val before = api.requests.size
         val fields = entered.map { (name, text) -> name to text }
         val made = "A".repeat(VALUE_LENGTH)
-        val delete = "/sample/services/svc-customers/delete"
+        val delete = "/sample/service/delete?id=svc-customers"
 
         val forged =
             listOf(
@@ -191,7 +191,7 @@ class UiFormsTest {
         val token = tokenOf(browser.get(SampleArea.NEW))
         val before = api.requests.size
 
-        val others = listOf("PUT", "DELETE", "PATCH", "OPTIONS").map { browser.request(it, "/sample/services/svc-customers") }
+        val others = listOf("PUT", "DELETE", "PATCH", "OPTIONS").map { browser.request(it, "/sample/service?id=svc-customers") }
         val nowhere = browser.post("/system", listOf("_token" to token))
 
         for (answer in others) {
@@ -331,9 +331,9 @@ class UiFormsTest {
     fun whatDeletesIsAskedAboutAndDoneOnlyForTheFormOfThePageThatAsks() {
         val api = fake()
         val browser = Browser(uiFor(api))
-        val path = "/sample/services/svc-customers/delete"
+        val path = "/sample/service/delete?id=svc-customers"
 
-        val service = browser.get("/sample/services/svc-customers")
+        val service = browser.get("/sample/service?id=svc-customers")
         val link = service.page.select("main a").attr("href")
         val asked = browser.get(link)
         val notAsked = browser.post(path, listOf("_token" to tokenOf(asked)))
@@ -371,7 +371,7 @@ class UiFormsTest {
         val ui = uiFor(api)
         val browser = Browser(ui)
 
-        val sent = browser.submit(browser.get("/sample/plans").form("main form[action$=apply]"))
+        val sent = browser.submit(browser.get("/sample/plans").form("main form[action*=apply]"))
         val address = sent.header("location")!!
         val shown = listOf(browser.follow(sent), browser.follow(sent), Browser(ui).get(address))
         val unknown = browser.get("/reports/${"A".repeat(VALUE_LENGTH)}")
@@ -393,7 +393,7 @@ class UiFormsTest {
         val api = fake()
         api.on("POST", "plans/plan-night/apply") { json(Samples.applyReport) }
         val browser = Browser(uiFor(api))
-        val sent = browser.submit(browser.get("/sample/plans").form("main form[action$=apply]"))
+        val sent = browser.submit(browser.get("/sample/plans").form("main form[action*=apply]"))
         api.close()
 
         val answer = browser.follow(sent)
@@ -526,7 +526,7 @@ class UiFormsTest {
         api.on("POST", "plans/plan-night/apply") { problem(422, "The request is not valid.", noSuchPlan) }
         val browser = Browser(uiFor(api, answerTimeout = Duration.ofMillis(SHORT)))
         val service = browser.get(SampleArea.NEW).form()
-        val plan = browser.get("/sample/plans").form("main form[action$=apply]")
+        val plan = browser.get("/sample/plans").form("main form[action*=apply]")
 
         val refused = browser.submit(plan)
         api.on("POST", "services") { problem(500, "The server could not write its definitions location.") }

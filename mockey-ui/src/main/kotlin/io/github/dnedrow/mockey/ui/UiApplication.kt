@@ -327,6 +327,7 @@ internal class UiApplication(
     ): Page {
         if (cause is ApiFailure) return failures.of(cause, canBeRepeated = call.request.httpMethod == HttpMethod.Get)
         if (cause is BadRequestException) return unreadable()
+        if (cause is NoSuchPage) return notFound()
         // The path is logged as the request wrote it, with its escapes, so it adds no line to the log.
         log.error("The UI failed to answer the request for {}.", call.request.path(), cause)
         return Page("The UI failed", HttpStatusCode.InternalServerError) {

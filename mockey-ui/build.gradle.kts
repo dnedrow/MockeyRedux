@@ -40,4 +40,7 @@ tasks.processResources {
 tasks.test {
     // What the version resource has to hold.
     systemProperty("mockey.version", project.version.toString())
+
+    // A test reads the sources of the UI for what writes markup as it is given.
+    inputs.dir("src/main/kotlin").withPropertyName("mainSources").withPathSensitivity(PathSensitivity.RELATIVE)
 }
