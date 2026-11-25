@@ -23,6 +23,7 @@ Mockey Redux is a Kotlin rewrite of Mockey, organized as six Gradle modules:
 - Use JUnit 5 and `kotlin.test` for tests.
 - Run ktlint through the existing Gradle convention.
 - Prefer small, focused changes and preserve the module dependency boundaries.
+- All documentation, including Kdocs, Markdown files, etc., should be written with a conversational tone, proper grammar, and correct spelling. Avoid using the first person in documentation. Documentation should be targeted at mid-level developers.
 
 ## Validation
 
