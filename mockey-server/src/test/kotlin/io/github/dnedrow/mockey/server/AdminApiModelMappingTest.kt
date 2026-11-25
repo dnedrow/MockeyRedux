@@ -5,7 +5,7 @@ import io.github.dnedrow.mockey.api.DefinitionSettingsDto
 import io.github.dnedrow.mockey.api.HeaderDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
 import io.github.dnedrow.mockey.api.NameValueDto
-import io.github.dnedrow.mockey.api.OutboundProxyUpdateDto
+import io.github.dnedrow.mockey.api.OutboundProxyAttributesDto
 import io.github.dnedrow.mockey.api.RecordedBodyDto
 import io.github.dnedrow.mockey.api.RecordedRequestDto
 import io.github.dnedrow.mockey.api.RecordedResponseDto
@@ -88,7 +88,8 @@ class AdminApiModelMappingTest {
         assertEquals(true, dto.passwordSet)
         assertContains(json, "proxy-user")
         assertFalse(json.contains("secret-password"))
-        assertEquals(proxy, OutboundProxyUpdateDto("http://proxy.example", true, "proxy-user", "secret-password").toModel())
+        assertEquals(proxy, OutboundProxyAttributesDto("http://proxy.example", true, "proxy-user", "secret-password").toModel())
+        assertEquals(OutboundProxyAttributesDto("http://proxy.example", true, "proxy-user", "secret-password"), proxy.attributes())
     }
 
     @Test

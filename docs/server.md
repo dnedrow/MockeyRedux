@@ -9,8 +9,8 @@ serves the admin API, which states what the server holds and is to change what t
 
 This document describes the server as it is now. The admin API is under way, and the web UI is not part of
 the server yet. The API states and changes the services with their scenarios, the plans, the twist
-configurations, the tag filter, and the tags. It states the history and the status of the server, and it
-changes nothing else yet.
+configurations, the tag filter, the tags, and the outbound proxy, and it empties the upstream session. It
+states the history, the inspectors, and the status of the server, and it changes nothing else yet.
 
 ## Running the server
 
@@ -154,6 +154,9 @@ In this version the admin API has these operations:
 | `GET`, `PUT`, `DELETE /tag-filter` | Reads, sets, and clears the tag filter. |
 | `GET /tags` | Lists the tags that services, scenarios, and plans carry. |
 | `DELETE /tags/{tag}` | Removes a tag from every service, scenario, and plan. |
+| `GET`, `PATCH /upstream-proxy` | Reads and sets the outbound proxy: its URL, whether it is enabled, and its credentials. No answer holds the password. |
+| `DELETE /system/upstream-session` | Empties the upstream session, which holds the cookies that real services have set. |
+| `GET /inspectors` | Lists the installed inspectors, each with its name and whether it is global. |
 | `GET /history`, `GET /system` | State the history and the status of the server. |
 
 Bodies are JSON in UTF-8. A request that creates or updates something states attributes in a JSON object:
@@ -212,6 +215,18 @@ neither matched nor forwarded.
 To a request that it forwards to a URL with the port of its own admin listener, the server adds the header
 `Mockey-Forwarded: true`. By that header the admin listener knows the request and refuses it, see "The admin
 listener through the mock listener".
+
+A network that lets programs out only through a proxy needs the server to forward through that proxy. The
+admin API sets this outbound proxy, at `/api/v1/upstream-proxy`: its URL, which starts with `http://` and
+names a host and a port, whether it is enabled, and a user name with a password when the proxy asks for
+them. While the proxy is enabled, the server sends every request that it forwards through it, to `http` and
+to `https` targets. The URL and whether the proxy is enabled belong to the definitions, and in writable mode
+they are stored with them. The user name and the password are held in memory only, so they have to be set
+again when the server has started anew. No answer of the admin API holds the password, and the log does not
+either: an answer says whether there is one.
+
+The server keeps the cookies that real services set in one session, and it sends them with every forwarded
+request that they apply to. A `DELETE` request for `/api/v1/system/upstream-session` empties that session.
 
 The server adds five headers to every response of the mock endpoint, unless the scenario or the real service
 sets a header of the same name: `Access-Control-Allow-Origin: *`, three headers that keep the response out of

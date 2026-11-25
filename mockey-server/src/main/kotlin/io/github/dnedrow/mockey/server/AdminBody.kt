@@ -4,6 +4,7 @@ import io.github.dnedrow.mockey.api.AdminApiJson
 import io.github.dnedrow.mockey.api.FieldErrorDto
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -27,7 +28,7 @@ import kotlinx.serialization.json.jsonObject
 internal suspend fun <T> AdminRequest.body(serializer: KSerializer<T>): T {
     val stated = jsonObject()
     WireType.requireValid(stated, serializer.descriptor, complete = true)
-    return AdminApiJson.instance.decodeFromJsonElement(serializer, stated)
+    return WireType.read(serializer, stated)
 }
 
 /**
@@ -59,8 +60,8 @@ internal class StatedAttributes<T>(
      * a list is the stated list, and not the list of [current] with something added.
      */
     fun on(current: T): T {
-        val json = AdminApiJson.instance
-        return json.decodeFromJsonElement(serializer, JsonObject(json.encodeToJsonElement(serializer, current).jsonObject + stated))
+        val held = AdminApiJson.instance.encodeToJsonElement(serializer, current).jsonObject
+        return WireType.read(serializer, JsonObject(held + stated))
     }
 }
 
@@ -82,6 +83,24 @@ internal object WireType {
 
     /** The name of the member that says which kind of a wire type with several kinds an object is. */
     private val kindMember: String = AdminApiJson.instance.configuration.classDiscriminator
+
+    /**
+     * Returns [checked] as a value of the wire type of [serializer]. [checked] is an object that is as the
+     * wire type has it, see [requireValid], so this does not fail. Should it fail all the same, the failure
+     * that is thrown says nothing of the object: the failure of the serialization library quotes what it
+     * read, the log gets what an operation fails with, and a request can hold a secret.
+     *
+     * @throws IllegalStateException when the serialization library does not take the object.
+     */
+    fun <T> read(
+        serializer: KSerializer<T>,
+        checked: JsonObject,
+    ): T =
+        try {
+            AdminApiJson.instance.decodeFromJsonElement(serializer, checked)
+        } catch (_: SerializationException) {
+            error("An object that is as the wire type ${serializer.descriptor.serialName} has it was not read as that type.")
+        }
 
     /**
      * Checks [stated] as an object of the wire type that [descriptor] describes. A [complete] object has

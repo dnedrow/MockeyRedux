@@ -1,5 +1,6 @@
 package io.github.dnedrow.mockey.server
 
+import io.github.dnedrow.mockey.api.InspectorDto
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.ktor.http.HttpMethod
@@ -9,7 +10,8 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 /**
- * The operations of the admin API on the server as a whole.
+ * The operations of the admin API on the server as a whole: its status, and the inspectors that are
+ * installed in it.
  *
  * [engine] is the engine of the server. [since] is the time at which the server started, [definitions] is
  * its definitions location, and [mock] is the address and the port on which its mock listener accepts
@@ -25,6 +27,7 @@ internal class AdminSystem(
     val routes: List<AdminRoute> =
         listOf(
             AdminRoute(HttpMethod.Get, "system") { AdminResponse.json(status(host)) },
+            AdminRoute(HttpMethod.Get, "inspectors") { AdminResponse.json(engine.inspectors.map { InspectorDto(it.name, it.isGlobal) }) },
         )
 
     /**

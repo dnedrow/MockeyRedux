@@ -12,7 +12,7 @@ An inspector has no say in how a request is answered. When an inspector fails, t
 usual, and its history entry gets a message that names the inspector that failed.
 
 Mockey finds the installed inspectors when it starts. It lists them with their names and says for each
-whether it is global.
+whether it is global. The server lists them at `/api/v1/inspectors` of its admin API.
 
 ## Writing an inspector
 

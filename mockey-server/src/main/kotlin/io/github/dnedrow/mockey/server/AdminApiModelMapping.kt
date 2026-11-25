@@ -9,9 +9,9 @@ import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.MergeReportDto
 import io.github.dnedrow.mockey.api.MergedScenarioDto
 import io.github.dnedrow.mockey.api.NameValueDto
+import io.github.dnedrow.mockey.api.OutboundProxyAttributesDto
 import io.github.dnedrow.mockey.api.OutboundProxyDefinitionDto
 import io.github.dnedrow.mockey.api.OutboundProxyDto
-import io.github.dnedrow.mockey.api.OutboundProxyUpdateDto
 import io.github.dnedrow.mockey.api.PlanApplyReportDto
 import io.github.dnedrow.mockey.api.PlanAttributesDto
 import io.github.dnedrow.mockey.api.PlanDto
@@ -331,21 +331,36 @@ internal fun DefinitionDocumentDto.toModel(): Definitions {
     )
 }
 
-internal fun OutboundProxy.toAdminDto(): OutboundProxyDto =
-    OutboundProxyDto(
-        url = url,
-        enabled = enabled,
-        username = credentials?.username,
-        passwordSet = credentials != null,
+/**
+ * Returns what the admin API states of the outbound proxy, which is `null` when there are no settings: its
+ * URL, whether it is enabled, the user name of its credentials, and whether they hold a password. The
+ * password is no part of it.
+ */
+internal fun OutboundProxy?.toAdminDto(): OutboundProxyDto {
+    val held = attributes()
+    return OutboundProxyDto(held.url, held.enabled, held.username, passwordSet = held.password != null)
+}
+
+/**
+ * Returns the attributes of the outbound proxy that a request sets, which is `null` when there are no
+ * settings. They hold the password, which no answer holds: they are what the attributes of a request are
+ * laid over. A user name or a password that is empty is none.
+ */
+internal fun OutboundProxy?.attributes(): OutboundProxyAttributesDto =
+    OutboundProxyAttributesDto(
+        url = this?.url.orEmpty(),
+        enabled = this?.enabled == true,
+        username = this?.credentials?.username?.takeIf { it.isNotEmpty() },
+        password = this?.credentials?.password?.takeIf { it.isNotEmpty() },
     )
 
-internal fun OutboundProxyUpdateDto.toModel(): OutboundProxy {
-    require((username == null) == (password == null)) { "A proxy user name and password must be supplied together." }
-    return OutboundProxy(
-        url = url,
-        enabled = enabled,
-        credentials = username?.let { ProxyCredentials(it, requireNotNull(password)) },
-    )
+/**
+ * Returns the settings of an outbound proxy with these attributes. The settings have credentials when the
+ * attributes hold a user name or a password.
+ */
+internal fun OutboundProxyAttributesDto.toModel(): OutboundProxy {
+    val credentials = if (username == null && password == null) null else ProxyCredentials(username.orEmpty(), password.orEmpty())
+    return OutboundProxy(url, enabled, credentials)
 }
 
 /**

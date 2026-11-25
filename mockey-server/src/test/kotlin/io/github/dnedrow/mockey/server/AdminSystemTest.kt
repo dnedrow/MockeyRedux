@@ -1,12 +1,15 @@
 package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.api.AdminApiJson
+import io.github.dnedrow.mockey.api.InspectorDto
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
 import io.github.dnedrow.mockey.api.TwistPairDto
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
+import io.github.dnedrow.mockey.core.inspection.Inspector
 import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistPair
+import io.github.dnedrow.mockey.core.request.MockRequest
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -20,24 +23,31 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The status of the server as the admin API states it, over real HTTP: on a listener that runs the admin
- * API with the operations on the server as a whole, for an engine and a mock listener of the test.
+ * The status of the server and its inspectors as the admin API states them, over real HTTP: on a listener
+ * that runs the admin API with the operations on the server as a whole, for an engine and a mock listener of
+ * the test.
  */
 class AdminSystemTest {
     private val since = Instant.parse("2026-01-02T03:04:05.678912Z")
     private val engine: MockeyEngine = runBlocking { MockeyEngine.create() }
+    private val otherEngines = mutableListOf<MockeyEngine>()
     private val listeners = mutableListOf<Listener>()
 
     @AfterTest
     fun stopEverything() {
         listeners.forEach(Listener::stop)
         engine.close()
+        otherEngines.forEach(MockeyEngine::close)
     }
 
-    /** Starts a listener that runs the admin API of a server whose mock listener accepts connections on [mock]. */
+    /**
+     * Starts a listener that runs the admin API of a server whose mock listener accepts connections on
+     * [mock], and whose engine is [engine].
+     */
     private fun api(
         mock: InetSocketAddress = address("127.0.0.1", 8080),
         definitions: Path = Path("mockey-definitions"),
+        engine: MockeyEngine = this.engine,
     ): Listener {
         val api = AdminApi(token = null, maxRequestBody = 1_024, routes = AdminSystem(engine, since, definitions, mock).routes)
         val module = MockeyServer.adminListenerModule(ForwardMark(adminPort = null), api)
@@ -48,6 +58,18 @@ class AdminSystemTest {
         host: String,
         port: Int,
     ) = InetSocketAddress(InetAddress.getByName(host), port)
+
+    /** Returns an inspector with [name] that has nothing to say about a request. */
+    private fun inspector(
+        name: String,
+        global: Boolean = false,
+    ): Inspector =
+        object : Inspector {
+            override val name = name
+            override val isGlobal = global
+
+            override fun inspect(request: MockRequest): String? = null
+        }
 
     /** Returns the status that the API states to a client that names [host] in its request. */
     private fun Listener.status(host: String = "mockey.test"): SystemStatusDto {
@@ -188,5 +210,21 @@ class AdminSystemTest {
         val liveness = Json.parseToJsonElement(RawHttp.get(ofLiveness.address, "/status").body) as JsonObject
 
         assertEquals("\"${api().status().startTime}\"", liveness.getValue("since").toString())
+    }
+
+    /** Task 12.5, and the scenario "Inspectors are listed" of the inspection, through the API. The list is in the order of the names. */
+    @Test
+    fun theInstalledInspectorsAreListedWithTheirNamesAndWhetherTheyAreGlobal() {
+        val installed = listOf(inspector("trace-header", global = true), inspector("session-check"))
+        val withInspectors = runBlocking { MockeyEngine.create { inspectors = installed } }.also { otherEngines += it }
+
+        val listed = RawHttp.get(api(engine = withInspectors).address, "/api/v1/inspectors")
+        val none = RawHttp.get(api().address, "/api/v1/inspectors")
+
+        assertEquals("HTTP/1.1 200 OK", listed.statusLine, "$listed")
+        assertEquals("""[{"name":"session-check","global":false},{"name":"trace-header","global":true}]""", listed.body)
+        val inspectors = AdminApiJson.instance.decodeFromString<List<InspectorDto>>(listed.body)
+        assertEquals(listOf(InspectorDto("session-check", global = false), InspectorDto("trace-header", global = true)), inspectors)
+        assertEquals(200 to "[]", none.status to none.body)
     }
 }

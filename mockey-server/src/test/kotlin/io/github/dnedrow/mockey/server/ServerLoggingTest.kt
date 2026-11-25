@@ -1,9 +1,6 @@
 package io.github.dnedrow.mockey.server
 
-import io.github.dnedrow.mockey.core.model.OutboundProxy
-import io.github.dnedrow.mockey.core.model.ProxyCredentials
 import io.github.dnedrow.mockey.core.model.Tags
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -138,14 +135,15 @@ class ServerLoggingTest {
      * verbose level with an admin token, given both ways, and with an outbound proxy that takes credentials.
      * It gets requests that present the token in every part of them, and it forwards them through the
      * proxy. The admin API takes a request that presents the token in its header, and it refuses one that
-     * has the token in its query string alone. The log holds nothing of a request.
+     * has the token in its query string alone. The proxy is set through the admin API, with its password in
+     * the body of the request, and the API gets bodies with the password that it refuses. The log holds
+     * nothing of a request.
      */
     @Test
     fun theMostVerboseLogHoldsNeitherTheAdminTokenNorTheProxyPassword() {
         val token = "tk-9f3b2c71d4e8"
         val tokenOfVariable = "tk-6a0d5e1f8b42"
         val password = "pw-5a6c0e2d9b17"
-        val proxyCredentials = ProxyCredentials("mockey", password)
         val credentials = Base64.getEncoder().encodeToString("mockey:$password".toByteArray())
 
         StubProxy().use { proxy ->
@@ -159,16 +157,13 @@ class ServerLoggingTest {
                         assertTrue(settings.adminToken!!.matches(presented))
                         MockeyServer.start(settings).use { server ->
                             val presenting = listOf("Authorization: Bearer $presented")
-                            runBlocking {
-                                server.engine.updateOutboundProxy {
-                                    OutboundProxy(
-                                        proxy.url,
-                                        enabled = true,
-                                        credentials = proxyCredentials,
-                                    )
-                                }
-                            }
                             val admin = server.listeners.admin.address
+                            val asJson = presenting + "Content-Type: application/json"
+                            val ofTheProxy = """{"url":"${proxy.url}","enabled":true,"username":"mockey","password":"$password"}"""
+                            val notOfAProxy = """{"secret":"$password","url":"http://mockey:$password@proxy.test"}"""
+                            val settings = listOf(ofTheProxy, ofTheProxy.dropLast(1), notOfAProxy)
+                            val requests = settings.map { RawHttp.request("PATCH", "/api/v1/upstream-proxy", asJson, it) }
+                            val ofSettings = requests.map { RawHttp.exchange(admin, it) }
                             val ofAdmin = RawHttp.get(admin, "/api/v1/system", presenting)
                             // The token does not belong in a query string, and the admin API takes no such parameter.
                             val inBoth = RawHttp.get(admin, "/api/v1/system?token=$presented", presenting)
@@ -180,6 +175,8 @@ class ServerLoggingTest {
                                     presenting,
                                 )
                             val ofStatus = RawHttp.get(server.listeners.mock.address, "/status?token=$presented", presenting)
+                            assertEquals(listOf<Int?>(200, 400, 422), ofSettings.map { it.status })
+                            assertFalse(ofSettings.any { password in it.text }, "An answer holds the password: $ofSettings")
                             assertEquals(listOf<Int?>(200, 400, 401), listOf(ofAdmin.status, inBoth.status, withoutHeader.status))
                             assertEquals(200 to StubProxy.ANSWER, ofMock.status to ofMock.body)
                             assertEquals(200, ofStatus.status)

@@ -117,7 +117,7 @@ class AdminApiModelsTest {
             setOf("formatVersion", "services", "plans", "twists", "settings"),
         )
         assertShape(OutboundProxyDto("http://proxy", true, "user", true), setOf("url", "enabled", "username", "passwordSet"))
-        assertShape(OutboundProxyUpdateDto("http://proxy", true, "user", "secret"), setOf("url", "enabled", "username", "password"))
+        assertShape(OutboundProxyAttributesDto("http://proxy", true, "user", "secret"), setOf("url", "enabled", "username", "password"))
         assertShape(TagFilterDto(listOf("orders")), setOf("tags"))
         assertShape(NameValueDto("name", "value"), setOf("name", "value"))
         assertShape(RecordedBodyDto("AQI=", 2, false), setOf("base64", "size", "isCut"))

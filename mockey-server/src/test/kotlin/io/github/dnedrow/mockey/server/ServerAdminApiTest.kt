@@ -29,11 +29,13 @@ import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.Base64
 import kotlin.io.path.isRegularFile
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
@@ -270,6 +272,8 @@ class ServerAdminApiTest {
                 "/api/v1/twists/${twist.value}" to 200,
                 "/api/v1/tag-filter" to 200,
                 "/api/v1/tags" to 200,
+                "/api/v1/upstream-proxy" to 200,
+                "/api/v1/inspectors" to 200,
                 "/api/v1/history" to 200,
                 "/api/v1/system" to 200,
                 "/api/v1/services?name=customers&tag=team-a" to 200,
@@ -398,6 +402,8 @@ class ServerAdminApiTest {
                 Triple("POST", "twists", """{"name":"to-qa2"}"""),
                 Triple("PUT", "tag-filter", """{"tags":["nightly"]}"""),
                 Triple("DELETE", "tag-filter", ""),
+                Triple("PATCH", "upstream-proxy", """{"url":"http://proxy.example:3128","enabled":true}"""),
+                Triple("DELETE", "system/upstream-session", ""),
             )
 
         val without = changes.map { (method, target, body) -> server.asked(method, target, body) }
@@ -490,6 +496,65 @@ class ServerAdminApiTest {
         val ofMock = listOf(withoutTheTag.status, withTheTag.status, afterTheRemoval.status, withoutAFilter.status)
         assertEquals(listOf<Int?>(404, 200, 404, 200), ofMock)
         assertEquals(emptyList(), server.asked("GET", "system").decoded<SystemStatusDto>().tagFilter)
+    }
+
+    /**
+     * The outbound proxy that a client sets through the API is the one that the next forwarded request goes
+     * through, with its credentials, and a proxy that is disabled is gone through no longer. A request that
+     * disables the proxy need not state the password, and the proxy has it when it is enabled again.
+     */
+    @Test
+    fun theOutboundProxyOfTheApiIsTheOneThatTheNextForwardedRequestGoesThrough() {
+        StubUpstream().use { upstream ->
+            StubProxy().use { proxy ->
+                val server = start(settings())
+                val mock = server.listeners.mock.address
+                val real = """{"name":"Real","mockUrl":"real","realUrls":["${upstream.origin}/real"]}"""
+                val settings = """{"url":"${proxy.url}","enabled":true,"username":"mockey","password":"$PROXY_PASSWORD"}"""
+
+                val created = server.asked("POST", "services", real)
+                val direct = RawHttp.get(mock, "/service/real")
+                val set = server.asked("PATCH", "upstream-proxy", settings)
+                val through = RawHttp.get(mock, "/service/real")
+                val disabled = server.asked("PATCH", "upstream-proxy", """{"enabled":false}""")
+                val directAgain = RawHttp.get(mock, "/service/real")
+                val enabled = server.asked("PATCH", "upstream-proxy", """{"enabled":true}""")
+                val throughAgain = RawHttp.get(mock, "/service/real")
+
+                assertEquals(listOf<Int?>(201, 200, 200, 200), listOf(created.status, set.status, disabled.status, enabled.status))
+                val ofTheService = "answered by the real service"
+                val bodies = listOf(direct.body, through.body, directAgain.body, throughAgain.body)
+                assertEquals(listOf(ofTheService, StubProxy.ANSWER, ofTheService, StubProxy.ANSWER), bodies)
+                val credentials = Base64.getEncoder().encodeToString("mockey:$PROXY_PASSWORD".toByteArray())
+                assertEquals(listOf<String?>("Basic $credentials", "Basic $credentials"), proxy.authorizations)
+                assertEquals(List(2) { "${upstream.origin}/real" }, proxy.targets.toList())
+                assertEquals(2, upstream.requests.size)
+                for (answer in listOf(set, disabled, enabled)) {
+                    assertFalse(PROXY_PASSWORD in answer.text || credentials in answer.text, "$answer")
+                }
+            }
+        }
+    }
+
+    /**
+     * The scenario "Emptying the store" of the proxying, through the API: after it, the next forwarded
+     * request carries no cookie that a real service has set.
+     */
+    @Test
+    fun theUpstreamSessionThatIsEmptiedThroughTheApiSendsNoCookieWithTheNextForwardedRequest() {
+        StubUpstream(headers = listOf("Content-Type: text/plain", "Set-Cookie: sid=abc; Path=/")).use { upstream ->
+            val server = start(settings())
+            val mock = server.listeners.mock.address
+            val created = server.asked("POST", "services", """{"name":"Real","mockUrl":"real","realUrls":["${upstream.origin}/real"]}""")
+
+            val answers = List(2) { RawHttp.get(mock, "/service/real") }
+            val emptied = server.asked("DELETE", "system/upstream-session")
+            val afterwards = RawHttp.get(mock, "/service/real")
+
+            val statuses = (listOf(created) + answers + emptied + afterwards).map { it.status }
+            assertEquals(listOf<Int?>(201, 200, 200, 204, 200), statuses)
+            assertEquals(listOf(emptyList(), listOf("sid=abc"), emptyList()), upstream.requests.map { it.headerValues("Cookie") })
+        }
     }
 
     /** The scenario "Unknown resource". */
@@ -586,6 +651,7 @@ class ServerAdminApiTest {
     }
 
     private companion object {
+        const val PROXY_PASSWORD = "pw-1c4e7a9d2f60"
         const val TOKEN = "tk-58e0b3a9c1d7"
         val PRESENTING = listOf("Authorization: Bearer $TOKEN")
     }

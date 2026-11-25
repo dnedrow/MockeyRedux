@@ -276,7 +276,10 @@ public data class DefinitionDocumentDto(
     public val settings: DefinitionSettingsDto = DefinitionSettingsDto(),
 )
 
-/** The outbound proxy settings that may be returned to an API client without revealing the password. */
+/**
+ * The outbound proxy settings that may be returned to an API client without revealing the password. Without
+ * settings, the URL is empty and the proxy is not enabled.
+ */
 @Serializable
 public data class OutboundProxyDto(
     public val url: String,
@@ -285,10 +288,14 @@ public data class OutboundProxyDto(
     public val passwordSet: Boolean = false,
 )
 
-/** Credentials accepted when setting an outbound proxy. The password is input-only. */
+/**
+ * The attributes of the outbound proxy that a request sets. A request states the ones that change. The user
+ * name and the password are the credentials for the proxy, and there are none while both are `null`. The
+ * password is input-only: no answer holds it, see [OutboundProxyDto].
+ */
 @Serializable
-public data class OutboundProxyUpdateDto(
-    public val url: String,
+public data class OutboundProxyAttributesDto(
+    public val url: String = "",
     public val enabled: Boolean = false,
     public val username: String? = null,
     public val password: String? = null,
