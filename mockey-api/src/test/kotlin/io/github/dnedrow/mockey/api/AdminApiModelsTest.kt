@@ -101,8 +101,12 @@ class AdminApiModelsTest {
         assertShape(DerivedRealUrlDto("svc1", "service", "http://qa2.example.com"), setOf("serviceId", "serviceName", "realUrl"))
         assertShape(PlanItemDto("service"), setOf("serviceName", "scenarioName", "responseMode", "delayMillis"))
         assertShape(PlanDto("p1", "plan"), setOf("id", "name", "description", "tags", "items"))
+        assertShape(PlanAttributesDto(), setOf("name", "description", "tags", "items"))
+        assertShape(PlanSaveRequestDto(listOf("svc1")), setOf("serviceIds", "name", "description", "tags"))
+        assertShape(PlanReferenceDto("p1"), setOf("planId"))
         assertShape(TwistPairDto("from", "to"), setOf("origination", "destination"))
         assertShape(TwistConfigurationDto("t1", "twist"), setOf("id", "name", "pairs"))
+        assertShape(TwistAttributesDto(), setOf("name", "pairs"))
         assertShape(OutboundProxyDefinitionDto("http://proxy", true), setOf("url", "enabled"))
         assertShape(
             DefinitionSettingsDto(),

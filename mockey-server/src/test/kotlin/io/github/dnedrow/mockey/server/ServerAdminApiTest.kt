@@ -4,6 +4,7 @@ import io.github.dnedrow.mockey.api.AdminApiJson
 import io.github.dnedrow.mockey.api.FieldErrorDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
+import io.github.dnedrow.mockey.api.PlanApplyReportDto
 import io.github.dnedrow.mockey.api.PlanDto
 import io.github.dnedrow.mockey.api.PlanItemDto
 import io.github.dnedrow.mockey.api.ProblemDto
@@ -11,6 +12,8 @@ import io.github.dnedrow.mockey.api.ResponseModeDto
 import io.github.dnedrow.mockey.api.ScenarioDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.SystemStatusDto
+import io.github.dnedrow.mockey.api.TwistConfigurationDto
+import io.github.dnedrow.mockey.api.TwistPairDto
 import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.PlanItem
@@ -32,6 +35,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 
 /**
  * The admin API of a server in the process of the test: the scenarios of the admin API as a whole server
@@ -249,15 +253,23 @@ class ServerAdminApiTest {
         fill(server)
         val before = stateOf(server, definitions)
         val admin = server.listeners.admin.address
-        val customers =
-            server.engine.definitions.services
-                .first()
-                .id.value
+        val held = server.engine.definitions
+        val customers = held.services.first().id
+        val plan = held.plans.single().id
+        val twist = held.twists.single().id
         val reads =
             mapOf(
                 "/api/v1/services" to 200,
-                "/api/v1/services/$customers" to 200,
+                "/api/v1/services/${customers.value}" to 200,
+                "/api/v1/services/${customers.value}/scenarios" to 200,
+                "/api/v1/universal-error-scenario" to 404,
                 "/api/v1/plans" to 200,
+                "/api/v1/plans/${plan.value}" to 200,
+                "/api/v1/default-plan" to 200,
+                "/api/v1/twists" to 200,
+                "/api/v1/twists/${twist.value}" to 200,
+                "/api/v1/tag-filter" to 200,
+                "/api/v1/tags" to 200,
                 "/api/v1/history" to 200,
                 "/api/v1/system" to 200,
                 "/api/v1/services?name=customers&tag=team-a" to 200,
@@ -382,6 +394,10 @@ class ServerAdminApiTest {
                 Triple("PATCH", "services/${customers.id.value}", """{"delayMillis":250}"""),
                 Triple("DELETE", "services/${customers.id.value}", ""),
                 Triple("POST", "services/${customers.id.value}/duplicate", ""),
+                Triple("POST", "plans", """{"serviceIds":["${customers.id.value}"]}"""),
+                Triple("POST", "twists", """{"name":"to-qa2"}"""),
+                Triple("PUT", "tag-filter", """{"tags":["nightly"]}"""),
+                Triple("DELETE", "tag-filter", ""),
             )
 
         val without = changes.map { (method, target, body) -> server.asked(method, target, body) }
@@ -391,6 +407,89 @@ class ServerAdminApiTest {
         assertEquals(List(changes.size) { 401 }, without.map { it.status })
         assertEquals(before, afterThem)
         assertEquals(200 to 250L, with.status to read(server).single().delayMillis)
+    }
+
+    /**
+     * The scenario "Apply a plan", on a server: a plan that a client saves and applies through the API puts
+     * a service back into the state in which it was saved, and the mock endpoint answers as it did then.
+     */
+    @Test
+    fun aPlanThatIsAppliedThroughTheApiPutsAServiceBackIntoTheStateInWhichItWasSaved() {
+        val server = start(settings())
+        val mock = server.listeners.mock.address
+        val customers = read(server).single().id.value
+
+        val saved = server.asked("POST", "plans", """{"name":"Found","serviceIds":["$customers"]}""")
+        val lost = server.asked("POST", "services/$customers/scenarios", """{"name":"lost","responseBody":"lost","statusCode":410}""")
+        val selecting = """{"defaultScenarioId":"${lost.decoded<ScenarioDto>().id}","delayMillis":5}"""
+        val selected = server.asked("PATCH", "services/$customers", selecting)
+        val ofLost = RawHttp.get(mock, "/service/customer/7")
+        val applied = server.asked("POST", "plans/${saved.decoded<PlanDto>().id}/apply")
+        val ofThePlan = RawHttp.get(mock, "/service/customer/7")
+
+        assertEquals(listOf<Int?>(201, 201, 200), listOf(saved.status, lost.status, selected.status))
+        assertEquals(410 to "lost", ofLost.status to ofLost.body)
+        assertEquals("HTTP/1.1 200 OK", applied.statusLine)
+        assertEquals(PlanApplyReportDto(saved.decoded<PlanDto>(), emptyList(), emptyList()), applied.decoded<PlanApplyReportDto>())
+        assertEquals(listOf(PlanItemDto("Customers", "found", ResponseModeDto.STATIC, 0)), saved.decoded<PlanDto>().items)
+        assertEquals(200 to StoredDefinitions.CUSTOMER, ofThePlan.status to ofThePlan.body)
+        assertEquals(0L, read(server).single().delayMillis)
+    }
+
+    /**
+     * The scenario "Enable a twist configuration": the status states the configuration, and the mock
+     * endpoint twists the target of the next request with it. A configuration twists nothing before it is
+     * enabled, and nothing after it is disabled.
+     */
+    @Test
+    fun aTwistConfigurationThatIsEnabledThroughTheApiIsStatedByTheStatusAndTwistsTheNextMockRequest() {
+        val server = start(settings())
+        val mock = server.listeners.mock.address
+        val pairs = """[{"origination":"kunde","destination":"customer"}]"""
+
+        val created = server.asked("POST", "twists", """{"name":"German paths","pairs":$pairs}""")
+        val twist = created.decoded<TwistConfigurationDto>()
+        val beforeItIsEnabled = RawHttp.get(mock, "/service/kunde/7")
+        val enabled = server.asked("POST", "twists/${twist.id}/enable")
+        val status = server.asked("GET", "system").decoded<SystemStatusDto>()
+        val twisted = RawHttp.get(mock, "/service/kunde/7")
+        val disabled = server.asked("POST", "twists/${twist.id}/disable")
+        val statusAfterwards = server.asked("GET", "system").decoded<SystemStatusDto>()
+        val afterItIsDisabled = RawHttp.get(mock, "/service/kunde/7")
+
+        assertEquals(listOf<Int?>(201, 200, 200), listOf(created.status, enabled.status, disabled.status))
+        assertEquals(TwistConfigurationDto(twist.id, "German paths", listOf(TwistPairDto("kunde", "customer"))), status.enabledTwist)
+        assertEquals(200 to StoredDefinitions.CUSTOMER, twisted.status to twisted.body)
+        assertEquals(listOf<Int?>(404, 404), listOf(beforeItIsEnabled.status, afterItIsDisabled.status))
+        assertNull(statusAfterwards.enabledTwist)
+    }
+
+    /**
+     * The tag filter that a client sets through the API counts for the next mock request: a service without
+     * one of its tags gets no request. The status states the filter. A tag that is removed from all
+     * definitions is a tag of the service no longer.
+     */
+    @Test
+    fun theTagFilterOfTheApiDecidesWhetherTheNextMockRequestGoesToAService() {
+        val server = start(settings())
+        val mock = server.listeners.mock.address
+        val customers = read(server).single().id.value
+
+        val set = server.asked("PUT", "tag-filter", """{"tags":["nightly"]}""")
+        val status = server.asked("GET", "system").decoded<SystemStatusDto>()
+        val withoutTheTag = RawHttp.get(mock, "/service/customer/7")
+        val tagged = server.asked("PATCH", "services/$customers", """{"tags":["nightly"]}""")
+        val withTheTag = RawHttp.get(mock, "/service/customer/7")
+        val removed = server.asked("DELETE", "tags/nightly")
+        val afterTheRemoval = RawHttp.get(mock, "/service/customer/7")
+        val cleared = server.asked("DELETE", "tag-filter")
+        val withoutAFilter = RawHttp.get(mock, "/service/customer/7")
+
+        assertEquals(listOf<Int?>(200, 200, 204, 204), listOf(set.status, tagged.status, removed.status, cleared.status))
+        assertEquals(listOf("nightly"), status.tagFilter)
+        val ofMock = listOf(withoutTheTag.status, withTheTag.status, afterTheRemoval.status, withoutAFilter.status)
+        assertEquals(listOf<Int?>(404, 200, 404, 200), ofMock)
+        assertEquals(emptyList(), server.asked("GET", "system").decoded<SystemStatusDto>().tagFilter)
     }
 
     /** The scenario "Unknown resource". */

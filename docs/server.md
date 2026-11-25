@@ -8,9 +8,9 @@ The server has two listeners. The mock listener serves the mock traffic and `/st
 serves the admin API, which states what the server holds and is to change what the server does.
 
 This document describes the server as it is now. The admin API is under way, and the web UI is not part of
-the server yet. The API states the services, the plans, the history, and the status of the server, and it
-changes the services and their scenarios. The rest of the definitions is what the server loads and imports
-when it starts.
+the server yet. The API states and changes the services with their scenarios, the plans, the twist
+configurations, the tag filter, and the tags. It states the history and the status of the server, and it
+changes nothing else yet.
 
 ## Running the server
 
@@ -143,12 +143,25 @@ In this version the admin API has these operations:
 | `GET`, `POST /services/{id}/scenarios` | Lists the scenarios of a service, and creates one. |
 | `GET`, `PATCH`, `DELETE /services/{id}/scenarios/{scenarioId}` | Reads, updates, and deletes a scenario. |
 | `GET`, `PUT`, `DELETE /universal-error-scenario` | Reads, designates, and clears the universal error scenario. |
-| `GET /plans`, `GET /history`, `GET /system` | State the plans, the history, and the status of the server. |
+| `GET`, `POST /plans` | Lists the plans, and saves the settings that services have now as a plan. A save under the name of a plan updates that plan. |
+| `GET`, `PATCH`, `DELETE /plans/{id}` | Reads, updates, and deletes a plan. |
+| `POST /plans/{id}/save` | Saves the settings that services have now as the items of the plan. |
+| `POST /plans/{id}/apply` | Applies a plan, and answers with the items that it skipped and the scenario names that named no scenario. |
+| `GET`, `PUT`, `DELETE /default-plan` | Reads, designates, and clears the default plan. |
+| `GET`, `POST /twists` | Lists the twist configurations, and creates one. |
+| `GET`, `PATCH`, `DELETE /twists/{id}` | Reads, updates, and deletes a twist configuration. |
+| `POST /twists/{id}/enable`, `POST /twists/{id}/disable` | Enables and disables a twist configuration. The status of the server states the one that is enabled. |
+| `GET`, `PUT`, `DELETE /tag-filter` | Reads, sets, and clears the tag filter. |
+| `GET /tags` | Lists the tags that services, scenarios, and plans carry. |
+| `DELETE /tags/{tag}` | Removes a tag from every service, scenario, and plan. |
+| `GET /history`, `GET /system` | State the history and the status of the server. |
 
 Bodies are JSON in UTF-8. A request that creates or updates something states attributes in a JSON object:
 a creation takes a default for every attribute that it does not state, and an update changes only the
 attributes that it states. A creation is answered with the status 201, with what was created and its
-identifier, and with its path in the `Location` header. A deletion is answered with the status 204.
+identifier, and with its path in the `Location` header. A save of a plan is a creation when no plan has its
+name, and it is answered with the status 200 when it updates a plan. A deletion is answered with the status
+204.
 
 An answer that reports a failure is a problem document: a JSON object that states the status and says what
 is wrong. The status is 400 for a body that is no JSON object and for a query string that the operation
@@ -285,6 +298,9 @@ tags are separated by spaces:
 ```shell
 mockey-server --tag-filter "team-a nightly"
 ```
+
+The admin API sets and clears the filter of a running server, at `/api/v1/tag-filter`. The filter is no part
+of the definitions and is not stored: a server starts with the filter of this setting.
 
 ## Logging
 

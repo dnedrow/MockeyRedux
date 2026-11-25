@@ -12,6 +12,8 @@ import io.github.dnedrow.mockey.api.NameValueDto
 import io.github.dnedrow.mockey.api.OutboundProxyDefinitionDto
 import io.github.dnedrow.mockey.api.OutboundProxyDto
 import io.github.dnedrow.mockey.api.OutboundProxyUpdateDto
+import io.github.dnedrow.mockey.api.PlanApplyReportDto
+import io.github.dnedrow.mockey.api.PlanAttributesDto
 import io.github.dnedrow.mockey.api.PlanDto
 import io.github.dnedrow.mockey.api.PlanItemDto
 import io.github.dnedrow.mockey.api.RecordedBodyDto
@@ -26,10 +28,13 @@ import io.github.dnedrow.mockey.api.ScenarioReferenceDto
 import io.github.dnedrow.mockey.api.ServiceAttributesDto
 import io.github.dnedrow.mockey.api.ServiceDefinitionDto
 import io.github.dnedrow.mockey.api.ServiceDto
+import io.github.dnedrow.mockey.api.TwistAttributesDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
 import io.github.dnedrow.mockey.api.TwistPairDto
+import io.github.dnedrow.mockey.api.UnresolvedPlanScenarioDto
 import io.github.dnedrow.mockey.core.definitions.DerivedRealUrl
 import io.github.dnedrow.mockey.core.definitions.MergeReport
+import io.github.dnedrow.mockey.core.definitions.PlanApplyReport
 import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.history.Outcome
 import io.github.dnedrow.mockey.core.history.RecordedBody
@@ -266,12 +271,38 @@ internal fun PlanDto.toModel(): Plan =
         items = items.map(PlanItemDto::toModel),
     )
 
+/** Returns the attributes of the plan that a request sets, as the admin API states them. */
+internal fun Plan.attributes(): PlanAttributesDto = PlanAttributesDto(name, description, tags.toList(), items.map(PlanItem::toAdminDto))
+
+/** Returns the plan with [attributes] in the place of its own. Its identifier stays as it is. */
+internal fun Plan.with(attributes: PlanAttributesDto): Plan =
+    copy(
+        name = attributes.name,
+        description = attributes.description,
+        tags = Tags.of(attributes.tags),
+        items = attributes.items.map(PlanItemDto::toModel),
+    )
+
+internal fun PlanApplyReport.toAdminDto(): PlanApplyReportDto =
+    PlanApplyReportDto(
+        plan = plan.toAdminDto(),
+        skippedItems = skippedItems.map(PlanItem::toAdminDto),
+        unresolvedScenarios = unresolvedScenarios.map { UnresolvedPlanScenarioDto(it.serviceName, it.scenarioName) },
+    )
+
 internal fun TwistConfiguration.toAdminDto(): TwistConfigurationDto =
     TwistConfigurationDto(
         id = id.value,
         name = name,
         pairs = pairs.map(TwistPair::toAdminDto),
     )
+
+/** Returns the attributes of the twist configuration that a request sets, as the admin API states them. */
+internal fun TwistConfiguration.attributes(): TwistAttributesDto = TwistAttributesDto(name, pairs.map(TwistPair::toAdminDto))
+
+/** Returns the twist configuration with [attributes] in the place of its own. Its identifier stays as it is. */
+internal fun TwistConfiguration.with(attributes: TwistAttributesDto): TwistConfiguration =
+    copy(name = attributes.name, pairs = attributes.pairs.map(TwistPairDto::toModel))
 
 internal fun TwistConfigurationDto.toModel(): TwistConfiguration =
     TwistConfiguration(

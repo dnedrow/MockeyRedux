@@ -192,6 +192,37 @@ public data class PlanDto(
     public val items: List<PlanItemDto> = emptyList(),
 )
 
+/**
+ * The attributes of a plan that a request sets. A request that updates a plan states the ones that change.
+ * A stated list of items takes the place of all items of the plan.
+ */
+@Serializable
+public data class PlanAttributesDto(
+    public val name: String = "",
+    public val description: String? = null,
+    public val tags: List<String> = emptyList(),
+    public val items: List<PlanItemDto> = emptyList(),
+)
+
+/**
+ * A request to save the settings that services have now as the items of a plan: for each service its name,
+ * the name of its default scenario, its response mode, and its delay. The plan gets the name, the
+ * description, and the tags that the request states, and it keeps its own where the request states none.
+ */
+@Serializable
+public data class PlanSaveRequestDto(
+    public val serviceIds: List<String>,
+    public val name: String? = null,
+    public val description: String? = null,
+    public val tags: List<String>? = null,
+)
+
+/** One plan among all plans, such as the default plan. */
+@Serializable
+public data class PlanReferenceDto(
+    public val planId: String,
+)
+
 /** One literal target replacement in a twist configuration. */
 @Serializable
 public data class TwistPairDto(
@@ -204,6 +235,17 @@ public data class TwistPairDto(
 public data class TwistConfigurationDto(
     public val id: String,
     public val name: String,
+    public val pairs: List<TwistPairDto> = emptyList(),
+)
+
+/**
+ * The attributes of a twist configuration that a request sets. A request that creates a twist configuration
+ * states the ones that differ from these defaults, and a request that updates one states the ones that
+ * change. A stated list of pairs takes the place of all pairs of the configuration.
+ */
+@Serializable
+public data class TwistAttributesDto(
+    public val name: String = "",
     public val pairs: List<TwistPairDto> = emptyList(),
 )
 
@@ -255,7 +297,7 @@ public data class OutboundProxyUpdateDto(
 /** Active routing tags; an empty list means no filter. */
 @Serializable
 public data class TagFilterDto(
-    public val tags: List<String> = emptyList(),
+    public val tags: List<String>,
 )
 
 /** One request parameter or cookie. */
@@ -414,14 +456,17 @@ public data class MergeReportDto(
     public val sourcesDeleted: Boolean,
 )
 
-/** One plan item that could not be applied because its service was missing. */
+/** A scenario name of a plan item that names no scenario of the service of that item. */
 @Serializable
 public data class UnresolvedPlanScenarioDto(
     public val serviceName: String,
     public val scenarioName: String,
 )
 
-/** The result of applying a plan. */
+/**
+ * The result of applying a plan: the plan, its items that were skipped because no service has their service
+ * name, and the scenario names that named no scenario.
+ */
 @Serializable
 public data class PlanApplyReportDto(
     public val plan: PlanDto,

@@ -268,6 +268,7 @@ internal class AdminApi(
                 AdminServices(engine).routes +
                     AdminScenarios(engine).routes +
                     AdminPlans(engine).routes +
+                    AdminRouting(engine).routes +
                     AdminHistory(engine).routes +
                     AdminSystem(engine, since, settings.definitions, mock).routes
             return AdminApi(settings.adminToken, settings.maxRequestBody, routes)

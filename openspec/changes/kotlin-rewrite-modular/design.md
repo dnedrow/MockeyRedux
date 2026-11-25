@@ -232,11 +232,11 @@ Indicative resource map (the OpenAPI document is the contract):
 
 | Area | Resources |
 |------|-----------|
-| System | `system` (status, read-only mode, tag filter), `system/reset`, `system/upstream-session`, `diagnostics`, `search` |
+| System | `system` (status, read-only mode), `system/reset`, `system/upstream-session`, `diagnostics`, `search` |
 | Services | `services`, `services/{id}`, `.../duplicate`, `.../merge`, `.../schema-report`, `services/real-urls/derive` |
-| Scenarios | `services/{id}/scenarios`, `services/{id}/scenarios/{scenarioId}` |
-| Plans | `plans`, `plans/{id}`, `plans/{id}/apply` |
-| Routing | `twists`, `twists/{id}`, `tags`, `tags/{tag}` |
+| Scenarios | `services/{id}/scenarios`, `services/{id}/scenarios/{scenarioId}`, `universal-error-scenario` |
+| Plans | `plans`, `plans/{id}`, `.../save`, `.../apply`, `default-plan` |
+| Routing | `twists`, `twists/{id}`, `.../enable`, `.../disable`, `tag-filter`, `tags`, `tags/{tag}` |
 | Proxying | `upstream-proxy` |
 | History | `history`, `history/{id}`, `.../replay`, `.../scenario`, `stats` |
 | Extensions | `inspectors` |
