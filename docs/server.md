@@ -139,6 +139,11 @@ it answers every other request with the status 401.
 The admin listener takes no request that the server forwarded as mock traffic. It answers such a request
 with the status 403, with a token and without one, see "The admin listener through the mock listener".
 
+The clients of the admin API are programs. A request that can change something, which is every request
+with a method other than `GET` and `HEAD`, gets the status 403 when it carries an `Origin` header, as the
+request of a web page does. A request with a body has to say that the body is JSON, with the header
+`Content-Type: application/json`, and gets the status 415 otherwise. See "The admin listener and web pages".
+
 The server does not start with an admin listener that other machines can reach and no admin token: whoever
 reaches the admin API can change the definitions and make the server send requests. The message names the two
 ways on: an admin token, or the setting `--allow-unprotected-admin`. See "Security" before taking the second.
@@ -377,6 +382,27 @@ What it does not cover:
 
 [decisions/forwarding-to-the-admin-listener.md](decisions/forwarding-to-the-admin-listener.md) says why the
 server does it this way.
+
+### The admin listener and web pages
+
+A browser on the machine of the server reaches the admin listener, and a page that it shows can make it
+send requests there, wherever the page comes from. The admin API therefore takes nothing from a page that
+could change something:
+
+- No answer of the admin listener carries an `Access-Control-Allow-Origin` header. So a page of another
+  origin reads no answer, and the browser sends none of the requests for which it asks the server first.
+- A request with a method other than `GET` and `HEAD` gets the status 403 when it carries an `Origin` header.
+  A browser sends that header with every such request of a page.
+- A request body is taken only as `application/json`. A browser asks the server before it sends such a body
+  for a page.
+
+One way stays open for reading. A page whose name is made to stand for the loopback address, after the
+browser has loaded it, is of one origin with the admin listener for that browser. Such a page reads what the
+admin API states, and it changes nothing. Give the server an admin token where a browser on its machine
+opens pages that are not trusted: a page does not know the token.
+
+[decisions/web-pages-and-the-admin-api.md](decisions/web-pages-and-the-admin-api.md) says why the admin API
+does it this way.
 
 ### The admin listener beyond the loopback address
 

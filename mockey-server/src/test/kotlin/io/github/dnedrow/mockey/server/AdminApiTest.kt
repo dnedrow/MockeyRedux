@@ -97,12 +97,20 @@ class AdminApiTest {
         return Listener.start(ListenerKind.ADMIN, RawHttp.loopback(0), module).also { listeners += it }
     }
 
+    /**
+     * Sends a request and returns the answer. A request with a [body] says that its body is JSON, unless
+     * [headers] say what it is.
+     */
     private fun Listener.answerTo(
         method: String,
         target: String,
         headers: List<String> = emptyList(),
         body: String = "",
-    ): RawHttp.Answer = RawHttp.exchange(address, RawHttp.request(method, target, headers, body))
+    ): RawHttp.Answer {
+        val declared = body.isEmpty() || headers.any { it.startsWith("Content-Type", ignoreCase = true) }
+        val all = if (declared) headers else headers + JSON
+        return RawHttp.exchange(address, RawHttp.request(method, target, all, body))
+    }
 
     /** Sends a request that consists of [lines] and nothing else, and returns the answer. */
     private fun Listener.answerToLines(vararg lines: String): RawHttp.Answer =
@@ -596,7 +604,8 @@ class AdminApiTest {
     fun aBodyThatIsLongerThanTheServerTakesGetsTheStatus413() {
         val api = api(maxRequestBody = 64)
         val atTheLimit = """{"name":"${"n".repeat(53)}"}"""
-        val inChunks = listOf("POST /api/v1/items HTTP/1.1", "Host: mockey.test", "Connection: close", "Transfer-Encoding: chunked", "")
+        val head = listOf("POST /api/v1/items HTTP/1.1", "Host: mockey.test", "Connection: close", JSON)
+        val inChunks = head + listOf("Transfer-Encoding: chunked", "")
 
         val taken = api.answerTo("POST", "/api/v1/items", body = atTheLimit)
         val oneMore = api.answerTo("POST", "/api/v1/items", body = "$atTheLimit ")
@@ -614,6 +623,79 @@ class AdminApiTest {
             )
         }
         assertEquals(listOf("create $atTheLimit"), asked)
+    }
+
+    /**
+     * The scenario "Body that is not declared as JSON". A browser sends a body of the first three types for
+     * a page of any origin without asking the server, so the API takes none of them, also where the body
+     * is a JSON object. Such a body is not read: one that is too long gets the same answer.
+     */
+    @Test
+    fun aBodyThatIsNotDeclaredAsJsonGetsTheStatus415AndNoOperationSeesIt() {
+        val api = api(maxRequestBody = 64)
+        val item = """{"name":"seven"}"""
+        val notJson =
+            listOf(
+                listOf("Content-Type: text/plain"),
+                listOf("Content-Type: application/x-www-form-urlencoded"),
+                listOf("Content-Type: multipart/form-data; boundary=x"),
+                listOf("Content-Type: application/json; charset=iso-8859-1"),
+                listOf("Content-Type: application/json; charset=klingon"),
+                listOf("Content-Type: application/merge-patch+json"),
+                listOf("Content-Type: text/json"),
+                listOf("Content-Type: json"),
+                listOf("Content-Type:"),
+                listOf("Content-Type: application/json", "Content-Type: text/plain"),
+                listOf("Content-Type: application/json", "Content-Type: application/json"),
+            )
+        val chunked = listOf("POST /api/v1/items HTTP/1.1", "Host: mockey.test", "Connection: close", "Transfer-Encoding: chunked", "")
+
+        val answers = notJson.map { api.answerTo("POST", "/api/v1/items", it, item) }
+        val withoutAType = RawHttp.exchange(api.address, RawHttp.request("POST", "/api/v1/items", body = item))
+        val inChunks = api.answerToLines(*chunked.toTypedArray(), "10", item, "0")
+        val tooLong = api.answerTo("POST", "/api/v1/items", listOf("Content-Type: text/plain"), "x".repeat(100_000))
+
+        for (answer in answers + withoutAType + inChunks + tooLong) {
+            assertProblem(answer, 415, "Unsupported Media Type", NOT_DECLARED_AS_JSON)
+        }
+        assertEquals(emptyList(), asked)
+    }
+
+    @Test
+    fun aBodyThatIsDeclaredAsJsonInUtf8IsTaken() {
+        val api = api()
+        val item = """{"name":"seven"}"""
+        val json =
+            listOf(
+                "Content-Type: application/json",
+                "content-type: Application/JSON",
+                "Content-Type: application/json; charset=utf-8",
+                "Content-Type: application/json;charset=UTF-8",
+                "Content-Type: application/json; charset=\"utf-8\"",
+            )
+
+        val answers = json.map { api.answerTo("POST", "/api/v1/items", listOf(it), item) }
+
+        assertEquals(List(json.size) { 201 }, answers.map { it.status })
+        assertEquals(List(json.size) { "create $item" }, asked)
+    }
+
+    /** A request without a body has nothing to declare. The operation that wants a body says that there is none. */
+    @Test
+    fun aRequestWithoutABodyNeedsNoContentType() {
+        val api = api()
+        val noBody = "The request has no body. The operation takes a JSON object."
+
+        val without = api.answerTo("POST", "/api/v1/items")
+        val ofNoLength = api.answerTo("POST", "/api/v1/items", listOf("Content-Length: 0"))
+        val ofAnotherType = api.answerTo("POST", "/api/v1/items", listOf("Content-Type: text/plain"))
+        val toAnOperationWithoutABody = api.answerTo("PUT", "/api/v1/items/7", listOf("Content-Type: text/plain"), "not read")
+
+        for (answer in listOf(without, ofNoLength, ofAnotherType)) {
+            assertProblem(answer, 400, "Bad Request", noBody)
+        }
+        assertEquals(200, toAnOperationWithoutABody.status)
+        assertEquals(listOf("change 7"), asked)
     }
 
     /** The client learns that the server failed, and the log says at which operation and why. Neither holds anything of the request. */
@@ -654,10 +736,10 @@ class AdminApiTest {
         val requests =
             listOf(
                 RawHttp.request("GET", "/api/v1/items", origin + presenting) to 200,
-                RawHttp.request("POST", "/api/v1/items", origin + presenting, "{}") to 201,
+                RawHttp.request("POST", "/api/v1/items", origin + presenting + JSON, "{}") to 403,
                 RawHttp.request("GET", "/api/v1/nothing", origin + presenting) to 404,
-                RawHttp.request("DELETE", "/api/v1/items", origin + presenting) to 405,
-                RawHttp.request("OPTIONS", "/api/v1/items", asking + presenting) to 405,
+                RawHttp.request("DELETE", "/api/v1/items", origin + presenting) to 403,
+                RawHttp.request("OPTIONS", "/api/v1/items", asking + presenting) to 403,
                 RawHttp.request("OPTIONS", "/api/v1/items", asking) to 401,
                 RawHttp.request("GET", "/api/v1/items", origin) to 401,
             )
@@ -668,6 +750,65 @@ class AdminApiTest {
             assertEquals(status, answer.status, "$answer")
             assertEquals(emptyList(), answer.headers.filter { it.startsWith("access-control-", ignoreCase = true) }, "$answer")
         }
+    }
+
+    /**
+     * The scenario "Request of a web page that would change something". A browser sends an `Origin` header
+     * with every request of a page whose method is neither `GET` nor `HEAD`, and `null` in it where it has
+     * nothing to say. Such a request gets to no operation, whatever it is for. A request that only reads
+     * changes nothing, so the header does not count for it.
+     */
+    @Test
+    fun aRequestThatCanChangeSomethingGetsTheStatus403WhenItCarriesAnOriginHeader() {
+        val api = api()
+        val origins = listOf("Origin: https://pages.example", "Origin: http://127.0.0.1:8081", "Origin: null", "origin:")
+        val changing =
+            listOf(
+                Triple("POST", "/api/v1/items", """{"name":"seven"}"""),
+                Triple("PUT", "/api/v1/items/7", ""),
+                Triple("PATCH", "/api/v1/items/7", "{}"),
+                Triple("DELETE", "/api/v1/items/7", ""),
+                Triple("OPTIONS", "/api/v1/items", ""),
+                Triple("POST", "/api/v1/nothing", ""),
+                Triple("FOO", "/api/v1/items", ""),
+            )
+        val requests = origins.flatMap { origin -> changing.map { it to listOf(origin) } }
+
+        val refused = requests.map { (request, origin) -> api.answerTo(request.first, request.second, origin, request.third) }
+        val reading = origins.flatMap { origin -> listOf("GET", "HEAD").map { api.answerTo(it, "/api/v1/items", listOf(origin)) } }
+
+        for (answer in refused) {
+            assertProblem(answer, 403, "Forbidden", OF_A_PAGE)
+        }
+        assertEquals(List(reading.size) { 200 }, reading.map { it.status })
+        assertEquals(List(reading.size) { "list" }, asked)
+    }
+
+    /** A program sends no `Origin` header, and what it sends about itself otherwise does not count. */
+    @Test
+    fun aRequestOfAProgramThatChangesSomethingIsTaken() {
+        val api = api()
+        val headers = listOf("Referer: https://pages.example/form", "Sec-Fetch-Site: cross-site", "User-Agent: curl/8.7.1")
+
+        val created = api.answerTo("POST", "/api/v1/items", headers, """{"name":"seven"}""")
+        val changed = api.answerTo("PUT", "/api/v1/items/7", headers)
+
+        assertEquals(listOf<Int?>(201, 200), listOf(created.status, changed.status))
+        assertEquals(listOf("""create {"name":"seven"}""", "change 7"), asked)
+    }
+
+    /** The token comes first: a request without it learns nothing else about the server. */
+    @Test
+    fun aRequestOfAPageWithoutTheTokenGetsTheStatus401() {
+        val api = api(token = TOKEN)
+        val origin = listOf("Origin: https://pages.example")
+
+        val without = api.answerTo("POST", "/api/v1/items", origin, """{"name":"seven"}""")
+        val with = api.answerTo("POST", "/api/v1/items", origin + "Authorization: Bearer $TOKEN", """{"name":"seven"}""")
+
+        assertProblem(without, 401, "Unauthorized", NO_TOKEN)
+        assertProblem(with, 403, "Forbidden", OF_A_PAGE)
+        assertEquals(emptyList(), asked)
     }
 
     /** With every part of a request that can hold a secret, at the level at which Ktor and Netty say the most. */
@@ -783,6 +924,15 @@ class AdminApiTest {
         const val NO_TOKEN =
             "The admin API takes a request only with the admin token, which a request presents as a bearer token " +
                 "in its Authorization header."
+        const val NOT_DECLARED_AS_JSON =
+            "The body of a request to the admin API is JSON in UTF-8, and the request has to say so " +
+                "with the header Content-Type: application/json."
+        const val OF_A_PAGE =
+            "The request carries an Origin header, as the request of a web page does, and its method is neither GET nor HEAD. " +
+                "The admin API takes a request that can change something only from a program."
+
+        /** The header with which a request says that its body is JSON. */
+        const val JSON = "Content-Type: application/json"
         const val NAME_TAKEN = "The item 'Other' already has this name."
         const val MOCK_URL_TAKEN = "The service 'Other' already uses the mock URL pattern 'customer/{id}'."
     }

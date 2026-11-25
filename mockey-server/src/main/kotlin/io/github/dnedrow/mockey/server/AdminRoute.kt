@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.api.AdminApiJson
+import io.ktor.http.BadContentTypeFormatException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -105,16 +106,19 @@ internal class AdminRequest(
     fun parameter(name: String): String = parameters.getValue(name)
 
     /**
-     * Returns the body of the request, which has to be one JSON object in UTF-8.
+     * Returns the body of the request, which has to be one JSON object in UTF-8. A request with a body has
+     * to say that its body is JSON, see [requireJson].
      *
      * The problem of a body that is no such object says what the body is not and nothing of what it is, and
      * the log gets nothing of it: a body can hold a secret, such as the password of the outbound proxy.
      *
-     * @throws AdminProblem with the status 413 for a body that is longer than the server takes, and with the
-     *   status 400 for a request without a body, and for a body that is no UTF-8 or no JSON object. A body
-     *   that is nested more deeply than the parser goes, which is some hundred levels, counts as no object.
+     * @throws AdminProblem with the status 415 for a body that the request does not declare as JSON, with
+     *   the status 413 for a body that is longer than the server takes, and with the status 400 for a
+     *   request without a body, and for a body that is no UTF-8 or no JSON object. A body that is nested
+     *   more deeply than the parser goes, which is some hundred levels, counts as no object.
      */
     suspend fun jsonObject(): JsonObject {
+        requireJson()
         val text =
             try {
                 Charsets.UTF_8
@@ -133,6 +137,37 @@ internal class AdminRequest(
             }
         return (json as? JsonObject)?.takeIf(::isJson)
             ?: throw AdminProblem(HttpStatusCode.BadRequest, "The body of the request is no JSON object.")
+    }
+
+    /**
+     * Checks that a request with a body declares that body as JSON: its one `Content-Type` header names the
+     * media type `application/json`, and no charset other than UTF-8. The body is not read before.
+     *
+     * The declaration is more than a formality. A web page can make a browser send a request with a body of
+     * the types that a form has, and of plain text, to any server without asking that server. For a body of
+     * JSON the browser asks first, and the admin listener permits a page nothing.
+     *
+     * @throws AdminProblem with the status 415 when the request has a body and does not declare it so.
+     */
+    private fun requireJson() {
+        val headers = call.request.headers
+        val length = headers[HttpHeaders.ContentLength]?.trim()
+        val hasBody = headers.contains(HttpHeaders.TransferEncoding) || (length != null && length != "0")
+        if (hasBody && !declaresJson(headers.getAll(HttpHeaders.ContentType).orEmpty())) {
+            throw AdminProblem(HttpStatusCode.UnsupportedMediaType, NOT_DECLARED_AS_JSON)
+        }
+    }
+
+    /** Returns whether [contentTypes], the values of the `Content-Type` headers of a request, are one that names JSON in UTF-8. */
+    private fun declaresJson(contentTypes: List<String>): Boolean {
+        val type =
+            try {
+                ContentType.parse(contentTypes.singleOrNull() ?: return false)
+            } catch (_: BadContentTypeFormatException) {
+                return false
+            }
+        val charset = type.parameter("charset")
+        return type.withoutParameters() == ContentType.Application.Json && (charset == null || charset.equals("utf-8", ignoreCase = true))
     }
 
     /**
@@ -175,6 +210,10 @@ internal class AdminRequest(
     }
 
     private companion object {
+        const val NOT_DECLARED_AS_JSON =
+            "The body of a request to the admin API is JSON in UTF-8, and the request has to say so " +
+                "with the header Content-Type: application/json."
+
         val BOOLEANS = setOf("true", "false")
 
         /** A number as JSON writes it. */

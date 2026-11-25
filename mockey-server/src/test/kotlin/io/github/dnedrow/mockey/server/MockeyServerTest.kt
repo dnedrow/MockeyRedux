@@ -120,8 +120,9 @@ class MockeyServerTest {
 
     /**
      * The scenario "No cross-origin header on the admin API", for everything that the admin listener
-     * answers: a page of another origin gets no permission from it, whatever it asks for. The mock listener
-     * gives the permission with its mock responses, and only with them.
+     * answers: a page of another origin gets no permission from it, whatever it asks for, and the admin API
+     * refuses what could change something. The mock listener gives the permission with its mock responses,
+     * and only with them.
      */
     @Test
     fun theAdminListenerGivesAPageOfAnotherOriginNoPermission() {
@@ -146,8 +147,8 @@ class MockeyServerTest {
             mapOf<String, Int?>(
                 "GET /" to 404,
                 "GET /api/v1/services" to 200,
-                "POST /api/v1/services" to 405,
-                "OPTIONS /api/v1/services" to 405,
+                "POST /api/v1/services" to 403,
+                "OPTIONS /api/v1/services" to 403,
                 "GET /status" to 404,
                 "GET /service/customer/7" to 404,
                 "OPTIONS /service/customer/7" to 404,

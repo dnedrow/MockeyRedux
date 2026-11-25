@@ -60,6 +60,17 @@ The server SHALL add the header `Mockey-Forwarded` to every request that it forw
 - **WHEN** a client sends a request with the header `Mockey-Forwarded` to the admin listener
 - **THEN** the response has status 403, and no admin operation is performed
 
+### Requirement: Web pages change nothing
+The admin API SHALL NOT perform an operation for a request with a method other than `GET` and `HEAD` that carries an `Origin` header, and SHALL answer such a request with status 403. It SHALL accept a request body only when the request declares the media type `application/json`, and SHALL answer a request with a body of any other declared type, or of none, with status 415.
+
+#### Scenario: Request of a web page that would change something
+- **WHEN** a client sends a `POST` request with the header `Origin: https://pages.example` to the admin API
+- **THEN** the response has status 403, and no admin operation is performed
+
+#### Scenario: Body that is not declared as JSON
+- **WHEN** a client sends a `POST` request whose body is a JSON object and whose `Content-Type` is `text/plain`
+- **THEN** the response has status 415, and no admin operation is performed
+
 ### Requirement: Access token
 When an admin token is configured, the system SHALL reject with status 401 every admin API request that does not present that token as a bearer token in the `Authorization` header, and SHALL NOT perform the requested operation.
 

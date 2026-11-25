@@ -30,14 +30,16 @@ import java.time.Instant
  *
  * 1. While the server has an admin token, the request has to present it, see [presentsToken]. A request
  *    that does not gets the status 401, whatever it is for, and nothing is read or changed for it.
- * 2. The path below the prefix names a resource. It is taken apart at its slashes, and a path that no route
+ * 2. A request that can change something must not come from a web page, see [comesFromAPage]. One that
+ *    does gets the status 403, whatever it is for.
+ * 3. The path below the prefix names a resource. It is taken apart at its slashes, and a path that no route
  *    is for gets the status 404.
- * 3. The method names the operation on the resource. `HEAD` stands for `GET`, and the HTTP engine leaves
+ * 4. The method names the operation on the resource. `HEAD` stands for `GET`, and the HTTP engine leaves
  *    the body out of the answer. A resource that has no operation with the method gets the status 405, with
  *    the methods that it does have.
- * 4. What the path has at the parameters of the route is decoded. That comes after the path was taken
+ * 5. What the path has at the parameters of the route is decoded. That comes after the path was taken
  *    apart, so that an escaped slash stays in its segment. A malformed escape gets the status 400.
- * 5. The operation answers, see [AdminRoute.handle].
+ * 6. The operation answers, see [AdminRoute.handle].
  *
  * The body of an answer is JSON in UTF-8. An answer that reports a failure is a problem document, see
  * [AdminProblem]. Every answer says that it is not to be stored: what the API says of the server now says
@@ -91,6 +93,7 @@ internal class AdminApi(
         if (!presentsToken(call)) {
             throw AdminProblem(HttpStatusCode.Unauthorized, NO_TOKEN, headers = mapOf(HttpHeaders.WWWAuthenticate to BEARER))
         }
+        if (comesFromAPage(call)) throw AdminProblem(HttpStatusCode.Forbidden, OF_A_PAGE)
         val (route, parameters) = routeOf(call.request.local.method, resource)
         return try {
             route.handle(AdminRequest(call, parameters, maxRequestBody))
@@ -122,6 +125,21 @@ internal class AdminApi(
         val scheme = credentials.substringBefore(' ')
         val presented = credentials.substring(scheme.length).trimStart(' ')
         return scheme.equals(BEARER, ignoreCase = true) && token.matches(asTheClientSent(presented))
+    }
+
+    /**
+     * Returns whether the request of [call] can change something and comes from a web page: its method is
+     * neither `GET` nor `HEAD`, and it carries an `Origin` header.
+     *
+     * A browser sends that header with every request of a page whose method is neither `GET` nor `HEAD`,
+     * also where it has nothing to say in it and sends `null`. A page of any origin can make the browser of
+     * someone on the machine of the server send a request to the admin listener, which the loopback address
+     * lets in. No page is a client of the admin API, and a program sends no such header by itself.
+     * `docs/decisions/web-pages-and-the-admin-api.md` says more.
+     */
+    private fun comesFromAPage(call: ApplicationCall): Boolean {
+        val method = call.request.local.method
+        return method != HttpMethod.Get && method != HttpMethod.Head && call.request.headers.contains(HttpHeaders.Origin)
     }
 
     /**
@@ -180,6 +198,9 @@ internal class AdminApi(
         private const val NO_TOKEN =
             "The admin API takes a request only with the admin token, which a request presents as a bearer token " +
                 "in its Authorization header."
+        private const val OF_A_PAGE =
+            "The request carries an Origin header, as the request of a web page does, and its method is neither GET nor HEAD. " +
+                "The admin API takes a request that can change something only from a program."
         private const val MALFORMED_PATH = "The path of the request holds a percent sign that begins no escape of a character."
         private const val NO_RESOURCE = "The admin API has no resource at the path of the request."
         private const val NO_OPERATION = "The resource has no operation with the method of the request."
