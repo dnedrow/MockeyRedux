@@ -116,8 +116,12 @@ class ServerProgramTest {
             assertEquals("127.0.0.1" to 8081, listening.adminHost to listening.adminPort)
             val ofMock = RawHttp.get(listening.mock, "/service/customer/7")
             val ofAdmin = RawHttp.get(listening.admin, "/service/customer/7")
+            val status = RawHttp.get(listening.mock, "/status")
             assertEquals(200 to StoredDefinitions.CUSTOMER, ofMock.status to ofMock.body)
             assertEquals(404 to "", ofAdmin.status to ofAdmin.body)
+            assertEquals(200, status.status)
+            assertTrue(status.body.startsWith("""{"status":"running","since":""""), status.body)
+            assertEquals(404, RawHttp.get(listening.admin, "/status").status)
             assertEquals(404, RawHttp.get(listening.admin, "/api/v1").status)
             assertContains(messages(program.output), "The mock listener accepts connections on 0.0.0.0:8080.")
             assertContains(messages(program.output), "The admin listener accepts connections on 127.0.0.1:8081.")
@@ -225,6 +229,7 @@ class ServerProgramTest {
                 assertEquals(404, RawHttp.get(listening.admin, "/api/v1/status?token=$token", presenting).status)
                 assertEquals(404, RawHttp.get(listening.mock, "/service/customer/7?token=$token", presenting).status)
                 assertEquals(404, RawHttp.get(listening.mock, "/service/$token").status)
+                assertEquals(200, RawHttp.get(listening.mock, "/status?token=$token", presenting).status)
             }
 
             val messages = messages(program.output)

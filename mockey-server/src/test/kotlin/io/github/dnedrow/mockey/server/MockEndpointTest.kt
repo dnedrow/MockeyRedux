@@ -13,6 +13,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -60,8 +61,10 @@ class MockEndpointTest {
     }
 
     /** The mock endpoint of [engine] on a listener, which takes bodies of [maxRequestBody] bytes at most. */
-    private fun endpoint(maxRequestBody: Long = MEBIBYTE): Listener =
-        Listener.start(ListenerKind.MOCK, RawHttp.loopback(0), MockEndpoint(engine, maxRequestBody).module).also { listeners += it }
+    private fun endpoint(maxRequestBody: Long = MEBIBYTE): Listener {
+        val module = MockeyServer.mockListenerModule(MockEndpoint(engine, maxRequestBody), StatusEndpoint(Instant.EPOCH))
+        return Listener.start(ListenerKind.MOCK, RawHttp.loopback(0), module).also { listeners += it }
+    }
 
     private val listener by lazy { endpoint() }
 
@@ -201,36 +204,6 @@ class MockEndpointTest {
         val head = listOf(line) + headers + listOf("Connection: close", "", "")
         val answer = RawHttp.exchange(listener.address, head.joinToString(RawHttp.CRLF).toByteArray())
         return answer.statusLine to answer.body
-    }
-
-    @Test
-    fun aRequestOfHttp11ThatNamesNoHostIsRefused() {
-        val refused = "HTTP/1.1 400 Bad Request" to "The request names no host in a Host header."
-
-        for (headers in listOf(emptyList(), listOf("Host:"), listOf("Host:   "))) {
-            assertEquals(refused, answerTo("GET /service/customer/7 HTTP/1.1", headers), "$headers")
-            assertEquals(refused, answerTo("GET http://mockey.test/service/customer/7 HTTP/1.1", headers), "$headers")
-        }
-        assertEquals(emptyList(), history())
-    }
-
-    @Test
-    fun aHostHeaderThatHoldsWhatNoNameOfAHostHoldsIsRefused() {
-        val explanation = "The request names no host in a Host header."
-
-        for (host in listOf("evil.example/service/x", "a?b", "a#b", "user@host", "a b", """a\b""")) {
-            assertEquals(
-                "HTTP/1.1 400 Bad Request" to explanation,
-                answerTo("GET /service/customer/7 HTTP/1.1", listOf("Host: $host")),
-                host,
-            )
-            assertEquals(
-                "HTTP/1.0 400 Bad Request" to explanation,
-                answerTo("GET /service/customer/7 HTTP/1.0", listOf("Host: $host")),
-                host,
-            )
-        }
-        assertEquals(emptyList(), history())
     }
 
     @Test
@@ -444,16 +417,43 @@ class MockEndpointTest {
         assertEquals(200, without.status)
     }
 
+    /** The client states a length beyond the limit and sends no body at all. It keeps its connection. */
     @Test
-    fun theAnswerToABodyThatIsTooLongIsPlainText() {
-        val head =
-            listOf("POST /service/customer/7 HTTP/1.1", "Host: mockey.test", "Connection: close", "Content-Length: ${5 * MEBIBYTE}", "", "")
+    fun aStatedLengthBeyondTheLimitIsAnsweredAtOnceOnAConnectionThatStays() {
+        val head = listOf("POST /service/customer/7 HTTP/1.1", "Host: mockey.test", "Content-Length: ${5 * MEBIBYTE}", "", "")
 
         val answer = RawHttp.exchange(listener.address, head.joinToString(RawHttp.CRLF).toByteArray(), waitMillis = 1_000)
 
         assertEquals("HTTP/1.1 413 Payload Too Large", answer.statusLine)
-        assertEquals(listOf("text/plain; charset=UTF-8"), answer.headerValues("Content-Type"))
+        assertEquals(listOf("text/plain; charset=utf-8"), answer.headerValues("Content-Type"))
         assertContains(answer.body, "longer than 1048576 bytes")
+        assertFalse(answer.ended, "The connection stays")
+    }
+
+    /**
+     * The client asks to close the connection after its request. Netty closes it as soon as the answer
+     * is written, so the answer waits until the client has sent its body: a client that is still sending
+     * when the connection closes can lose the answer.
+     */
+    @Test
+    fun aClientThatClosesItsConnectionGetsTheStatus413WhenItHasSentItsBody() {
+        val body = "x".repeat(8 * MEBIBYTE.toInt())
+
+        val answers = List(5) { send("POST", "/service/customer/7", listOf("Content-Type: text/plain"), body) }
+
+        assertEquals(List(5) { "HTTP/1.1 413 Payload Too Large" }, answers.map { it.statusLine })
+        assertEquals(List(5) { true }, answers.map { it.ended })
+        assertEquals(emptyList(), history())
+    }
+
+    @Test
+    fun aClientOfHttp10GetsTheStatus413WhenItHasSentItsBody() {
+        val body = "x".repeat(4 * MEBIBYTE.toInt())
+        val head = listOf("POST /service/customer/7 HTTP/1.0", "Content-Length: ${body.length}", "", body)
+
+        val answers = List(3) { RawHttp.exchange(listener.address, head.joinToString(RawHttp.CRLF).toByteArray()) }
+
+        assertEquals(List(3) { "HTTP/1.0 413 Payload Too Large" }, answers.map { it.statusLine })
     }
 
     @Test

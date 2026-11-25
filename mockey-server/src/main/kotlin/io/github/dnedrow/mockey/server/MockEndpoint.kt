@@ -4,22 +4,20 @@ import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.request.MockRequest
 import io.github.dnedrow.mockey.core.response.MockResponse
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.content.OutgoingContent
-import io.ktor.http.content.TextContent
-import io.ktor.http.withCharset
-import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.application.ApplicationCallPipeline
-import io.ktor.server.application.call
 import io.ktor.server.response.respond
 import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.readByteArray
 import org.slf4j.LoggerFactory
+import java.time.Clock
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * The mock endpoint: the one handler of the mock listener, which hands every request whose path begins with
@@ -30,25 +28,36 @@ import org.slf4j.LoggerFactory
  * A request reaches the engine as the client sent it: its method, whatever that is, the path and the query
  * string of its request target without any decoding, its headers, and its body.
  *
- * Two kinds of request do not reach the engine. A request with a body of more than [maxRequestBody] bytes
- * gets the status 413. A request that names no host gets the status 400, as HTTP has it: a request of
- * HTTP/1.1 without a `Host` header, and a request whose `Host` header holds what no name of a host holds.
+ * A request with a body of more than [maxRequestBody] bytes does not reach the engine. It gets the status
+ * 413. The URL of a request names the host that the request names, see [RequestHost]. A listener passes no
+ * request on that names none.
+ *
+ * Every response of the mock endpoint carries the five default headers of mock responses, see
+ * [withDefaults]. [clock] tells the time that one of them states.
  */
 internal class MockEndpoint(
     private val engine: MockeyEngine,
     private val maxRequestBody: Long,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
-    /** The module of the mock listener. */
-    val module: suspend Application.() -> Unit = { intercept(ApplicationCallPipeline.Call) { handle(call) } }
-
-    /** Answers the request of [call] when it is mock traffic. Ktor answers what is left unanswered with the status 404. */
-    private suspend fun handle(call: ApplicationCall) {
+    /** Answers the request of [call] when it is mock traffic, and returns whether it is. */
+    suspend fun handle(call: ApplicationCall): Boolean {
         val connection = call.request.local
         val target = RequestTarget.parse(connection.uri)
-        if (!target.path.startsWith(MockRequest.SERVICE_PATH)) return
-        val host = hostOf(call) ?: return call.respond(plain(HttpStatusCode.BadRequest, NO_HOST))
+        if (!target.path.startsWith(MockRequest.SERVICE_PATH)) return false
+        answer(call, target)
+        return true
+    }
+
+    /** Answers the request of [call], which is mock traffic for [target]. */
+    private suspend fun answer(
+        call: ApplicationCall,
+        target: RequestTarget,
+    ) {
+        val connection = call.request.local
+        val host = checkNotNull(RequestHost.of(call)) { "A listener passes no request on that names no host." }
         val url = target.url ?: "$SCHEME$host${target.path}"
-        val body = bodyOf(call) ?: return call.respond(plain(HttpStatusCode.PayloadTooLarge, tooLarge()))
+        val body = bodyOf(call) ?: return refuse(call, HttpStatusCode.PayloadTooLarge, tooLarge())
         val headers = headersOf(call)
         val method = connection.method.value
         val response =
@@ -59,33 +68,30 @@ internal class MockEndpoint(
             } catch (failure: Exception) {
                 // The query string is left out, because it can hold a secret.
                 log.error("The request {} {} failed.", method, target.path, failure)
-                return call.respond(plain(HttpStatusCode.InternalServerError, FAILED))
+                return refuse(call, HttpStatusCode.InternalServerError, FAILED)
             }
         write(call, method, response)
     }
 
     /**
-     * Returns the host that the request names in its `Host` header, with its port, as the client wrote it.
-     * A request of HTTP/1.0 need not name a host, and for such a request it is the address and the port of
-     * the listener.
-     *
-     * Returns `null` for a request that names no host: when a request of a later version has no `Host`
-     * header, and when the header holds what no name of a host holds.
+     * Answers a request that the engine does not handle with [status] and [explanation], as plain text. The
+     * body of such a request may not have been read, see [UnreadBody].
      */
-    private fun hostOf(call: ApplicationCall): String? {
-        val connection = call.request.local
-        val host = call.request.headers[HttpHeaders.Host]?.trim()
-        return when {
-            host.isNullOrEmpty() -> hostAndPort(connection.localAddress, connection.localPort).takeIf { connection.version == HTTP_1_0 }
-            host.any { it in NOT_IN_A_HOST || it.isWhitespace() || it.isISOControl() } -> null
-            else -> host
-        }
+    private suspend fun refuse(
+        call: ApplicationCall,
+        status: HttpStatusCode,
+        explanation: String,
+    ) {
+        write(call, call.request.local.method.value, builtIn(status.value, explanation))
     }
 
-    private fun hostAndPort(
-        address: String,
-        port: Int,
-    ): String = if (':' in address) "[$address]:$port" else "$address:$port"
+    private fun builtIn(
+        status: Int,
+        explanation: String,
+    ): MockResponse {
+        val headers = listOf(Header(HttpHeaders.ContentType, Refusal.PLAIN_TEXT.toString()))
+        return MockResponse(status, headers, explanation.toByteArray(Charsets.UTF_8))
+    }
 
     /**
      * Returns the headers of the request: the names in the order in which the client sent them, and with
@@ -105,8 +111,8 @@ internal class MockEndpoint(
 
     /**
      * Returns the body of the request, or `null` when it is longer than the server takes. A request that
-     * states a length beyond that is not read at all, and any other is read as far as the limit goes. The
-     * engine reads and drops the rest of a body that is not read here.
+     * states a length beyond that is not read at all, and any other is read as far as the limit goes. What
+     * is not read here is read and dropped before the answer or after it, see [UnreadBody].
      *
      * The body is read from the channel of the request itself. The channel that Ktor gives a call for its
      * body is the same one, but on the way to it Ktor writes the request target with its query string to
@@ -149,9 +155,9 @@ internal class MockEndpoint(
         if (response.status !in WRITABLE_STATUSES) {
             log.warn("A response with the status {} was not sent, because that is no status of HTTP.", response.status)
             val explanation = "The response has the status ${response.status}, which is no status of HTTP."
-            return call.respond(plain(HttpStatusCode.InternalServerError, explanation))
+            return write(call, method, builtIn(HttpStatusCode.InternalServerError.value, explanation))
         }
-        for (header in response.headers.filterNot { it.name.lowercase() in SET_BY_THE_SERVER }) {
+        for (header in withDefaults(response.headers).filterNot { it.name.lowercase() in SET_BY_THE_SERVER }) {
             try {
                 call.response.headers.append(header.name, header.value, safeOnly = false)
             } catch (_: IllegalArgumentException) {
@@ -176,10 +182,17 @@ internal class MockEndpoint(
         }
     }
 
-    private fun plain(
-        status: HttpStatusCode,
-        text: String,
-    ): OutgoingContent = TextContent(text, ContentType.Text.Plain.withCharset(Charsets.UTF_8), status)
+    /**
+     * Returns [headers] with the default headers of mock responses after them: `Access-Control-Allow-Origin`,
+     * `Cache-Control`, `Pragma`, `Expires`, and `Last-Modified` with the time of now. A default is left out
+     * when [headers] hold a header of its name, in any letter case, so that a scenario or a real service that
+     * sets such a header has its way.
+     */
+    private fun withDefaults(headers: List<Header>): List<Header> {
+        val defined = headers.map { it.name.lowercase() }.toSet()
+        val defaults = FIXED_DEFAULTS + Header(HttpHeaders.LastModified, HTTP_DATE.format(clock.instant()))
+        return headers + defaults.filterNot { it.name.lowercase() in defined }
+    }
 
     /** A response that ends with its headers, which state [contentLength] as the length of a body that is not sent. */
     private class HeadersOnly(
@@ -192,11 +205,18 @@ internal class MockEndpoint(
 
         private const val SCHEME = "http://"
 
-        /** Characters that the name of a host with its port never holds, and that would end the host in a URL. */
-        private const val NOT_IN_A_HOST = "/\\?#@"
+        /** The default headers of mock responses whose values are always the same. */
+        private val FIXED_DEFAULTS =
+            listOf(
+                Header(HttpHeaders.AccessControlAllowOrigin, "*"),
+                Header(HttpHeaders.CacheControl, "no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0"),
+                Header(HttpHeaders.Pragma, "no-cache"),
+                Header(HttpHeaders.Expires, "Tue, 03 Jul 2001 06:00:00 GMT"),
+            )
 
-        private const val HTTP_1_0 = "HTTP/1.0"
-        private const val NO_HOST = "The request names no host in a Host header."
+        /** A time as an HTTP header states it, such as `Tue, 03 Jul 2001 06:00:00 GMT`. */
+        private val HTTP_DATE = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US).withZone(ZoneOffset.UTC)
+
         private const val FAILED = "The server failed to handle the request. Its log says why."
 
         /** The statuses that a status line can state: numbers of three digits. */
@@ -230,14 +250,8 @@ internal class RequestTarget private constructor(
         fun parse(target: String): RequestTarget {
             val withoutQuery = target.substringBefore('?')
             val query = if (withoutQuery.length < target.length) target.substring(withoutQuery.length + 1) else null
-            val origin = ABSOLUTE.find(withoutQuery)?.value
-            return if (origin ==
-                null
-            ) {
-                RequestTarget(null, withoutQuery, query)
-            } else {
-                RequestTarget(withoutQuery, withoutQuery.removePrefix(origin), query)
-            }
+            val origin = ABSOLUTE.find(withoutQuery)?.value ?: return RequestTarget(null, withoutQuery, query)
+            return RequestTarget(withoutQuery, withoutQuery.removePrefix(origin), query)
         }
     }
 }

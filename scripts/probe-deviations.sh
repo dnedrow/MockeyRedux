@@ -136,7 +136,8 @@ confirm DEV-29 "the merge reports no additions and no conflicts" contains "$merg
 confirm DEV-29 "the source service Orders is deleted" lacks "$definitions" '"serviceName":"Orders"'
 confirm DEV-29 "none of its scenarios reached the destination service" lacks "$definitions" '"scenarioName":"open"'
 
-# DEV-63 to DEV-67: what Jetty, the HTTP server of legacy, does with a request before Mockey sees it.
+# DEV-63 to DEV-67: what Jetty, the HTTP server of legacy, does with a request before Mockey sees it. The lines
+# that say "No deviation" show what the new server does in the same way, so that it stays out of the register.
 load responses-static
 plan='/service/static/plan'
 letters() { head -c "$1" /dev/zero | tr '\0' a; }
@@ -168,8 +169,22 @@ confirm DEV-66 "a request with the Host header a/b is answered" \
   same "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: a/b' "$BASE_URL$plan")" 200
 confirm DEV-66 "a request with the Host header a?b is answered" \
   same "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: a?b' "$BASE_URL$plan")" 200
+confirm DEV-66 "a request with an empty Host header is answered" \
+  contains "$(raw "GET $plan HTTP/1.1\r\nHost:\r\nConnection: close\r\n\r\n")" ' 200 '
+confirm DEV-66 "a request with two Host headers is answered" \
+  contains "$(raw "GET $plan HTTP/1.1\r\nHost: 127.0.0.1\r\nHost: other.test\r\nConnection: close\r\n\r\n")" ' 200 '
 confirm "No deviation" "a request of HTTP/1.1 without a Host header gets the status 400, as in the new server" \
   contains "$(raw "GET $plan HTTP/1.1\r\nConnection: close\r\n\r\n")" ' 400 '
+confirm "No deviation" "and so does such a request for /status" \
+  contains "$(raw "GET /status HTTP/1.1\r\nConnection: close\r\n\r\n")" ' 400 '
+confirm "No deviation" "and such a request for a path that nothing serves" \
+  contains "$(raw "GET /no/such/path HTTP/1.1\r\nConnection: close\r\n\r\n")" ' 400 '
+confirm "No deviation" "a request of HTTP/1.0 without a Host header for /status is answered, as in the new server" \
+  contains "$(raw "GET /status HTTP/1.0\r\n\r\n")" ' 200 '
+for method in POST PUT DELETE PATCH OPTIONS TRACE FOO; do
+  confirm "No deviation" "a request with the method $method for /status gets the status, as in the new server" \
+    contains "$(curl -s -X "$method" "$BASE_URL/status")" '"running"'
+done
 
 confirm DEV-67 "a request for /service is answered by Mockey, as a request for /service/ is" \
   same "$(get /service)" "$(get /service/)"

@@ -146,6 +146,12 @@ The listeners (task 11.2):
   IPv6: a listener on `0.0.0.0` answered a request to `[::1]`, and its socket stated its address as
   `[0:0:0:0:0:0:0:0]`. The log states the address of a listener as it was set. This was seen on macOS and is
   not asserted, because it depends on the machine.
+- Neither Ktor nor Netty asks that a request names a host. HTTP has it that a request of HTTP/1.1 without a
+  `Host` header gets the status 400, and Jetty answers so in legacy, whatever the request is for. Every
+  listener therefore refuses such a request itself, in the phase of the plugins, before anything else sees
+  the request (`RequestHost`, task 11.4). A request of HTTP/1.0 need not name a host.
+- Ktor answers a request with more than one `Host` header with the status 400 and no reason
+  (`verifyHostHeader` in `BaseApplicationEngine.kt`). The listener comes first and gives the reason.
 
 The mock endpoint (tasks 11.3 and 11.4):
 
@@ -165,10 +171,19 @@ Task 11.3 found more, and the tests of the mock endpoint show it:
   `call.receiveChannel()` gives is the same one, but on the way to it Ktor writes the request target with its
   query string to the log, at the level of traces. With the channel of the request, the log holds nothing of
   a request at any level.
-- A handler can answer without reading the body. The engine then reads the rest of the body and drops it, so
-  that the client has sent its request when the answer arrives. That is how a body beyond the limit gets its
-  status 413: a client received it after sending 1 GiB. The mock endpoint looks at `Content-Length` first and
-  reads a body without one, which comes in chunks, as far as the limit and one byte more.
+- A handler can answer without reading the body. On a connection that stays, the engine then reads the rest
+  of the body and drops it, so that the client has sent its request when the answer arrives. That is how a
+  body beyond the limit gets its status 413: a client received it after sending 1 GiB. The mock endpoint
+  looks at `Content-Length` first and reads a body without one, which comes in chunks, as far as the limit and
+  one byte more.
+- On a connection that ends with the answer, the engine closes the connection as soon as the answer is
+  written, also when the client is still sending its body. Such a client loses the answer: not one of the
+  clients that sent 8 MiB with `Connection: close` got the status 413, and each of them found the connection
+  closed without an answer. The same holds for a client of HTTP/1.0, which does not keep its connection
+  unless it asks for that. Before an answer on such a connection, every listener therefore reads the rest of
+  the body and drops it (`UnreadBody`, task 11.4). It does so where Ktor sends a response, so that it also
+  holds for the status 404 that Ktor gives itself, and for `/status`, which reads no body. On a connection
+  that stays, the answer still goes out at once.
 - Netty answers a request with `Expect: 100-continue` with `100 Continue` before the handler runs. A client
   that waits for it therefore sends a body beyond the limit before it gets the status 413.
 - For a status that allows no body, 204 or 304 or one of the 100 range, the engine sends none. It also takes
@@ -177,7 +192,8 @@ Task 11.3 found more, and the tests of the mock endpoint show it:
   header. The mock endpoint therefore leaves the `Content-Length` and the `Transfer-Encoding` of a response
   out, and for a response without a body it gives the engine the length to state.
 - A request that nothing answers gets the status 404 with no body from Ktor. That is the answer to every
-  request on the mock listener that is no mock traffic.
+  request on the mock listener that is neither mock traffic nor a request for `/status`, and to every
+  request on the admin listener until the admin API is there.
 
 Stopping (task 11.7):
 
@@ -203,8 +219,9 @@ answered, because legacy does not run in it. `scripts/probe-deviations.sh` sends
 | Long headers | A header of 7,000 characters gets `413 FULL head`. | Headers of up to 8,192 characters together are taken. More get the status 400. | DEV-64 |
 | A long body | A body of 52 MiB is taken. | A body beyond the limit, 50 MiB unless it is set otherwise, gets the status 413. | DEV-65 |
 | Lines that end with a line feed alone | Taken. | Status 400. | DEV-66 |
-| A `Host` header such as `a/b` or `a?b` | Taken. | Status 400. | DEV-66 |
-| A request of HTTP/1.1 without a `Host` header | Status 400. | Status 400. | none |
+| A `Host` header such as `a/b` or `a?b`, or an empty one | Taken. | Status 400. | DEV-66 |
+| More than one `Host` header | Taken. | Status 400. | DEV-66 |
+| A request of HTTP/1.1 without a `Host` header, whatever it is for | Status 400. | Status 400. | none |
 | A request for `/service` | It is mock traffic with an empty target, as a request for `/service/` is. | Status 404. Only a path that begins with `/service/` is mock traffic. | DEV-67 |
 
 ## Repeating the spike

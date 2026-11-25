@@ -174,8 +174,10 @@ class ServerLoggingTest {
                                     "/service/http://upstream.test/$presented?token=$presented",
                                     presenting,
                                 )
+                            val ofStatus = RawHttp.get(server.listeners.mock.address, "/status?token=$presented", presenting)
                             assertEquals(404, ofAdmin.status)
                             assertEquals(200 to StubProxy.ANSWER, ofMock.status to ofMock.body)
+                            assertEquals(200, ofStatus.status)
                         }
                     }
                     logAtEveryLevel()

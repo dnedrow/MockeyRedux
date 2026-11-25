@@ -126,7 +126,9 @@ internal class Listener private constructor(
         private const val STOP_TIMEOUT_MILLIS = 5_000L
 
         /**
-         * Starts a listener on [address] that runs [module].
+         * Starts a listener on [address] that runs [module] for the requests that name a host. The listener
+         * answers every other request itself, see [RequestHost]. It also sees to it that a client gets the
+         * answer to a request whose body nothing has read, see [UnreadBody].
          *
          * @throws StartupFailure when the listener cannot be bound to the address and the port.
          */
@@ -136,8 +138,13 @@ internal class Listener private constructor(
             module: suspend Application.() -> Unit,
         ): Listener {
             val listening = CopyOnWriteArrayList<Channel>()
+            val guarded: suspend Application.() -> Unit = {
+                RequestHost.require(this)
+                UnreadBody.dropBeforeTheLastAnswer(this)
+                module()
+            }
             val server =
-                HttpEngine.server(address.address.hostAddress, address.port, module) {
+                HttpEngine.server(address.address.hostAddress, address.port, guarded) {
                     configureBootstrap = {
                         handler(
                             object : ChannelInitializer<Channel>() {

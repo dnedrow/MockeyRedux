@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.server
 
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.net.ConnectException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -9,6 +10,7 @@ import java.net.Socket
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets
+import kotlin.random.Random
 
 /**
  * HTTP over a socket, for tests that have to say exactly what a client writes to a connection, or that have
@@ -18,6 +20,11 @@ internal object RawHttp {
     const val CRLF = "\r\n"
     private const val WAIT_MILLIS = 5_000
     private const val BUFFER_SIZE = 8_192
+
+    /** Ports below the ones that Linux, macOS, and Windows give to clients, and above the ones of well-known services. */
+    private const val FIRST_PORT_OF_NO_CLIENT = 20_000
+    private const val FIRST_PORT_OF_CLIENTS = 30_000
+    private const val PORT_ATTEMPTS = 200
 
     /** What a server wrote to a connection, and whether it [ended] the connection. Every byte is one character. */
     class Answer(
@@ -62,7 +69,8 @@ internal object RawHttp {
      * Writes [request] to a new connection to [address], and returns what the server writes until it ends the
      * connection, or until it has written nothing for [waitMillis].
      *
-     * @throws IOException when no connection is made within [waitMillis].
+     * @throws IOException when no connection is made within [waitMillis], or when nothing listens at
+     *   [address].
      */
     fun exchange(
         address: InetSocketAddress,
@@ -71,6 +79,9 @@ internal object RawHttp {
     ): Answer =
         Socket().use { socket ->
             socket.connect(address, waitMillis)
+            // A client can get the port that it connects to for its own end, when nothing listens there and
+            // the port is one of those that the system gives to clients. Then it is connected to itself.
+            if (socket.localSocketAddress == socket.remoteSocketAddress) throw ConnectException("Nothing listens at $address.")
             socket.soTimeout = waitMillis
             val bytes = ByteArrayOutputStream()
             val buffer = ByteArray(BUFFER_SIZE)
@@ -96,15 +107,16 @@ internal object RawHttp {
     ): Answer = exchange(address, request("GET", target, headers))
 
     /**
-     * Sends a GET request to [address] and returns the answer, or `null` when no connection is made within
-     * [waitMillis] or the server writes nothing in that time.
+     * Sends a GET request for [target] to [address] and returns the answer, or `null` when no connection is
+     * made within [waitMillis] or the server writes nothing in that time.
      */
     fun getIfReached(
         address: InetSocketAddress,
         waitMillis: Int,
+        target: String = "/",
     ): Answer? =
         try {
-            exchange(address, request("GET", "/"), waitMillis).takeUnless { it.nothing }
+            exchange(address, request("GET", target), waitMillis).takeUnless { it.nothing }
         } catch (_: IOException) {
             null
         }
@@ -117,4 +129,35 @@ internal object RawHttp {
         val sockets = List(count) { ServerSocket(0) }
         return sockets.map { it.localPort }.also { sockets.forEach(ServerSocket::close) }
     }
+
+    /**
+     * Returns [count] ports that nothing listens on, and that the system gives to no client for its own end
+     * of a connection. A test needs such ports when it connects to a port before its server listens there:
+     * a client that got the port of the server for itself would be connected to itself, and it would hold
+     * the port when the server wants it.
+     */
+    fun freePortsThatNoClientGets(count: Int): List<Int> {
+        val ports = mutableListOf<Int>()
+        repeat(PORT_ATTEMPTS) {
+            val candidate = Random.nextInt(FIRST_PORT_OF_NO_CLIENT, FIRST_PORT_OF_CLIENTS)
+            if (ports.size < count && candidate !in ports && isFree(candidate)) ports += candidate
+        }
+        check(ports.size == count) { "Found only ${ports.size} of $count free ports." }
+        return ports
+    }
+
+    /**
+     * Returns whether nothing on the loopback address holds [port]: no listener, and no connection that is
+     * open or that was closed a moment ago.
+     */
+    private fun isFree(port: Int): Boolean =
+        try {
+            ServerSocket().use {
+                it.reuseAddress = false
+                it.bind(loopback(port))
+            }
+            true
+        } catch (_: IOException) {
+            false
+        }
 }

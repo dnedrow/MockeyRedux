@@ -1,7 +1,15 @@
 package io.github.dnedrow.mockey.server
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.ServerSocket
 import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,12 +22,21 @@ import kotlin.time.measureTimedValue
 class MockeyServerTest {
     private val levelBefore = ServerLogging.level()
     private val servers = mutableListOf<MockeyServer>()
+    private val directories = mutableListOf<Path>()
 
     @AfterTest
     fun closeTheServersAndRestoreTheLevelOfTheLog() {
         servers.forEach(MockeyServer::close)
+        directories.forEach { it.toFile().deleteRecursively() }
         ServerLogging.configure(levelBefore)
     }
+
+    /** Returns a definitions location that holds the service `Customers`. */
+    private fun definitionsLocation(): Path =
+        Files.createTempDirectory("mockey-server-test").also {
+            directories.add(it)
+            StoredDefinitions.customers(it)
+        }
 
     /** Settings with which a server of a test listens on the loopback address only, and says little in the log. */
     private fun settings(
@@ -27,7 +44,10 @@ class MockeyServerTest {
         adminPort: Int = 0,
     ) = ServerSettings(mockHost = "127.0.0.1", mockPort = mockPort, adminPort = adminPort, logLevel = LogLevel.WARN)
 
-    private fun start(settings: ServerSettings): MockeyServer = MockeyServer.start(settings).also { servers += it }
+    private fun start(
+        settings: ServerSettings,
+        clock: Clock = Clock.systemUTC(),
+    ): MockeyServer = MockeyServer.start(settings, clock).also { servers += it }
 
     @Test
     fun theServerListensWhereItsSettingsSay() {
@@ -51,27 +71,96 @@ class MockeyServerTest {
 
     @Test
     fun theMockListenerServesTheDefinitionsOfTheDefinitionsLocationAndTheAdminListenerDoesNot() {
-        val directory = Files.createTempDirectory("mockey-server-test")
-        try {
-            StoredDefinitions.customers(directory)
+        val server = start(settings().copy(definitions = definitionsLocation()))
 
-            val server = start(settings().copy(definitions = directory))
+        val ofMock = RawHttp.get(server.listeners.mock.address, "/service/customer/7")
+        val ofAdmin = RawHttp.get(server.listeners.admin.address, "/service/customer/7")
+        assertEquals(200 to StoredDefinitions.CUSTOMER, ofMock.status to ofMock.body)
+        assertEquals("HTTP/1.1 404 Not Found" to "", ofAdmin.statusLine to ofAdmin.body)
+        assertEquals(
+            listOf("customer/7"),
+            server.engine.history
+                .entries()
+                .map { it.target },
+        )
+    }
 
-            val ofMock = RawHttp.get(server.listeners.mock.address, "/service/customer/7")
-            val ofAdmin = RawHttp.get(server.listeners.admin.address, "/service/customer/7")
-            assertEquals(200 to StoredDefinitions.CUSTOMER, ofMock.status to ofMock.body)
-            assertEquals("HTTP/1.1 404 Not Found" to "", ofAdmin.statusLine to ofAdmin.body)
-            assertEquals(
-                listOf("customer/7"),
-                server.engine.history
-                    .entries()
-                    .map { it.target },
+    /** The scenario "Status while running", with the time at which this server started. */
+    @Test
+    fun theMockListenerSaysSinceWhenTheServerRunsAndTheAdminListenerDoesNot() {
+        val before = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+        val server = start(settings())
+        val after = Instant.now()
+
+        val ofMock = RawHttp.get(server.listeners.mock.address, "/status")
+        val ofAdmin = RawHttp.get(server.listeners.admin.address, "/status")
+
+        val status = Json.parseToJsonElement(ofMock.body) as JsonObject
+        val since = Instant.parse((status.getValue("since") as JsonPrimitive).content)
+        assertEquals("HTTP/1.1 200 OK", ofMock.statusLine)
+        assertEquals(setOf("status", "since"), status.keys)
+        assertEquals(JsonPrimitive("running"), status["status"])
+        assertEquals(server.since.truncatedTo(ChronoUnit.MILLIS), since)
+        assertTrue(since in before..after, "The server runs since $since, and it was started between $before and $after")
+        assertEquals("HTTP/1.1 404 Not Found" to "", ofAdmin.statusLine to ofAdmin.body)
+    }
+
+    @Test
+    fun theServerTellsTheTimeOfItsClock() {
+        val clock = Clock.fixed(Instant.parse("2031-05-06T07:08:09.123456Z"), ZoneOffset.UTC)
+
+        val server = start(settings().copy(definitions = definitionsLocation()), clock)
+
+        val status = RawHttp.get(server.listeners.mock.address, "/status")
+        val ofService = RawHttp.get(server.listeners.mock.address, "/service/customer/7")
+        assertEquals(clock.instant(), server.since)
+        assertEquals("""{"status":"running","since":"2031-05-06T07:08:09.123Z"}""", status.body)
+        assertEquals(listOf("Tue, 06 May 2031 07:08:09 GMT"), ofService.headerValues("Last-Modified"))
+    }
+
+    /**
+     * The scenario "No cross-origin header on the admin API", for everything that the admin listener
+     * answers: a page of another origin gets no permission from it, whatever it asks for. The mock listener
+     * gives the permission with its mock responses, and only with them.
+     */
+    @Test
+    fun theAdminListenerGivesAPageOfAnotherOriginNoPermission() {
+        val server = start(settings().copy(definitions = definitionsLocation()))
+        val origin = listOf("Origin: https://pages.example")
+        val asking = origin + listOf("Access-Control-Request-Method: PUT", "Access-Control-Request-Headers: authorization, content-type")
+        val requests =
+            mapOf(
+                "GET /" to RawHttp.request("GET", "/", origin),
+                "GET /api/v1/services" to RawHttp.request("GET", "/api/v1/services", origin),
+                "POST /api/v1/services" to RawHttp.request("POST", "/api/v1/services", origin, body = "{}"),
+                "OPTIONS /api/v1/services" to RawHttp.request("OPTIONS", "/api/v1/services", asking),
+                "GET /status" to RawHttp.request("GET", "/status", origin),
+                "GET /service/customer/7" to RawHttp.request("GET", "/service/customer/7", origin),
+                "OPTIONS /service/customer/7" to RawHttp.request("OPTIONS", "/service/customer/7", asking),
             )
-        } finally {
-            servers.forEach(MockeyServer::close)
-            servers.clear()
-            directory.toFile().deleteRecursively()
+
+        fun permissions(answer: RawHttp.Answer) = answer.headers.filter { it.startsWith("access-control-", ignoreCase = true) }
+
+        for ((request, bytes) in requests) {
+            val ofAdmin = RawHttp.exchange(server.listeners.admin.address, bytes)
+
+            assertEquals(404, ofAdmin.status, request)
+            assertEquals(emptyList(), permissions(ofAdmin), request)
         }
+        val ofMock = requests.mapValues { (_, bytes) -> permissions(RawHttp.exchange(server.listeners.mock.address, bytes)) }
+        val forMockTraffic = listOf("Access-Control-Allow-Origin: *")
+        assertEquals(
+            mapOf(
+                "GET /" to emptyList(),
+                "GET /api/v1/services" to emptyList(),
+                "POST /api/v1/services" to emptyList(),
+                "OPTIONS /api/v1/services" to emptyList(),
+                "GET /status" to emptyList(),
+                "GET /service/customer/7" to forMockTraffic,
+                "OPTIONS /service/customer/7" to forMockTraffic,
+            ),
+            ofMock,
+        )
     }
 
     @Test
@@ -100,6 +189,22 @@ class MockeyServerTest {
             assertEquals("HTTP/1.1 404 Not Found", answer.statusLine)
             assertEquals(listOf("Content-Length: 0", "Connection: close"), answer.headers)
             assertEquals("", answer.body)
+        }
+    }
+
+    @Test
+    fun bothListenersRefuseARequestThatNamesNoHost() {
+        val server = start(settings())
+        val request = "GET /status HTTP/1.1\r\nConnection: close\r\n\r\n".toByteArray()
+
+        for (listener in listOf(server.listeners.mock, server.listeners.admin)) {
+            val answer = RawHttp.exchange(listener.address, request)
+
+            assertEquals(
+                "HTTP/1.1 400 Bad Request" to "The request names no host in a Host header.",
+                answer.statusLine to answer.body,
+                listener.kind.title,
+            )
         }
     }
 

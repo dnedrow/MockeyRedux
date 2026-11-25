@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":mockey-legacy"))
     // The core of Clikt alone: its full artifact adds a terminal library that loads native code.
     implementation(libs.clikt.core)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty) {
         // The native libraries of QUIC for five platforms, which only HTTP/3 loads. The server offers no
