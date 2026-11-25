@@ -136,6 +136,45 @@ confirm DEV-29 "the merge reports no additions and no conflicts" contains "$merg
 confirm DEV-29 "the source service Orders is deleted" lacks "$definitions" '"serviceName":"Orders"'
 confirm DEV-29 "none of its scenarios reached the destination service" lacks "$definitions" '"scenarioName":"open"'
 
+# DEV-63 to DEV-67: what Jetty, the HTTP server of legacy, does with a request before Mockey sees it.
+load responses-static
+plan='/service/static/plan'
+letters() { head -c "$1" /dev/zero | tr '\0' a; }
+# raw <request>: writes the request to a connection as it is and prints the status line of the answer.
+raw() {
+  exec 3<>"/dev/tcp/127.0.0.1/$PORT"
+  printf '%b' "$1" >&3
+  head -n 1 <&3 | tr -d '\r'
+  exec 3>&- 3<&-
+}
+confirm DEV-63 "the static service answers a request for its URL" same "$(status_of "$plan")" 200
+confirm DEV-63 "the same request with a % that starts no escape gets the status 400" \
+  same "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is "$BASE_URL/service/static/pl%zzan")" 400
+
+confirm DEV-64 "a request with a query string of 6,000 characters is answered" same "$(status_of "$plan?q=$(letters 6000)")" 200
+confirm DEV-64 "a request with a query string of 7,000 characters gets the status 413" \
+  same "$(status_of "$plan?q=$(letters 7000)")" 413
+confirm DEV-64 "a header of 7,000 characters gets the status 413" \
+  same "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Long: $(letters 7000)" "$BASE_URL$plan")" 413
+
+letters 54525952 >"$WORK/body-of-52-mib"
+confirm DEV-65 "a body of 52 MiB is taken" \
+  same "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/octet-stream' --data-binary "@$WORK/body-of-52-mib" "$BASE_URL$plan")" 200
+rm -f "$WORK/body-of-52-mib"
+
+confirm DEV-66 "a request whose lines end with a line feed alone is answered" \
+  contains "$(raw "GET $plan HTTP/1.1\nHost: 127.0.0.1\nConnection: close\n\n")" ' 200 '
+confirm DEV-66 "a request with the Host header a/b is answered" \
+  same "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: a/b' "$BASE_URL$plan")" 200
+confirm DEV-66 "a request with the Host header a?b is answered" \
+  same "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: a?b' "$BASE_URL$plan")" 200
+confirm "No deviation" "a request of HTTP/1.1 without a Host header gets the status 400, as in the new server" \
+  contains "$(raw "GET $plan HTTP/1.1\r\nConnection: close\r\n\r\n")" ' 400 '
+
+confirm DEV-67 "a request for /service is answered by Mockey, as a request for /service/ is" \
+  same "$(get /service)" "$(get /service/)"
+confirm DEV-67 "and that answer is the one for a target that no service knows" contains "$(get /service)" '"fail"'
+
 stop_legacy
 
 # ---- writable instance -------------------------------------------------------------------------------------

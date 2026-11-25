@@ -156,6 +156,29 @@ The mock endpoint (tasks 11.3 and 11.4):
   are written in the order in which it sets them. It need not leave out the body of the response to a `HEAD`
   request, because the engine does.
 
+Task 11.3 found more, and the tests of the mock endpoint show it:
+
+- Ktor lists the name of a request header once for each spelling of it, and for each spelling it gives the
+  values of all of them. A header that a client sends as `x-id` and as `X-Id` would reach the engine twice.
+  The mock endpoint takes each name once, whatever its letter case, with its values under the first spelling.
+- The mock endpoint reads the body from `call.request.receiveChannel()`. The channel that
+  `call.receiveChannel()` gives is the same one, but on the way to it Ktor writes the request target with its
+  query string to the log, at the level of traces. With the channel of the request, the log holds nothing of
+  a request at any level.
+- A handler can answer without reading the body. The engine then reads the rest of the body and drops it, so
+  that the client has sent its request when the answer arrives. That is how a body beyond the limit gets its
+  status 413: a client received it after sending 1 GiB. The mock endpoint looks at `Content-Length` first and
+  reads a body without one, which comes in chunks, as far as the limit and one byte more.
+- Netty answers a request with `Expect: 100-continue` with `100 Continue` before the handler runs. A client
+  that waits for it therefore sends a body beyond the limit before it gets the status 413.
+- For a status that allows no body, 204 or 304 or one of the 100 range, the engine sends none. It also takes
+  `Content-Length` from a response with the status 204 or one of the 100 range.
+- The engine states the length of a body itself, and it fails a response that states another length in a
+  header. The mock endpoint therefore leaves the `Content-Length` and the `Transfer-Encoding` of a response
+  out, and for a response without a body it gives the engine the length to state.
+- A request that nothing answers gets the status 404 with no body from Ktor. That is the answer to every
+  request on the mock listener that is no mock traffic.
+
 Stopping (task 11.7):
 
 - Ktor registers a shutdown hook for every server that it starts. The hook stops the server with a grace
@@ -168,18 +191,21 @@ Stopping (task 11.7):
 
 ## What differs from the HTTP server of legacy
 
-Legacy runs on Jetty 6. The differences below come from the two HTTP servers and not from Mockey. They were
-seen by sending the same requests to legacy at commit `88e31ed`, started as `docs/parity/running-legacy.md`
-says. No test of this repository holds what legacy answered, because legacy does not run in it.
+Legacy runs on Jetty 7.0.0.RC5, as the `pom.properties` files in its jar say. The differences below come
+from the two HTTP servers and not from Mockey. They were seen by sending the same requests to legacy at commit
+`88e31ed`, started as `docs/parity/running-legacy.md` says. No test of this repository holds what legacy
+answered, because legacy does not run in it. `scripts/probe-deviations.sh` sends the requests to legacy again.
 
-| Request | Legacy | The new server |
-|---|---|---|
-| A long request line | A target of 6,009 characters is taken. A target of 7,009 characters gets `413 FULL head`. | A request line of 65,536 characters is taken. A longer one gets the status 400. |
-| A long header | A header of 9,000 characters gets `413 FULL head`. | The same request gets the status 400. |
-| A malformed percent escape in the path, such as `/service/a%zzb` | Jetty answers `400 Bad Request`, and Mockey does not see the request. | The request reaches the handler, and with it the mock endpoint. |
-| Lines that end with a line feed alone | Taken. | Status 400. |
-
-Task 11.3 adds what concerns the mock endpoint to the deviation register.
+| Request | Legacy | The new server | Deviation |
+|---|---|---|---|
+| A malformed percent escape in the path, such as `/service/a%zzb` | Jetty answers `400 Bad Request`, and Mockey does not see the request. | The request reaches the handler, and with it the mock endpoint. | DEV-63 |
+| A long request line | With the headers that `curl` sends, a target of 6,050 characters is taken, and one of 6,080 characters gets `413 FULL head`: the request line and the headers have to fit into 6,144 bytes together. | A request line of 65,536 characters is taken. A longer one gets the status 400. | DEV-64 |
+| Long headers | A header of 7,000 characters gets `413 FULL head`. | Headers of up to 8,192 characters together are taken. More get the status 400. | DEV-64 |
+| A long body | A body of 52 MiB is taken. | A body beyond the limit, 50 MiB unless it is set otherwise, gets the status 413. | DEV-65 |
+| Lines that end with a line feed alone | Taken. | Status 400. | DEV-66 |
+| A `Host` header such as `a/b` or `a?b` | Taken. | Status 400. | DEV-66 |
+| A request of HTTP/1.1 without a `Host` header | Status 400. | Status 400. | none |
+| A request for `/service` | It is mock traffic with an empty target, as a request for `/service/` is. | Status 404. Only a path that begins with `/service/` is mock traffic. | DEV-67 |
 
 ## Repeating the spike
 

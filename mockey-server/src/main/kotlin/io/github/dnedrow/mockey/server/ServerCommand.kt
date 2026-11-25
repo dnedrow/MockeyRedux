@@ -121,7 +121,7 @@ internal class ServerCommand(
 
     private val maxRequestBody by setting("max-request-body", "Number of bytes that the body of a request may have.", metavar = "bytes")
         .long()
-        .restrictTo(min = 0)
+        .restrictTo(0..ServerSettings.LARGEST_BODY)
         .default(defaults.maxRequestBody, defaultForHelp = bytes(defaults.maxRequestBody))
 
     private val forwardUnknownTargets by setting(

@@ -262,6 +262,12 @@ class ServerCommandTest {
     }
 
     @Test
+    fun theLargestBodyThatCanBeAllowedIsTheLargestThatTheRuntimeHolds() {
+        assertEquals(2_147_483_639L, run("--max-request-body", "2147483639").settings.maxRequestBody)
+        assertEquals(0L, run("--max-request-body", "0").settings.maxRequestBody)
+    }
+
+    @Test
     fun aPortCanBeAnyPortOrTheFreeOne() {
         assertEquals(0, run("--mock-port", "0").settings.mockPort)
         assertEquals(65_535, run("--admin-port", "65535").settings.adminPort)
@@ -414,6 +420,7 @@ class ServerCommandTest {
                 refusedOption("--upstream-response-timeout", "Infinity"),
                 refusedVariable("MOCKEY_UPSTREAM_RESPONSE_TIMEOUT", "0ms"),
                 refusedOption("--max-request-body", "-1"),
+                refusedOption("--max-request-body", "2147483640"),
                 refusedOption("--max-request-body", "9223372036854775808"),
                 refusedVariable("MOCKEY_FORWARD_UNKNOWN_TARGETS", "2"),
                 refusedOption("--log-level", "loud"),

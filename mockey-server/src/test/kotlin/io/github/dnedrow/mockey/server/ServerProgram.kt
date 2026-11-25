@@ -93,15 +93,18 @@ internal object ServerProgram {
     private const val ERRORS = "errors.txt"
 
     /**
-     * Starts the program with [arguments] in a directory of its own. Of the environment of this test it gets
-     * everything but the variables of the program, in whose place it gets [variables].
+     * Starts the program with [arguments] in a directory of its own, which [prepare] fills first. Of the
+     * environment of this test it gets everything but the variables of the program, in whose place it gets
+     * [variables].
      */
     fun start(
         vararg arguments: String,
         variables: Map<String, String> = emptyMap(),
+        prepare: (Path) -> Unit = {},
     ): Running {
         val java = Path(System.getProperty("java.home"), "bin", "java").toString()
         val directory = Files.createTempDirectory("mockey-server-program")
+        prepare(directory)
         val builder =
             ProcessBuilder(listOf(java, "-cp", System.getProperty("java.class.path"), MAIN_CLASS) + arguments)
                 .directory(directory.toFile())

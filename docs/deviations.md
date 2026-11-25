@@ -23,6 +23,10 @@ DEV-59 to DEV-61 were found when the import was implemented (task 9.5). They con
 that are there already, which legacy offers through its upload page only, so they are taken from the source.
 DEV-62 was found when the import of legacy definitions was implemented (task 10.2). It changes no response, so
 it is taken from the source as well.
+DEV-63 to DEV-67 were found when the mock endpoint of the server was implemented (tasks 11.0 and 11.3). They
+come from the HTTP server that receives a request before Mockey does, which is Jetty 7 in legacy and Ktor on
+Netty in the new server, see `docs/decisions/http-stack.md`. No parity case can hold such a request, so the
+probe shows what legacy does.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
@@ -88,3 +92,8 @@ it is taken from the source as well.
 | DEV-60 | An import takes every plan and every twist configuration of the document by its number. One whose number is in use takes the place of the existing one, and any other is added, also under a name that is in use. | A plan or a twist configuration is added when its name is not in use, and it is reported as a conflict otherwise. An import replaces nothing. | read: steps 6 and 7 of `MockeyXmlFileManager.loadConfigurationWithXmlDef`, and `OrderedMap.save` |
 | DEV-61 | An import adds a service with all its real URLs, also with one that another service lists. | A real URL that another service lists is left out, and the report says so. | read: `MockeyXmlFileManager.addServicesToStore` and `mergeServices` |
 | DEV-62 | A scenario can have its rules flag on and no match text. Legacy saves and loads it like any other scenario, and it never evaluates a match text that is blank, so the flag means nothing. | Import gives such a scenario a rule-set criterion without text, which is not a well-formed rule set. The scenario answers no request in dynamic mode, as in legacy. The import report and the definition diagnostics name it, and it is not saved again until its criterion is repaired or removed. | read: `Scenario.hasMatchArgument`, `Service.execute`, and `ScenarioValidator.validate` |
+| DEV-63 | A request whose path holds a `%` that starts no escape, such as `/service/a%zzb`, gets the status 400 from Jetty, the HTTP server of legacy. Mockey does not see the request. | The request reaches the mock endpoint like any other request, and the `%` is part of the target as it is. | run: probe |
+| DEV-64 | The request line and the headers of a request have to fit into 6,144 bytes together, which is what Jetty holds of a request. A longer request gets the status 413. | A request line of up to 65,536 characters is taken, and so are headers of up to 8,192 characters together. A request with more gets the status 400. | run: probe, which finds a request with a query string of 6,000 characters answered and one with 7,000 characters refused |
+| DEV-65 | A request body of any length is taken. Jetty limits only the length of a form, and legacy raises that limit to 500 MB. | A body that is longer than the server is set to take, which is 50 MiB unless it is set otherwise, gets the status 413. The request is neither matched nor forwarded, and the history does not record it. | run: probe, which posts 52 MiB. read: `JettyRunner.main` for the limit of a form |
+| DEV-66 | Jetty takes a request whose lines end with a line feed alone. It also takes a request whose `Host` header holds what no name of a host holds, such as `a/b` or `a?b`. | Both get the status 400. | run: probe |
+| DEV-67 | A request for `/service`, without a slash after it, is mock traffic with an empty target, as a request for `/service/` is. | Only a path that begins with `/service/` is mock traffic. A request for `/service` gets the status 404, and the history does not record it. | run: probe |

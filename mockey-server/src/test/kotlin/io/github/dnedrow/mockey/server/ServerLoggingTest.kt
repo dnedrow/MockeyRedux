@@ -1,10 +1,8 @@
 package io.github.dnedrow.mockey.server
 
-import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.OutboundProxy
 import io.github.dnedrow.mockey.core.model.ProxyCredentials
 import io.github.dnedrow.mockey.core.model.Tags
-import io.github.dnedrow.mockey.core.request.MockRequest
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
@@ -137,8 +135,9 @@ class ServerLoggingTest {
 
     /**
      * The scenario "Secrets are not logged", as far as the server goes at this point: it runs at the most
-     * verbose level with an admin token, given both ways, and gets requests that present the tokens, and an
-     * engine forwards a request through an outbound proxy that takes credentials.
+     * verbose level with an admin token, given both ways, and with an outbound proxy that takes credentials.
+     * It gets requests that present the token in every part of them, and it forwards them through the
+     * proxy. The log holds nothing of a request.
      */
     @Test
     fun theMostVerboseLogHoldsNeitherTheAdminTokenNorTheProxyPassword() {
@@ -158,29 +157,32 @@ class ServerLoggingTest {
                     for ((settings, presented) in listOf(withBoth to token, withTheVariable to tokenOfVariable)) {
                         assertTrue(settings.adminToken!!.matches(presented))
                         MockeyServer.start(settings).use { server ->
-                            for (listener in listOf(server.listeners.mock, server.listeners.admin)) {
-                                val address = RawHttp.loopback(listener.address.port)
-                                val answer =
-                                    RawHttp.get(
-                                        address,
-                                        "/api/v1/status?token=$presented",
-                                        listOf("Authorization: Bearer $presented"),
+                            val presenting = listOf("Authorization: Bearer $presented")
+                            runBlocking {
+                                server.engine.updateOutboundProxy {
+                                    OutboundProxy(
+                                        proxy.url,
+                                        enabled = true,
+                                        credentials = proxyCredentials,
                                     )
-                                assertEquals(404, answer.status)
+                                }
                             }
-                        }
-                    }
-                    runBlocking {
-                        MockeyEngine.create().use { engine ->
-                            engine.updateOutboundProxy { OutboundProxy(proxy.url, enabled = true, credentials = proxyCredentials) }
-                            val handled = engine.handle(MockRequest("GET", "/service/http://upstream.test/orders"))
-                            assertEquals(200 to StubProxy.ANSWER, handled.response.status to handled.response.bodyText)
+                            val ofAdmin = RawHttp.get(server.listeners.admin.address, "/api/v1/status?token=$presented", presenting)
+                            val ofMock =
+                                RawHttp.get(
+                                    server.listeners.mock.address,
+                                    "/service/http://upstream.test/$presented?token=$presented",
+                                    presenting,
+                                )
+                            assertEquals(404, ofAdmin.status)
+                            assertEquals(200 to StubProxy.ANSWER, ofMock.status to ofMock.body)
                         }
                     }
                     logAtEveryLevel()
                 }
 
-            assertEquals(listOf<String?>("Basic $credentials"), proxy.authorizations, "The proxy got the credentials")
+            assertEquals(listOf<String?>("Basic $credentials", "Basic $credentials"), proxy.authorizations, "The proxy got the credentials")
+            assertEquals(listOf(token, tokenOfVariable).map { "http://upstream.test/$it?token=$it" }, proxy.targets.toList())
             assertEquals(listOf("error", "warn", "info", "debug", "trace"), messagesIn(log), "The log is written at every level")
             assertEquals(2, Regex(""" - {3}admin-token = set\n""").findAll(log).count(), log)
             for (secret in listOf(token, tokenOfVariable, password, credentials)) {

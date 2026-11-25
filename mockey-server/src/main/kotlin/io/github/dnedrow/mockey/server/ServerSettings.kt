@@ -40,7 +40,7 @@ internal data class ServerSettings(
     val upstreamConnectTimeout: Duration = 10.seconds,
     /** The time within which the complete response of an upstream has to arrive. */
     val upstreamResponseTimeout: Duration = 60.seconds,
-    /** The number of bytes that the body of a request may have. */
+    /** The number of bytes that the body of a request may have, which is [LARGEST_BODY] at most. */
     val maxRequestBody: Long = 50L * MEBIBYTE,
     /** Whether a request for an absolute target that no service knows is forwarded to that target. */
     val forwardUnknownTargets: Boolean = true,
@@ -79,6 +79,12 @@ internal data class ServerSettings(
     internal companion object {
         /** What the help and the log say for a setting that has no value. */
         const val NONE = "none"
+
+        /**
+         * The largest number of bytes that the body of a request can be allowed to have. The server holds a
+         * body in memory in one piece, and the Java runtime gives no piece of memory that is larger.
+         */
+        const val LARGEST_BODY = Int.MAX_VALUE - 8L
 
         private const val MEBIBYTE = 1_048_576
     }

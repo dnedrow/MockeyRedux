@@ -88,7 +88,7 @@ class ServerProgramTest {
             val listening = program.listening()
 
             assertEquals(ofOption to ofAdmin, listening.mockPort to listening.adminPort)
-            assertEquals(404, RawHttp.get(RawHttp.loopback(ofOption)).status)
+            assertEquals(404, RawHttp.get(RawHttp.loopback(ofOption), "/service/customer/7").status)
             assertNull(RawHttp.getIfReached(RawHttp.loopback(ofVariable), WAIT_MILLIS), "Nothing listens on the port of the variable")
             val messages = messages(program.output)
             assertEquals("mockey-server ${System.getProperty("mockey.version")} starts with these settings:", messages.first())
@@ -101,17 +101,23 @@ class ServerProgramTest {
         }
     }
 
-    /** The scenario "Defaults", as far as the listeners go. It takes the two default ports, which have to be free. */
+    /**
+     * The scenario "Defaults", as far as the server goes. It takes the two default ports, which have to be
+     * free. The program finds its definitions in the default location, under its working directory.
+     */
     @Test
-    fun theProgramStartedWithoutListenerSettingsListensOnAllAddressesAtPort8080AndOnLoopbackAtPort8081() {
+    fun theProgramStartedWithoutSettingsServesMockTrafficOnAllAddressesAtPort8080AndListensOnLoopbackAtPort8081() {
         TestEnvironment.needs(isFree("0.0.0.0", 8080) && isFree("127.0.0.1", 8081), "the ports 8080 and 8081 free")
 
-        ServerProgram.start().use { program ->
+        ServerProgram.start(prepare = { StoredDefinitions.customers(it.resolve("mockey-definitions")) }).use { program ->
             val listening = program.listening()
 
             assertEquals("0.0.0.0" to 8080, listening.mockHost to listening.mockPort)
             assertEquals("127.0.0.1" to 8081, listening.adminHost to listening.adminPort)
-            assertEquals(404, RawHttp.get(listening.mock, "/service/").status)
+            val ofMock = RawHttp.get(listening.mock, "/service/customer/7")
+            val ofAdmin = RawHttp.get(listening.admin, "/service/customer/7")
+            assertEquals(200 to StoredDefinitions.CUSTOMER, ofMock.status to ofMock.body)
+            assertEquals(404 to "", ofAdmin.status to ofAdmin.body)
             assertEquals(404, RawHttp.get(listening.admin, "/api/v1").status)
             assertContains(messages(program.output), "The mock listener accepts connections on 0.0.0.0:8080.")
             assertContains(messages(program.output), "The admin listener accepts connections on 127.0.0.1:8081.")
@@ -215,9 +221,10 @@ class ServerProgramTest {
         ServerProgram.start(*arguments, variables = mapOf("MOCKEY_ADMIN_TOKEN" to ofVariable)).use { program ->
             val listening = program.listening()
             for (token in listOf(ofVariable, ofOption)) {
-                for (listener in listOf(listening.mock, listening.admin)) {
-                    assertEquals(404, RawHttp.get(listener, "/api/v1/status?token=$token", listOf("Authorization: Bearer $token")).status)
-                }
+                val presenting = listOf("Authorization: Bearer $token")
+                assertEquals(404, RawHttp.get(listening.admin, "/api/v1/status?token=$token", presenting).status)
+                assertEquals(404, RawHttp.get(listening.mock, "/service/customer/7?token=$token", presenting).status)
+                assertEquals(404, RawHttp.get(listening.mock, "/service/$token").status)
             }
 
             val messages = messages(program.output)

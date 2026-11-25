@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.server
 
 import java.net.ServerSocket
+import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,6 +47,47 @@ class MockeyServerTest {
         )
         assertEquals(404, RawHttp.get(RawHttp.loopback(mockPort)).status)
         assertEquals(404, RawHttp.get(RawHttp.loopback(adminPort)).status)
+    }
+
+    @Test
+    fun theMockListenerServesTheDefinitionsOfTheDefinitionsLocationAndTheAdminListenerDoesNot() {
+        val directory = Files.createTempDirectory("mockey-server-test")
+        try {
+            StoredDefinitions.customers(directory)
+
+            val server = start(settings().copy(definitions = directory))
+
+            val ofMock = RawHttp.get(server.listeners.mock.address, "/service/customer/7")
+            val ofAdmin = RawHttp.get(server.listeners.admin.address, "/service/customer/7")
+            assertEquals(200 to StoredDefinitions.CUSTOMER, ofMock.status to ofMock.body)
+            assertEquals("HTTP/1.1 404 Not Found" to "", ofAdmin.statusLine to ofAdmin.body)
+            assertEquals(
+                listOf("customer/7"),
+                server.engine.history
+                    .entries()
+                    .map { it.target },
+            )
+        } finally {
+            servers.forEach(MockeyServer::close)
+            servers.clear()
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun theServerTakesBodiesAsLongAsItsSettingsSay() {
+        val server = start(settings().copy(maxRequestBody = 10))
+
+        val atTheLimit = RawHttp.exchange(server.listeners.mock.address, RawHttp.request("POST", "/service/x", body = "0123456789"))
+        val oneMore = RawHttp.exchange(server.listeners.mock.address, RawHttp.request("POST", "/service/x", body = "0123456789a"))
+
+        assertEquals(404 to 413, atTheLimit.status to oneMore.status)
+        assertEquals(
+            listOf(10L),
+            server.engine.history
+                .entries()
+                .map { it.request.body.size },
+        )
     }
 
     @Test
