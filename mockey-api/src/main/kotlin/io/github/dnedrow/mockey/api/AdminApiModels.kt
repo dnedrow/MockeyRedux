@@ -80,6 +80,77 @@ public data class ServiceDto(
     public val responseSchemaEnabled: Boolean = false,
 )
 
+/**
+ * The attributes of a scenario that a request sets. A request that creates a scenario states the ones that
+ * differ from these defaults, and a request that updates a scenario states the ones that change.
+ */
+@Serializable
+public data class ScenarioAttributesDto(
+    public val name: String = "",
+    public val responseBody: String = "",
+    public val statusCode: Int = 200,
+    public val headers: List<HeaderDto> = emptyList(),
+    public val matchCriterion: MatchCriterionDto = MatchCriterionDto.None,
+    public val methodRestriction: String? = null,
+    public val delayMillis: Long = 0,
+    public val tags: List<String> = emptyList(),
+)
+
+/**
+ * The attributes of a service that a request sets. A request that creates a service states the ones that
+ * differ from these defaults, and a request that updates a service states the ones that change. The
+ * scenarios of a service are no attribute: each is created, updated, and deleted by itself.
+ */
+@Serializable
+public data class ServiceAttributesDto(
+    public val name: String = "",
+    public val mockUrl: String = "",
+    public val description: String? = null,
+    public val realUrls: List<String> = emptyList(),
+    public val defaultRealUrlIndex: Int = 0,
+    public val responseMode: ResponseModeDto = ResponseModeDto.PROXY,
+    public val delayMillis: Long = 0,
+    public val tags: List<String> = emptyList(),
+    public val defaultScenarioId: String? = null,
+    public val errorScenarioId: String? = null,
+    public val requestRules: String? = null,
+    public val requestRulesEnabled: Boolean = false,
+    public val inspectorName: String? = null,
+    public val responseSchema: String? = null,
+    public val responseSchemaEnabled: Boolean = false,
+)
+
+/** One scenario among those of all services, such as the universal error scenario. */
+@Serializable
+public data class ScenarioReferenceDto(
+    public val serviceId: String,
+    public val scenarioId: String,
+)
+
+/** A request to merge the source services into the service that the request addresses. */
+@Serializable
+public data class ServiceMergeRequestDto(
+    public val sourceIds: List<String>,
+)
+
+/**
+ * A request to derive real URLs for all services. Each real URL gives one URL for each replacement: the URL
+ * in which what the regular expression finds is replaced.
+ */
+@Serializable
+public data class RealUrlDerivationRequestDto(
+    public val expression: String,
+    public val replacements: List<String>,
+)
+
+/** A real URL that a derivation added to a service. */
+@Serializable
+public data class DerivedRealUrlDto(
+    public val serviceId: String,
+    public val serviceName: String,
+    public val realUrl: String,
+)
+
 /** A persisted service definition without its derived effective response mode. */
 @Serializable
 public data class ServiceDefinitionDto(

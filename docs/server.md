@@ -9,7 +9,8 @@ serves the admin API, which states what the server holds and is to change what t
 
 This document describes the server as it is now. The admin API is under way, and the web UI is not part of
 the server yet. The API states the services, the plans, the history, and the status of the server, and it
-changes nothing. So the definitions of the server are the ones that it loads and imports when it starts.
+changes the services and their scenarios. The rest of the definitions is what the server loads and imports
+when it starts.
 
 ## Running the server
 
@@ -129,12 +130,35 @@ every other path with the status 404, and the mock listener serves nothing of th
 admin listener accepts connections on port 8081 on the loopback address `127.0.0.1`, so that only programs
 on the same machine reach it.
 
-In this version the admin API answers `GET` requests for `/api/v1/services`, for a service by its
-identifier at `/api/v1/services/{id}`, and for `/api/v1/plans`, `/api/v1/history`, and `/api/v1/system`,
-which is the status of the server. Its answers are JSON. An answer that reports a failure is a problem
-document: a JSON object that states the status and says what is wrong. While the server has an admin token,
-the API takes a request only when it presents the token in the header `Authorization: Bearer <token>`, and
-it answers every other request with the status 401.
+In this version the admin API has these operations:
+
+| Method and path below `/api/v1` | What it does |
+|---|---|
+| `GET /services` | Lists the services with their scenarios. `?tag=` leaves the services that carry one of the tags, and `?name=` the ones with that name, without regard to letter case. |
+| `POST /services` | Creates a service. |
+| `GET`, `PATCH`, `DELETE /services/{id}` | Reads, updates, and deletes a service. An update also designates its default scenario and its error scenario. |
+| `POST /services/{id}/duplicate` | Creates a copy of a service. |
+| `POST /services/{id}/merge` | Merges the services that the request names into the service. |
+| `POST /services/real-urls/derive` | Derives real URLs for all services. |
+| `GET`, `POST /services/{id}/scenarios` | Lists the scenarios of a service, and creates one. |
+| `GET`, `PATCH`, `DELETE /services/{id}/scenarios/{scenarioId}` | Reads, updates, and deletes a scenario. |
+| `GET`, `PUT`, `DELETE /universal-error-scenario` | Reads, designates, and clears the universal error scenario. |
+| `GET /plans`, `GET /history`, `GET /system` | State the plans, the history, and the status of the server. |
+
+Bodies are JSON in UTF-8. A request that creates or updates something states attributes in a JSON object:
+a creation takes a default for every attribute that it does not state, and an update changes only the
+attributes that it states. A creation is answered with the status 201, with what was created and its
+identifier, and with its path in the `Location` header. A deletion is answered with the status 204.
+
+An answer that reports a failure is a problem document: a JSON object that states the status and says what
+is wrong. The status is 400 for a body that is no JSON object and for a query string that the operation
+does not take, 404 for what is not there, and 422 for a request that is not valid, where the document names
+every invalid member with a message. A change takes effect before its request is answered. In read-only
+mode, which is the default, it is kept in memory, and in writable mode it is stored in the definitions
+location.
+
+While the server has an admin token, the API takes a request only when it presents the token in the header
+`Authorization: Bearer <token>`, and it answers every other request with the status 401.
 
 The admin listener takes no request that the server forwarded as mock traffic. It answers such a request
 with the status 403, with a token and without one, see "The admin listener through the mock listener".

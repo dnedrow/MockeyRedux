@@ -33,13 +33,16 @@ class AdminApiTest {
     /** What the operations of the test were asked for, in the order of the requests. */
     private val asked = CopyOnWriteArrayList<String>()
 
+    /** The parameters that the operations on items take in a query string, and look at no further. */
+    private val ofItems = setOf("x", "token")
+
     private val routes =
         listOf(
-            AdminRoute(HttpMethod.Get, "items") {
+            AdminRoute(HttpMethod.Get, "items", ofItems) {
                 asked += "list"
                 AdminResponse.json(listOf("first", "zweites ✓"))
             },
-            AdminRoute(HttpMethod.Post, "items") {
+            AdminRoute(HttpMethod.Post, "items", ofItems) {
                 val item = jsonObject()
                 asked += "create $item"
                 AdminResponse.json(item, HttpStatusCode.Created)
@@ -48,11 +51,11 @@ class AdminApiTest {
                 asked += "newest"
                 AdminResponse.json("the newest item")
             },
-            AdminRoute(HttpMethod.Get, "items/{itemId}") {
+            AdminRoute(HttpMethod.Get, "items/{itemId}", ofItems) {
                 asked += "read ${parameter("itemId")}"
                 AdminResponse.json(parameter("itemId"))
             },
-            AdminRoute(HttpMethod.Put, "items/{itemId}") {
+            AdminRoute(HttpMethod.Put, "items/{itemId}", ofItems) {
                 asked += "change ${parameter("itemId")}"
                 AdminResponse.json(changed(parameter("itemId")).orProblem())
             },
@@ -60,8 +63,24 @@ class AdminApiTest {
                 asked += "read ${parameter("partId")} of ${parameter("itemId")}"
                 AdminResponse.json(listOf(parameter("itemId"), parameter("partId")))
             },
+            AdminRoute(HttpMethod.Get, "found", query = setOf("term", "tag")) {
+                asked += "find"
+                AdminResponse.json(mapOf("term" to queryValues("term"), "tag" to queryValues("tag")))
+            },
+            AdminRoute(HttpMethod.Get, "first", query = setOf("term")) {
+                asked += "find the first"
+                AdminResponse.json(queryValue("term"))
+            },
+            AdminRoute(HttpMethod.Post, "copies/{itemId}") {
+                asked += "copy ${parameter("itemId")}"
+                AdminResponse.created("a copy", "items", parameter("itemId"), "copies", "the first/of 2")
+            },
+            AdminRoute(HttpMethod.Delete, "copies/{itemId}") {
+                asked += "delete the copies of ${parameter("itemId")}"
+                AdminResponse.noContent()
+            },
             AdminRoute(HttpMethod.Get, "host") { AdminResponse.json(host) },
-            AdminRoute(HttpMethod.Get, "broken") { error(FAILURE) },
+            AdminRoute(HttpMethod.Get, "broken", ofItems) { error(FAILURE) },
         )
 
     @AfterTest
@@ -199,12 +218,109 @@ class AdminApiTest {
     @Test
     fun theQueryStringIsNoPartOfThePath() {
         val api = api()
-        val targets = listOf("/api/v1/items?", "/api/v1/items?x=/api/v1/broken", "/api/v1/items?/7", "/api/v1/items/7?x=1")
+        val targets = listOf("/api/v1/items?", "/api/v1/items?x=/api/v1/broken", "/api/v1/items?x=/7", "/api/v1/items/7?x=1")
 
         val answers = targets.map { api.answerTo("GET", it) }
 
         assertEquals(List(4) { 200 }, answers.map { it.status })
         assertEquals(listOf("list", "list", "list", "read 7"), asked)
+    }
+
+    // The query string
+
+    /** The parameters of a query string are decoded as a form writes them, and a name can be there more than once. */
+    @Test
+    fun anOperationGetsTheParametersOfTheQueryStringDecodedAndInTheirOrder() {
+        val api = api()
+        val queries =
+            mapOf(
+                "" to """{"term":[],"tag":[]}""",
+                "?" to """{"term":[],"tag":[]}""",
+                "?term=orders" to """{"term":["orders"],"tag":[]}""",
+                "?tag=b&term=x&tag=a&tag=b" to """{"term":["x"],"tag":["b","a","b"]}""",
+                "?term=a+b%20c%2Bd%26e%3Df" to """{"term":["a b c+d&e=f"],"tag":[]}""",
+                "?term=a=b==c" to """{"term":["a=b==c"],"tag":[]}""",
+                "?term&tag=" to """{"term":[""],"tag":[""]}""",
+                "?&&term=x&" to """{"term":["x"],"tag":[]}""",
+                "?%74erm=x" to """{"term":["x"],"tag":[]}""",
+                "?term=Kunden%C3%BCbersicht+%E2%9C%93" to """{"term":["Kundenübersicht ✓"],"tag":[]}""",
+                "?term=${RawHttp.utf8("Kundenübersicht+✓")}" to """{"term":["Kundenübersicht ✓"],"tag":[]}""",
+            )
+
+        val answers = queries.keys.associateWith { api.answerTo("GET", "/api/v1/found$it") }
+
+        assertEquals(queries, answers.mapValues { (_, answer) -> answer.bodyInUtf8 })
+        assertEquals(List(queries.size) { 200 }, answers.values.map { it.status })
+    }
+
+    /**
+     * A client that misspells a parameter is not to get what it would get without the parameter. The problem
+     * names the parameters that the operation takes, and nothing of the query string.
+     */
+    @Test
+    fun aParameterThatAnOperationDoesNotTakeGetsTheStatus400AndIsNotRepeated() {
+        val api = api()
+        val another = "The query string of the request has a parameter that the operation does not take."
+        val requests =
+            mapOf(
+                "/api/v1/found?terms=$SECRET" to "$another It takes these: term, tag.",
+                "/api/v1/found?term=x&$SECRET=y" to "$another It takes these: term, tag.",
+                "/api/v1/found?Term=x" to "$another It takes these: term, tag.",
+                "/api/v1/found?=$SECRET" to "$another It takes these: term, tag.",
+                "/api/v1/found?term=x&$SECRET" to "$another It takes these: term, tag.",
+                "/api/v1/first?tag=$SECRET" to "$another It takes these: term.",
+                "/api/v1/host?$SECRET" to "$another It takes no parameter.",
+                "/api/v1/items/newest?x=$SECRET" to "$another It takes no parameter.",
+            )
+        var answers = emptyMap<String, RawHttp.Answer>()
+
+        val log = TestLog.of { answers = requests.keys.associateWith { api.answerTo("GET", it) } }
+
+        for ((target, answer) in answers) {
+            assertProblem(answer, 400, "Bad Request", requests.getValue(target))
+        }
+        assertEquals(emptyList(), TestLog.messages(log))
+        assertEquals(emptyList(), asked)
+    }
+
+    @Test
+    fun aQueryStringWithAMalformedEscapeGetsTheStatus400AndIsNotRepeated() {
+        val api = api()
+        val queries = listOf("term=$SECRET%zz", "term=%", "te%4=x", "term=%C3%28$SECRET%")
+        val malformed = "The query string of the request holds a percent sign that begins no escape of a character."
+        var answers = emptyList<RawHttp.Answer>()
+
+        val log = TestLog.of { answers = queries.map { api.answerTo("GET", "/api/v1/found?$it") } }
+
+        for (answer in answers) {
+            assertProblem(answer, 400, "Bad Request", malformed)
+        }
+        assertEquals(emptyList(), TestLog.messages(log))
+        assertEquals(emptyList(), asked)
+    }
+
+    /** An operation that takes one value of a parameter says so. Without the parameter there is none. */
+    @Test
+    fun aParameterThatIsToBeThereOnceGetsTheStatus400WhenItIsThereTwice() {
+        val api = api()
+
+        val once = api.answerTo("GET", "/api/v1/first?term=a+b")
+        val never = api.answerTo("GET", "/api/v1/first")
+        val twice = api.answerTo("GET", "/api/v1/first?term=$SECRET&term=$SECRET")
+
+        assertEquals(listOf(200 to "\"a b\"", 200 to "null"), listOf(once, never).map { it.status to it.body })
+        assertProblem(twice, 400, "Bad Request", "The query string of the request has the parameter term more than once.")
+    }
+
+    /** The path and the method come first: a request for nothing, or for no operation, learns that whatever its query string is. */
+    @Test
+    fun theQueryStringIsLookedAtWhenTheOperationIsKnown() {
+        val api = api()
+
+        val ofNothing = api.answerTo("GET", "/api/v1/nothing?term=%zz")
+        val withoutOperation = api.answerTo("DELETE", "/api/v1/found?another=1")
+
+        assertEquals(listOf<Int?>(404, 405), listOf(ofNothing.status, withoutOperation.status))
     }
 
     /** The listener refuses such a request before the API sees it, see [RequestHost]. Its refusal is plain text and no problem document. */
@@ -696,6 +812,36 @@ class AdminApiTest {
         }
         assertEquals(200, toAnOperationWithoutABody.status)
         assertEquals(listOf("change 7"), asked)
+    }
+
+    // Answers without a body, and answers that say where something is
+
+    /** The scenario "Created service is returned", as far as the API of a test goes: the answer says where the resource is. */
+    @Test
+    fun theAnswerToACreationHasTheStatus201AndThePathOfWhatWasCreated() {
+        val answer = api().answerTo("POST", "/api/v1/copies/a%20b%2Fc")
+
+        assertEquals("HTTP/1.1 201 Created" to "\"a copy\"", answer.statusLine to answer.body)
+        assertEquals(
+            listOf(
+                "Cache-Control: no-store",
+                "Location: /api/v1/items/a%20b%2Fc/copies/the%20first%2Fof%202",
+                "Content-Length: 8",
+                "Content-Type: application/json",
+                "Connection: close",
+            ),
+            answer.headers,
+        )
+        assertEquals(listOf("copy a b/c"), asked)
+    }
+
+    @Test
+    fun anAnswerWithoutABodyHasTheStatus204AndNothingThatDescribesABody() {
+        val answer = api().answerTo("DELETE", "/api/v1/copies/7")
+
+        assertEquals("HTTP/1.1 204 No Content" to "", answer.statusLine to answer.body)
+        assertEquals(listOf("Cache-Control: no-store", "Connection: close"), answer.headers)
+        assertEquals(listOf("delete the copies of 7"), asked)
     }
 
     /** The client learns that the server failed, and the log says at which operation and why. Neither holds anything of the request. */

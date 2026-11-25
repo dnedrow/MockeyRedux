@@ -71,6 +71,34 @@ class AdminApiModelsTest {
                 "responseSchemaEnabled",
             ),
         )
+        assertShape(
+            ScenarioAttributesDto(),
+            setOf("name", "responseBody", "statusCode", "headers", "matchCriterion", "methodRestriction", "delayMillis", "tags"),
+        )
+        assertShape(
+            ServiceAttributesDto(),
+            setOf(
+                "name",
+                "mockUrl",
+                "description",
+                "realUrls",
+                "defaultRealUrlIndex",
+                "responseMode",
+                "delayMillis",
+                "tags",
+                "defaultScenarioId",
+                "errorScenarioId",
+                "requestRules",
+                "requestRulesEnabled",
+                "inspectorName",
+                "responseSchema",
+                "responseSchemaEnabled",
+            ),
+        )
+        assertShape(ScenarioReferenceDto("svc1", "s1"), setOf("serviceId", "scenarioId"))
+        assertShape(ServiceMergeRequestDto(listOf("svc2")), setOf("sourceIds"))
+        assertShape(RealUrlDerivationRequestDto("qa1", listOf("qa2")), setOf("expression", "replacements"))
+        assertShape(DerivedRealUrlDto("svc1", "service", "http://qa2.example.com"), setOf("serviceId", "serviceName", "realUrl"))
         assertShape(PlanItemDto("service"), setOf("serviceName", "scenarioName", "responseMode", "delayMillis"))
         assertShape(PlanDto("p1", "plan"), setOf("id", "name", "description", "tags", "items"))
         assertShape(TwistPairDto("from", "to"), setOf("origination", "destination"))

@@ -331,7 +331,7 @@ Stopping (task 11.7):
   shows it by holding the event loop. It was found when the test that expected a refusal failed in the
   continuous integration, where other tasks of the build kept the processors busy.
 
-The admin API (task 12.2):
+The admin API (tasks 12.2 and 12.3):
 
 - The API is one interceptor of the call phase of the admin listener, with no routing and no plugin, see
   "The admin API and the routing of Ktor". It reads the target from `call.request.local.uri`. A request is
@@ -347,9 +347,11 @@ The admin API (task 12.2):
 - The API reads the body of a request from `call.request.receiveChannel()`, as the mock endpoint does and
   for the same reason: the log gets nothing of a request at any level. It looks at `Content-Length` first
   and reads as far as the limit of the server and one byte more, and a longer body gets the status 413.
-- An operation that takes parameters from the query string is to take the query string from the request
-  target and to decode it itself. What Ktor makes of a query string fails over a malformed escape with the
-  request target in its message, see above, and what an operation fails with goes to the log.
+- The API takes the query string from the request target and decodes it itself, as a form writes it, and
+  an operation gets the parameters that its route names. What Ktor makes of a query string fails over a
+  malformed escape with the request target in its message, see above, and what an operation fails with goes
+  to the log. A request with a parameter that its operation does not take gets the status 400, so that a
+  client which misspells a filter does not get everything.
 - Netty hands each byte of a header on as one character, as it does with the bytes of a request target. The
   API compares the admin token with the bytes that a client sent, so that a token with a character beyond
   ASCII is found. It reads what a path has at a parameter as UTF-8, for a client that does not escape such
@@ -357,8 +359,10 @@ The admin API (task 12.2):
 - A request that a listener refuses before the API sees it gets the answer of the listener and no problem
   document: a request that names no host gets the plain text of `RequestHost`.
 - The engine adds no header of its own, so an answer of the API carries what the API sets: `Cache-Control:
-  no-store`, and with a problem what belongs to it, `WWW-Authenticate` or `Allow`. No answer carries a
-  header that lets a page of another origin read it.
+  no-store`, with a problem what belongs to it, `WWW-Authenticate` or `Allow`, and with a creation
+  `Location`. No answer carries a header that lets a page of another origin read it.
+- An answer without a body is the status alone. With the status 204 the engine sends neither a
+  `Content-Length` nor a `Content-Type`.
 - When an operation fails, the log names the operation by its route, which is the path as the table has it,
   and the client gets the status 500 without what the failure says.
 - The admin listener starts after the mock listener, and what makes its module is given the mock listener.

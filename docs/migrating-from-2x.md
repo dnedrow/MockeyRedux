@@ -5,8 +5,8 @@ configurations, and settings. This document describes how they move over, what t
 Mockey 2.x have become, what behaves differently, and what is gone.
 
 It describes the server as it is now. The server answers mock traffic, and its admin API states what the
-server holds and changes nothing yet. The web UI and the automation endpoints of Mockey 2.x are not part of
-it yet, see "What is gone".
+server holds and changes its services and their scenarios. The web UI and the automation endpoints of
+Mockey 2.x are not part of it yet, see "What is gone".
 
 ## Importing the definitions
 
@@ -182,8 +182,8 @@ of a migrated installation meet first:
 
 - The admin pages and the automation endpoints on the port of the mock traffic. Administration has a
   listener of its own, which only programs on the same machine reach by default (DEV-26). In this version the
-  admin API changes nothing yet, the server has no web UI, and the automation endpoints `/config/service`,
-  `/plan/setup`, `/definitions`, and `/home` answer with the status 404.
+  admin API changes services and scenarios and nothing else yet, the server has no web UI, and the automation
+  endpoints `/config/service`, `/plan/setup`, `/definitions`, and `/home` answer with the status 404.
 - Opening a browser when the server starts, and the option `-H` with it (DEV-25).
 - Loading definitions from any file or URL of the server's machine while the server runs, as `/home?action=init`
   and the upload page did. Files and URLs are sources at startup and for the import command (DEV-27).

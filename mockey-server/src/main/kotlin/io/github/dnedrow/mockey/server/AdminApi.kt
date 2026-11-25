@@ -8,6 +8,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLDecodeException
 import io.ktor.http.content.TextContent
 import io.ktor.http.decodeURLPart
+import io.ktor.http.decodeURLQueryComponent
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
 import kotlinx.coroutines.CancellationException
@@ -39,7 +40,9 @@ import java.time.Instant
  *    the methods that it does have.
  * 5. What the path has at the parameters of the route is decoded. That comes after the path was taken
  *    apart, so that an escaped slash stays in its segment. A malformed escape gets the status 400.
- * 6. The operation answers, see [AdminRoute.handle].
+ * 6. The query string is taken apart, see [queryOf]. A malformed escape in it gets the status 400, and so
+ *    does a parameter that the operation does not take.
+ * 7. The operation answers, see [AdminRoute.handle].
  *
  * The body of an answer is JSON in UTF-8. An answer that reports a failure is a problem document, see
  * [AdminProblem]. Every answer says that it is not to be stored: what the API says of the server now says
@@ -73,10 +76,12 @@ internal class AdminApi(
             try {
                 answer(call, path.removePrefix(PREFIX).removePrefix("/"))
             } catch (problem: AdminProblem) {
-                problem.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
-                AdminResponse(problem.status, AdminApiJson.instance.encodeToString(problem.document()), AdminProblem.CONTENT_TYPE)
+                val document = AdminApiJson.instance.encodeToString(problem.document())
+                AdminResponse(problem.status, document, AdminProblem.CONTENT_TYPE, problem.headers)
             }
-        call.respond(TextContent(response.body, response.contentType, response.status))
+        response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+        val body = response.body
+        if (body == null) call.respond(response.status) else call.respond(TextContent(body, response.contentType, response.status))
         return true
     }
 
@@ -95,8 +100,9 @@ internal class AdminApi(
         }
         if (comesFromAPage(call)) throw AdminProblem(HttpStatusCode.Forbidden, OF_A_PAGE)
         val (route, parameters) = routeOf(call.request.local.method, resource)
+        val request = AdminRequest(call, parameters, queryOf(call, route), maxRequestBody)
         return try {
-            route.handle(AdminRequest(call, parameters, maxRequestBody))
+            route.handle(request)
         } catch (problem: AdminProblem) {
             throw problem
         } catch (cancellation: CancellationException) {
@@ -174,6 +180,45 @@ internal class AdminApi(
     }
 
     /**
+     * Returns the parameters of the query string of the request of [call], by their names, each with its
+     * values in their order. The query string is what follows the first `?` of the request target. Its
+     * parameters stand between `&` signs, and the value of a parameter follows its first `=`. Names and
+     * values are decoded as a form writes them: a `+` stands for a space, and an escape for a byte of a
+     * character in UTF-8.
+     *
+     * The problem of a parameter that [route] does not take names the parameters that it does take, and
+     * not the one of the request, which can hold what the client did not mean to send.
+     *
+     * @throws AdminProblem with the status 400 for a malformed escape, and for a parameter that the
+     *   operation does not take.
+     */
+    private fun queryOf(
+        call: ApplicationCall,
+        route: AdminRoute,
+    ): Map<String, List<String>> {
+        val written = RequestTarget.parse(call.request.local.uri).query.orEmpty()
+        val parameters =
+            try {
+                written.split('&').filter { it.isNotEmpty() }.map { parameter ->
+                    val name = parameter.substringBefore('=')
+                    val value = parameter.substring(name.length).removePrefix("=")
+                    asTheClientSent(name).decodeURLQueryComponent(plusIsSpace = true) to
+                        asTheClientSent(value).decodeURLQueryComponent(plusIsSpace = true)
+                }
+            } catch (_: URLDecodeException) {
+                throw AdminProblem(HttpStatusCode.BadRequest, MALFORMED_QUERY)
+            }
+        if (parameters.any { (name, _) -> name !in route.query }) throw AdminProblem(HttpStatusCode.BadRequest, otherParameter(route))
+        return parameters.groupBy({ it.first }, { it.second })
+    }
+
+    /** Returns what the problem of a request says that has a parameter in its query string which [route] does not take. */
+    private fun otherParameter(route: AdminRoute): String {
+        val taken = if (route.query.isEmpty()) "It takes no parameter." else "It takes these: ${route.query.joinToString()}."
+        return "The query string of the request has a parameter that the operation does not take. $taken"
+    }
+
+    /**
      * Returns the problem of a request with a method that none of [operations] has, which are the operations
      * of the resource of the request. The answer lists their methods in its `Allow` header, and with `GET`
      * the method `HEAD`.
@@ -202,6 +247,8 @@ internal class AdminApi(
             "The request carries an Origin header, as the request of a web page does, and its method is neither GET nor HEAD. " +
                 "The admin API takes a request that can change something only from a program."
         private const val MALFORMED_PATH = "The path of the request holds a percent sign that begins no escape of a character."
+        private const val MALFORMED_QUERY =
+            "The query string of the request holds a percent sign that begins no escape of a character."
         private const val NO_RESOURCE = "The admin API has no resource at the path of the request."
         private const val NO_OPERATION = "The resource has no operation with the method of the request."
         private const val FAILED = "The server failed to handle the request. Its log says why."
@@ -219,6 +266,7 @@ internal class AdminApi(
         ): AdminApi {
             val routes =
                 AdminServices(engine).routes +
+                    AdminScenarios(engine).routes +
                     AdminPlans(engine).routes +
                     AdminHistory(engine).routes +
                     AdminSystem(engine, since, settings.definitions, mock).routes

@@ -220,10 +220,12 @@ class ServerProgramTest {
 
         ServerProgram.start(*arguments, variables = mapOf("MOCKEY_ADMIN_TOKEN" to ofVariable)).use { program ->
             val listening = program.listening()
-            // The option comes before the variable, so its token is the token of the server.
-            for ((token, ofApi) in listOf(ofVariable to 401, ofOption to 200)) {
+            // The option comes before the variable, so its token is the token of the server. The token does not
+            // belong in a query string, and the admin API takes no such parameter from a request that presents it.
+            for ((token, ofApi) in listOf(ofVariable to (401 to 401), ofOption to (200 to 400))) {
                 val presenting = listOf("Authorization: Bearer $token")
-                assertEquals(ofApi, RawHttp.get(listening.admin, "/api/v1/system?token=$token", presenting).status)
+                assertEquals(ofApi.first, RawHttp.get(listening.admin, "/api/v1/system", presenting).status)
+                assertEquals(ofApi.second, RawHttp.get(listening.admin, "/api/v1/system?token=$token", presenting).status)
                 assertEquals(401, RawHttp.get(listening.admin, "/api/v1/services?token=$token").status)
                 assertEquals(404, RawHttp.get(listening.mock, "/service/customer/7?token=$token", presenting).status)
                 assertEquals(404, RawHttp.get(listening.mock, "/service/$token").status)

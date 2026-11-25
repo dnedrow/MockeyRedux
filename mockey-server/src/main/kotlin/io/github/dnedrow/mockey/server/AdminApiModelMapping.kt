@@ -2,9 +2,12 @@ package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.api.DefinitionDocumentDto
 import io.github.dnedrow.mockey.api.DefinitionSettingsDto
+import io.github.dnedrow.mockey.api.DerivedRealUrlDto
 import io.github.dnedrow.mockey.api.HeaderDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
+import io.github.dnedrow.mockey.api.MergeReportDto
+import io.github.dnedrow.mockey.api.MergedScenarioDto
 import io.github.dnedrow.mockey.api.NameValueDto
 import io.github.dnedrow.mockey.api.OutboundProxyDefinitionDto
 import io.github.dnedrow.mockey.api.OutboundProxyDto
@@ -17,11 +20,16 @@ import io.github.dnedrow.mockey.api.RecordedResponseDto
 import io.github.dnedrow.mockey.api.RecordedScenarioDto
 import io.github.dnedrow.mockey.api.RecordedServiceDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
+import io.github.dnedrow.mockey.api.ScenarioAttributesDto
 import io.github.dnedrow.mockey.api.ScenarioDto
+import io.github.dnedrow.mockey.api.ScenarioReferenceDto
+import io.github.dnedrow.mockey.api.ServiceAttributesDto
 import io.github.dnedrow.mockey.api.ServiceDefinitionDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
 import io.github.dnedrow.mockey.api.TwistPairDto
+import io.github.dnedrow.mockey.core.definitions.DerivedRealUrl
+import io.github.dnedrow.mockey.core.definitions.MergeReport
 import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.history.Outcome
 import io.github.dnedrow.mockey.core.history.RecordedBody
@@ -87,6 +95,49 @@ internal fun ServiceDto.toModel(): Service =
         inspectorName = inspectorName,
         responseSchema = responseSchema,
         responseSchemaEnabled = responseSchemaEnabled,
+    )
+
+/** Returns the attributes of the service that a request sets, as the admin API states them. */
+internal fun Service.attributes(): ServiceAttributesDto =
+    ServiceAttributesDto(
+        name = name,
+        mockUrl = mockUrl,
+        description = description,
+        realUrls = realUrls,
+        defaultRealUrlIndex = defaultRealUrlIndex,
+        responseMode = responseMode.toDto(),
+        delayMillis = delayMillis,
+        tags = tags.toList(),
+        defaultScenarioId = defaultScenarioId?.value,
+        errorScenarioId = errorScenarioId?.value,
+        requestRules = requestRules,
+        requestRulesEnabled = requestRulesEnabled,
+        inspectorName = inspectorName,
+        responseSchema = responseSchema,
+        responseSchemaEnabled = responseSchemaEnabled,
+    )
+
+/**
+ * Returns the service with [attributes] in the place of its own. Its identifier and its scenarios stay as
+ * they are. An identifier among the attributes is not blank.
+ */
+internal fun Service.with(attributes: ServiceAttributesDto): Service =
+    copy(
+        name = attributes.name,
+        mockUrl = attributes.mockUrl,
+        description = attributes.description,
+        realUrls = attributes.realUrls,
+        defaultRealUrlIndex = attributes.defaultRealUrlIndex,
+        responseMode = attributes.responseMode.toModel(),
+        delayMillis = attributes.delayMillis,
+        tags = Tags.of(attributes.tags),
+        defaultScenarioId = attributes.defaultScenarioId?.let(::ScenarioId),
+        errorScenarioId = attributes.errorScenarioId?.let(::ScenarioId),
+        requestRules = attributes.requestRules,
+        requestRulesEnabled = attributes.requestRulesEnabled,
+        inspectorName = attributes.inspectorName,
+        responseSchema = attributes.responseSchema,
+        responseSchemaEnabled = attributes.responseSchemaEnabled,
     )
 
 internal fun Service.toDefinitionDto(): ServiceDefinitionDto =
@@ -156,6 +207,46 @@ internal fun ScenarioDto.toModel(): Scenario =
         delayMillis = delayMillis,
         tags = Tags.of(tags),
     )
+
+/** Returns the attributes of the scenario that a request sets, as the admin API states them. */
+internal fun Scenario.attributes(): ScenarioAttributesDto =
+    ScenarioAttributesDto(
+        name = name,
+        responseBody = responseBody,
+        statusCode = statusCode,
+        headers = headers.map(Header::toAdminDto),
+        matchCriterion = matchCriterion.toDto(),
+        methodRestriction = methodRestriction,
+        delayMillis = delayMillis,
+        tags = tags.toList(),
+    )
+
+/**
+ * Returns the scenario with [attributes] in the place of its own. Its identifier stays as it is. A text
+ * criterion among the attributes is not blank.
+ */
+internal fun Scenario.with(attributes: ScenarioAttributesDto): Scenario =
+    copy(
+        name = attributes.name,
+        responseBody = attributes.responseBody,
+        statusCode = attributes.statusCode,
+        headers = attributes.headers.map(HeaderDto::toModel),
+        matchCriterion = attributes.matchCriterion.toModel(),
+        methodRestriction = attributes.methodRestriction,
+        delayMillis = attributes.delayMillis,
+        tags = Tags.of(attributes.tags),
+    )
+
+internal fun ScenarioReference.toAdminDto(): ScenarioReferenceDto = ScenarioReferenceDto(serviceId.value, scenarioId.value)
+
+internal fun MergeReport.toAdminDto(): MergeReportDto =
+    MergeReportDto(
+        copied = copied.map { MergedScenarioDto(it.serviceName, it.scenarioName) },
+        skipped = skipped.map { MergedScenarioDto(it.serviceName, it.scenarioName) },
+        sourcesDeleted = sourcesDeleted,
+    )
+
+internal fun DerivedRealUrl.toAdminDto(): DerivedRealUrlDto = DerivedRealUrlDto(serviceId.value, serviceName, realUrl)
 
 internal fun Plan.toAdminDto(): PlanDto =
     PlanDto(

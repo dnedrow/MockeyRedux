@@ -246,6 +246,29 @@ class ForwardMarkTest {
         return upstream!!
     }
 
+    /** "No admin operation is performed", for a request that would change the definitions of the server. */
+    @Test
+    fun aForwardedRequestChangesNothingThroughTheAdminApi() {
+        val server = server()
+        val mock = server.listeners.mock.address
+        val admin = "http://127.0.0.1:${server.adminPort}/api/v1"
+        val engine = server.engine
+        val customers = engine.definitions.services.single()
+        val json = listOf("Content-Type: application/json")
+        val orders = """{"name":"Orders","mockUrl":"orders"}"""
+
+        val creating = RawHttp.exchange(mock, RawHttp.request("POST", "/service/$admin/services", json, orders))
+        val deleting = RawHttp.exchange(mock, RawHttp.request("DELETE", "/service/$admin/services/${customers.id.value}"))
+        val directly = RawHttp.exchange(server.listeners.admin.address, RawHttp.request("POST", "/api/v1/services", json, orders))
+
+        assertRefused(creating)
+        assertRefused(deleting)
+        assertEquals(201, directly.status)
+        // The two targets were unknown, and each left a service in proxy mode behind, as every unknown target does.
+        val defined = engine.definitions.services.filterNot { it.mockUrl.startsWith(admin) }
+        assertEquals(listOf(customers.name to customers.mockUrl, "Orders" to "orders"), defined.map { it.name to it.mockUrl })
+    }
+
     /** A request that goes elsewhere is forwarded as the client sent it: the server adds no mark, and it takes none away. */
     @Test
     fun aRequestThatTheServerForwardsToAnotherPortIsAsItWas() {

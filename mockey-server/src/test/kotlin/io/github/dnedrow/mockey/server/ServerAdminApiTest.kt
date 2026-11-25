@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.api.AdminApiJson
+import io.github.dnedrow.mockey.api.FieldErrorDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.PlanDto
@@ -14,6 +15,7 @@ import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.PlanItem
 import io.github.dnedrow.mockey.core.model.ResponseMode
+import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistPair
 import kotlinx.coroutines.runBlocking
@@ -29,14 +31,13 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 /**
- * The admin API of a server in the process of the test: the scenarios of the admin API that a server can
- * show whose API changes nothing yet. How the API takes a request, and what it answers when it does not do
- * what the request asks for, is the matter of [AdminApiTest].
- *
- * The scenarios "Validation failure" and "Unparseable body" need an operation that takes a body, and the
- * server has none yet. Until it does, [AdminApiTest] shows them with operations of its own.
+ * The admin API of a server in the process of the test: the scenarios of the admin API as a whole server
+ * shows them, with its definitions location and its mock listener. How the API takes a request, and what it
+ * answers when it does not do what the request asks for, is the matter of [AdminApiTest]. What each
+ * operation does is the matter of the tests of its area, such as [AdminServicesTest].
  */
 class ServerAdminApiTest {
     private val levelBefore = ServerLogging.level()
@@ -209,10 +210,10 @@ class ServerAdminApiTest {
                 "/api/v1/plans",
                 "/api/v1/history",
                 "/api/v1/system",
-                "/api/v1/services?token=$TOKEN",
             )
+        val inTheQueryString = RawHttp.get(admin, "/api/v1/services?token=$TOKEN")
 
-        val without = targets.map { RawHttp.get(admin, it) }
+        val without = targets.map { RawHttp.get(admin, it) } + inTheQueryString
         val withAnother = targets.map { RawHttp.get(admin, it, listOf("Authorization: Bearer ${TOKEN.reversed()}")) }
         val withTheToken = targets.map { RawHttp.get(admin, it, PRESENTING) }
         val ofMock = RawHttp.get(server.listeners.mock.address, "/status")
@@ -275,6 +276,121 @@ class ServerAdminApiTest {
         assertEquals(before, stateOf(server, definitions))
         assertEquals(3, before.history.size)
         assertContains(before.stored.keys, "mockey.json")
+    }
+
+    /** Returns the services that [server] holds. */
+    private fun read(server: MockeyServer): List<Service> = server.engine.definitions.services
+
+    /** Sends a request to the admin API of this server, with [body] as JSON, and returns the answer. */
+    private fun MockeyServer.asked(
+        method: String,
+        target: String,
+        body: String = "",
+        headers: List<String> = emptyList(),
+    ): RawHttp.Answer {
+        val json = if (body.isEmpty()) emptyList() else listOf("Content-Type: application/json")
+        return RawHttp.exchange(listeners.admin.address, RawHttp.request(method, "/api/v1/$target", headers + json, body))
+    }
+
+    /**
+     * The scenario "Create a service with a scenario and select it", on a server with its default mode, in
+     * which it keeps a change in memory. The mock endpoint answers with the scenario, and the definitions
+     * location holds what it held.
+     */
+    @Test
+    fun aClientDefinesAServiceWithAScenarioThroughTheApiAndTheMockEndpointAnswersWithIt() {
+        val definitions = definitionsLocation()
+        val server = start(settings(definitions))
+        val stored = stateOf(server, definitions).stored
+
+        val service = server.asked("POST", "services", """{"name":"Orders","mockUrl":"orders"}""")
+        val id = service.decoded<ServiceDto>().id
+        val scenario = server.asked("POST", "services/$id/scenarios", """{"name":"listed","responseBody":"[7, 8]","statusCode":203}""")
+        val updated = server.asked("PATCH", "services/$id", """{"responseMode":"static"}""")
+        val read = server.asked("GET", "services/$id").decoded<ServiceDto>()
+        val ofMock = RawHttp.get(server.listeners.mock.address, "/service/orders")
+
+        assertEquals(listOf<Int?>(201, 201, 200), listOf(service.status, scenario.status, updated.status))
+        assertEquals(ResponseModeDto.STATIC to ResponseModeDto.STATIC, read.responseMode to read.effectiveResponseMode)
+        assertEquals(scenario.decoded<ScenarioDto>().id to listOf("listed"), read.defaultScenarioId to read.scenarios.map { it.name })
+        assertEquals(203 to "[7, 8]", ofMock.status to ofMock.body)
+        assertEquals(stored, stateOf(server, definitions).stored)
+        assertEquals(listOf("Customers", "Orders"), read(server).map { it.name })
+    }
+
+    /** In writable mode a change is in the definitions location when its request is answered, and the next server starts with it. */
+    @Test
+    fun aChangeThroughTheApiIsStoredInWritableModeAndTheNextServerHasIt() {
+        val definitions = definitionsLocation()
+        val writable = settings(definitions).copy(readOnly = false)
+        val first = start(writable)
+        val stored = stateOf(first, definitions).stored
+
+        val created = first.asked("POST", "services", """{"name":"Orders","mockUrl":"orders","tags":["nightly"]}""")
+        val deleted = first.asked("DELETE", "services/${read(first).first().id.value}")
+        val afterTheChanges = stateOf(first, definitions).stored
+        first.close()
+        val second = start(writable)
+
+        assertEquals(listOf<Int?>(201, 204), listOf(created.status, deleted.status))
+        assertNotEquals(stored, afterTheChanges)
+        val listed = second.asked("GET", "services").decoded<List<ServiceDto>>()
+        assertEquals(listOf(created.decoded<ServiceDto>()), listed)
+        assertEquals(listOf("nightly"), listed.single().tags)
+    }
+
+    /** The scenarios "Validation failure" and "Unparseable body", and the scenario "Created service is returned". */
+    @Test
+    fun aServiceThatIsNotValidOrNotReadableIsNotCreatedAndAValidOneIsReturned() {
+        val definitions = definitionsLocation()
+        val server = start(settings(definitions).copy(readOnly = false))
+        val before = stateOf(server, definitions)
+
+        val taken = server.asked("POST", "services", """{"name":"Clients","mockUrl":"customer/{id}"}""")
+        val unparseable = server.asked("POST", "services", """{"name":"Clients","mockUrl":""")
+        val afterBoth = stateOf(server, definitions)
+        val created = server.asked("POST", "services", """{"name":"Clients","mockUrl":"client/{id}"}""")
+
+        val message = "The service 'Customers' already uses the mock URL pattern 'customer/{id}'."
+        val invalid = listOf(FieldErrorDto("mockUrl", message))
+        assertEquals("HTTP/1.1 422 Unprocessable Entity", taken.statusLine)
+        assertEquals(listOf("application/problem+json"), taken.headerValues("Content-Type"))
+        assertEquals(
+            ProblemDto("about:blank", "Unprocessable Entity", 422, "The request is not valid. mockUrl: $message", invalid),
+            taken.decoded<ProblemDto>(),
+        )
+        assertEquals("HTTP/1.1 400 Bad Request", unparseable.statusLine)
+        val noObject = ProblemDto("about:blank", "Bad Request", 400, "The body of the request is no JSON object.")
+        assertEquals(noObject, unparseable.decoded<ProblemDto>())
+        assertEquals(before, afterBoth)
+        assertEquals("HTTP/1.1 201 Created", created.statusLine)
+        val service = created.decoded<ServiceDto>()
+        assertEquals(ServiceDto(service.id, "Clients", "client/{id}"), service)
+        assertEquals(service, read(server).last().toAdminDto())
+    }
+
+    /** The scenario "Request without the token", for a request that would change something: nothing is changed for it. */
+    @Test
+    fun aServerWithAnAdminTokenChangesSomethingOnlyForARequestWithTheToken() {
+        val definitions = definitionsLocation()
+        val server = start(settings(definitions).copy(adminToken = AdminToken(TOKEN), readOnly = false))
+        val before = stateOf(server, definitions)
+        val customers = read(server).single()
+        val changes =
+            listOf(
+                Triple("POST", "services", """{"name":"Orders","mockUrl":"orders"}"""),
+                Triple("PATCH", "services/${customers.id.value}", """{"delayMillis":250}"""),
+                Triple("DELETE", "services/${customers.id.value}", ""),
+                Triple("POST", "services/${customers.id.value}/duplicate", ""),
+            )
+
+        val without = changes.map { (method, target, body) -> server.asked(method, target, body) }
+        val afterThem = stateOf(server, definitions)
+        val with = server.asked("PATCH", "services/${customers.id.value}", """{"delayMillis":250}""", PRESENTING)
+
+        assertEquals(List(changes.size) { 401 }, without.map { it.status })
+        assertEquals(before, afterThem)
+        assertEquals(200 to 250L, with.status to read(server).single().delayMillis)
     }
 
     /** The scenario "Unknown resource". */

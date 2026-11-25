@@ -168,8 +168,11 @@ class ServerLoggingTest {
                                     )
                                 }
                             }
-                            val ofAdmin = RawHttp.get(server.listeners.admin.address, "/api/v1/system?token=$presented", presenting)
-                            val withoutHeader = RawHttp.get(server.listeners.admin.address, "/api/v1/services?token=$presented")
+                            val admin = server.listeners.admin.address
+                            val ofAdmin = RawHttp.get(admin, "/api/v1/system", presenting)
+                            // The token does not belong in a query string, and the admin API takes no such parameter.
+                            val inBoth = RawHttp.get(admin, "/api/v1/system?token=$presented", presenting)
+                            val withoutHeader = RawHttp.get(admin, "/api/v1/services?token=$presented")
                             val ofMock =
                                 RawHttp.get(
                                     server.listeners.mock.address,
@@ -177,7 +180,7 @@ class ServerLoggingTest {
                                     presenting,
                                 )
                             val ofStatus = RawHttp.get(server.listeners.mock.address, "/status?token=$presented", presenting)
-                            assertEquals(200 to 401, ofAdmin.status to withoutHeader.status)
+                            assertEquals(listOf<Int?>(200, 400, 401), listOf(ofAdmin.status, inBoth.status, withoutHeader.status))
                             assertEquals(200 to StubProxy.ANSWER, ofMock.status to ofMock.body)
                             assertEquals(200, ofStatus.status)
                         }

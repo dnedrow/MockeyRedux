@@ -6,6 +6,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLPathPart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.utils.io.readBuffer
 import kotlinx.io.readByteArray
@@ -27,10 +28,15 @@ import java.nio.charset.CharacterCodingException
  * `services/{serviceId}`. A segment in braces is a parameter: it stands for any one segment that is not
  * empty, and [AdminRequest.parameter] tells the operation what a request has there. Every other segment
  * stands for itself, as it is written here: a client that escapes a character of it writes another path.
+ *
+ * [query] holds the names of the parameters that the operation takes in the query string of a request,
+ * see [AdminRequest.queryValues]. A request with any other parameter gets to no operation: a client that
+ * misspells a filter is not to get everything.
  */
 internal class AdminRoute(
     val method: HttpMethod,
     val path: String,
+    val query: Set<String> = emptySet(),
     val handle: suspend AdminRequest.() -> AdminResponse,
 ) {
     private val segments = path.split('/')
@@ -81,11 +87,13 @@ internal class AdminRoute(
 
 /**
  * A request to an operation of the admin API, as far as an operation has to know it. The request has
- * presented the admin token when the server has one, and its path and its method are those of the route.
+ * presented the admin token when the server has one, its path and its method are those of the route, and
+ * its query string holds no parameter that the route does not name.
  */
 internal class AdminRequest(
     private val call: ApplicationCall,
     private val parameters: Map<String, String>,
+    private val query: Map<String, List<String>>,
     private val maxBody: Long,
 ) {
     /**
@@ -104,6 +112,26 @@ internal class AdminRequest(
 
     /** Returns what the path of the request has at the parameter [name] of the route, decoded. It is never empty. */
     fun parameter(name: String): String = parameters.getValue(name)
+
+    /**
+     * Returns the values that the query string of the request has for the parameter [name], decoded and in
+     * their order. A request without the parameter has none. A parameter without a `=` has an empty value.
+     */
+    fun queryValues(name: String): List<String> = query[name].orEmpty()
+
+    /**
+     * Returns the one value that the query string of the request has for the parameter [name], or `null`
+     * for a request without the parameter.
+     *
+     * @throws AdminProblem with the status 400 when the request has the parameter more than once.
+     */
+    fun queryValue(name: String): String? {
+        val values = queryValues(name)
+        if (values.size > 1) {
+            throw AdminProblem(HttpStatusCode.BadRequest, "The query string of the request has the parameter $name more than once.")
+        }
+        return values.firstOrNull()
+    }
 
     /**
      * Returns the body of the request, which has to be one JSON object in UTF-8. A request with a body has
@@ -223,12 +251,14 @@ internal class AdminRequest(
 
 /**
  * What an operation of the admin API answers: a [status] and a [body], which is a JSON text unless
- * [contentType] says otherwise. The server sends the body in UTF-8.
+ * [contentType] says otherwise. The server sends the body in UTF-8. An answer without a body has `null`
+ * there. [headers] are headers that the answer carries besides, by their names.
  */
 internal class AdminResponse(
     val status: HttpStatusCode,
-    val body: String,
+    val body: String?,
     val contentType: ContentType = ContentType.Application.Json,
+    val headers: Map<String, String> = emptyMap(),
 ) {
     internal companion object {
         /** Returns the answer with [status] whose body is [value] as JSON, in the form that the wire types of the API give it. */
@@ -236,5 +266,23 @@ internal class AdminResponse(
             value: T,
             status: HttpStatusCode = HttpStatusCode.OK,
         ): AdminResponse = AdminResponse(status, AdminApiJson.instance.encodeToString(value))
+
+        /**
+         * Returns the answer to a request that created a resource: the status 201, [value] as JSON, which
+         * is the resource with its identifier, and in the `Location` header the path of the resource.
+         * [resource] is that path below the prefix of the API, with each of its segments as it is, such as
+         * the segments `services` and the identifier of a service.
+         */
+        inline fun <reified T> created(
+            value: T,
+            vararg resource: String,
+        ): AdminResponse {
+            val location = resource.joinToString("/", "${AdminApi.PREFIX}/") { it.encodeURLPathPart() }
+            val body = AdminApiJson.instance.encodeToString(value)
+            return AdminResponse(HttpStatusCode.Created, body, headers = mapOf(HttpHeaders.Location to location))
+        }
+
+        /** Returns the answer to a request that was done and that has nothing to state: the status 204, without a body. */
+        fun noContent(): AdminResponse = AdminResponse(HttpStatusCode.NoContent, body = null)
     }
 }
