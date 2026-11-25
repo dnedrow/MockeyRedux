@@ -51,7 +51,7 @@ internal sealed interface SourceDefinitions {
 
 /** Tells that no definitions could be read from a source. The message names the source and says why. */
 internal class UnreadableSource(
-    message: String,
+    override val message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause)
 

@@ -36,6 +36,18 @@ internal class SettingsHelpFormatter(
                 it.isNotEmpty()
             }.joinToString(" ")
 
+    /**
+     * Returns the parameters of the usage line. A command that runs without one of its commands shows them
+     * as something that can be left out.
+     */
+    override fun renderUsageParametersString(parameters: List<ParameterHelp>): String {
+        val usage = super.renderUsageParametersString(parameters)
+        val arguments = renderRepeatedMetavar(renderOptionalMetavar(normalizeParameter(localization.argumentsMetavar())))
+        val command = "${normalizeParameter(localization.commandMetavar())} $arguments"
+        val optional = context.command.invokeWithoutSubcommand && usage.endsWith(command)
+        return if (optional) usage.removeSuffix(command) + renderOptionalMetavar(command) else usage
+    }
+
     override fun renderProlog(prolog: String): String = paragraphs(prolog)
 
     override fun renderEpilog(epilog: String): String = paragraphs(epilog)

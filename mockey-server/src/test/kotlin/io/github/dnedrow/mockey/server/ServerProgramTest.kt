@@ -36,7 +36,7 @@ class ServerProgramTest {
         val outcome = ServerProgram.run("--help")
 
         assertEquals(0, outcome.status, "$outcome")
-        assertTrue(outcome.output.startsWith("Usage: mockey-server [<options>]\n"), "$outcome")
+        assertTrue(outcome.output.startsWith("Usage: mockey-server [<options>] [<command> [<args>]...]\n"), "$outcome")
         assertContains(outcome.output, "  --mock-port=<port>\n")
         assertContains(outcome.output, "      Environment variable: MOCKEY_MOCK_PORT\n      Default: 8080\n")
         assertEquals("", outcome.errors)
@@ -57,7 +57,8 @@ class ServerProgramTest {
 
         assertEquals(1, outcome.status, "$outcome")
         assertEquals(
-            "Usage: mockey-server [<options>]\n\nError: invalid value for --mock-port: http is not a valid integer\n",
+            "Usage: mockey-server [<options>] [<command> [<args>]...]\n\n" +
+                "Error: invalid value for --mock-port: http is not a valid integer\n",
             outcome.errors,
         )
         assertEquals("", outcome.output)

@@ -302,7 +302,8 @@ class ServerCommandTest {
      */
     private fun optionEntries(help: String): Map<String, List<String>> {
         val entries = linkedMapOf<String, MutableList<String>>()
-        for (line in help.substringAfter("\nOptions:\n").lines().filter { it.isNotBlank() }) {
+        val options = help.substringAfter("\nOptions:\n").substringBefore("\nCommands:\n")
+        for (line in options.lines().filter { it.isNotBlank() }) {
             if (line.startsWith("      ")) entries.values.last() += line.trim() else entries[line.trim()] = mutableListOf()
         }
         return entries
@@ -338,7 +339,7 @@ class ServerCommandTest {
             assertEquals(0, run.status)
             assertEquals(emptyList(), run.served)
             assertEquals("", run.errors)
-            assertTrue(run.output.startsWith("Usage: mockey-server [<options>]\n"), run.output)
+            assertTrue(run.output.startsWith("$USAGE\n\nServes mock responses"), run.output)
         }
     }
 
@@ -437,7 +438,7 @@ class ServerCommandTest {
                 assertEquals(1, run.status, "$case")
                 assertEquals(emptyList(), run.served, "$case")
                 assertEquals("", run.output, "$case")
-                assertTrue(run.errors.startsWith("Usage: mockey-server [<options>]\n\nError: "), "$case gave ${run.errors}")
+                assertTrue(run.errors.startsWith("$USAGE\n\nError: "), "$case gave ${run.errors}")
                 assertContains(run.errors.substringAfter("Error: "), case.named, message = "$case")
             }
         } finally {
@@ -474,9 +475,11 @@ class ServerCommandTest {
                 run(variables = ofVariable),
                 run("--help", variables = ofVariable),
                 run("--log-level", "loud", variables = ofVariable),
+                run("--admin-token", token, "import-legacy", "no-such-source"),
+                run("import-legacy", "--help", variables = ofVariable),
             )
 
-        assertEquals(listOf(0, 0, 0, 1, 1, 1, 1, 0, 0, 1), runs.map { it.status })
+        assertEquals(listOf(0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0), runs.map { it.status })
         for (run in runs) {
             assertFalse(token in run.output, run.output)
             assertFalse(token in run.errors, run.errors)
@@ -488,3 +491,6 @@ class ServerCommandTest {
         }
     }
 }
+
+/** The first line of the help of the program and of its messages about arguments that it cannot use. */
+private const val USAGE = "Usage: mockey-server [<options>] [<command> [<args>]...]"

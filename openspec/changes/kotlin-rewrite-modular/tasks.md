@@ -102,7 +102,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 11.3 Implement the mock endpoint: conversion of HTTP requests to engine requests from the raw request target, all methods, and the request size limit. Verify with tests over real HTTP for double slashes, encoded characters, and a 413 response.
 - [x] 11.4 Implement response writing with the default headers, `/status`, readiness ordering, and the absence of cross-origin headers on the admin listener (DEV-26, DEV-28). Verify with tests over real HTTP for each scenario of those requirements.
 - [x] 11.5 Implement the startup flow: load definitions, apply initial definitions from a file or URL, protect stored definitions in writable mode (DEV-30), apply the default plan, and set the tag filter. Verify with tests for each source type and for the refusal.
-- [ ] 11.6 Implement the legacy import command. Verify with a test that runs it on a legacy directory and checks the definitions location, the printed report, and exit status 0.
+- [x] 11.6 Implement the legacy import command. Verify with a test that runs it on a legacy directory and checks the definitions location, the printed report, and exit status 0.
 - [ ] 11.7 Implement graceful shutdown. Verify with a test that sends a termination signal during a save and finds the save complete.
 - [ ] 11.8 Run the parity suite against the new server, loading fixtures through the importer, and fix differences. Verify that every case labeled `same` passes and every deviation case returns its stated new response.
 - [ ] 11.9 Package the server as a distribution with start scripts and as a runnable jar. Verify by starting it from the built distribution on a plain JDK 21 and receiving `running` from `/status`.

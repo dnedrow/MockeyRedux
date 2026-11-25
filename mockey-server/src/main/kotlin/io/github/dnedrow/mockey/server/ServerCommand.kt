@@ -3,8 +3,10 @@ package io.github.dnedrow.mockey.server
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.CoreCliktCommand
+import com.github.ajalt.clikt.core.MultiUsageError
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.parse
+import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.output.HelpFormatter
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.options.NullableOption
@@ -32,6 +34,10 @@ import kotlin.time.Duration
  * cannot be used, which is reported with the option or the variable that it came from. A server that does
  * not start is reported with its reason, see [StartupFailure].
  *
+ * Arguments that name a command run that command in the place of the server: [ImportLegacyCommand] imports
+ * the definitions of Mockey 2.x. The settings are read all the same, so that one that cannot be used is
+ * reported, and [serve] is not called.
+ *
  * @param environment gives the value of an environment variable, or `null` when it is not set.
  * @param output receives the help and the version.
  * @param errors receives the messages about arguments that cannot be used.
@@ -44,6 +50,9 @@ internal class ServerCommand(
     private val serve: (ServerSettings) -> Unit = ::serve,
 ) : CoreCliktCommand(name = PROGRAM_NAME) {
     private val defaults = ServerSettings()
+
+    /** The server runs when the arguments name no command. */
+    override val invokeWithoutSubcommand: Boolean = true
 
     private val mockHost by setting("mock-host", "Address on which the mock listener accepts connections.")
         .notBlank("address")
@@ -154,6 +163,7 @@ internal class ServerCommand(
             }
         }
         versionOption(ServerVersion.text, help = "Prints the version and exits.")
+        subcommands(ImportLegacyCommand { definitions })
     }
 
     override fun help(context: Context): String =
@@ -166,6 +176,7 @@ internal class ServerCommand(
         """.trimIndent()
 
     override fun run() {
+        if (currentContext.invokedSubcommand != null) return
         val settings =
             ServerSettings(
                 mockHost = mockHost,
@@ -218,14 +229,16 @@ internal class ServerCommand(
 
 /**
  * Runs the program with the arguments [argv] and returns its exit status: 0 after the server has run, after
- * the help, and after the version, and another number when the arguments cannot be used or the server does
- * not start.
+ * an import, after the help, and after the version, and another number when the arguments cannot be used,
+ * the server does not start, or the import is not carried out.
  */
 internal fun ServerCommand.execute(argv: List<String>): Int =
     try {
         parse(argv)
         0
     } catch (error: CliktError) {
+        // Several errors at once come without the command that they are about, and the usage would be that of the program.
+        if (error is MultiUsageError) error.context = error.context ?: error.errors.firstNotNullOfOrNull { it.context }
         echoFormattedHelp(error)
         error.statusCode
     }
