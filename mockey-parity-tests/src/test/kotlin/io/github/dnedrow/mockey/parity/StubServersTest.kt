@@ -5,12 +5,16 @@ import java.net.Authenticator
 import java.net.InetSocketAddress
 import java.net.PasswordAuthentication
 import java.net.ProxySelector
+import java.net.Socket
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -37,6 +41,54 @@ class StubServersTest {
             assertEquals("POST", request.method)
             assertEquals("/orders?id=7", request.target)
             assertEquals("payload", String(request.body))
+        }
+    }
+
+    /**
+     * The stubs listen on the ports that the fixtures name, in one test after the other. So a stub that is
+     * closed has left its port, also while a client still holds a connection to it, and the next stub listens
+     * on that port at once.
+     */
+    @Test
+    fun aStubThatIsClosedHasLeftItsPortToTheNextOne() {
+        val port = StubHttpServer.upstream().use { it.port }
+
+        repeat(REBINDS) { round ->
+            HttpClient.newHttpClient().use { keeping ->
+                StubHttpServer.upstream(port).use {
+                    val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/round/$round")).build()
+                    assertEquals("upstream:/round/$round", keeping.send(request, HttpResponse.BodyHandlers.ofString()).body())
+                }
+            }
+        }
+    }
+
+    /**
+     * What frees the port: a stub that is closed has ended its threads when the call returns, among them
+     * the one that waits for connections. Here a thread is at work for a request and takes its time to end.
+     */
+    @Test
+    fun closingAStubWaitsUntilItsThreadsHaveEnded() {
+        val atWork = CountDownLatch(1)
+        val ended = AtomicBoolean(false)
+        val stub =
+            RawHttpServer(0) {
+                atWork.countDown()
+                try {
+                    Thread.sleep(NEVER_BY_ITSELF_MILLIS)
+                } catch (_: InterruptedException) {
+                    Thread.sleep(SLOW_END_MILLIS)
+                    ended.set(true)
+                }
+                null
+            }
+
+        Socket("127.0.0.1", stub.port).use { client ->
+            client.getOutputStream().write("GET / HTTP/1.1\r\n\r\n".toByteArray())
+            assertTrue(atWork.await(NEVER_BY_ITSELF_MILLIS, TimeUnit.MILLISECONDS), "The stub did not take the request.")
+            stub.close()
+
+            assertTrue(ended.get(), "The stub was closed while one of its threads was still at work.")
         }
     }
 
@@ -246,5 +298,16 @@ class StubServersTest {
                 .method(method, HttpRequest.BodyPublishers.ofByteArray(body))
         headers.forEach { (name, value) -> request.header(name, value) }
         return client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray())
+    }
+
+    private companion object {
+        /** How often a stub is started on the port that the one before it has just left. */
+        const val REBINDS = 25
+
+        /** For how long a thread of a stub is at work that nothing ends. A test that waits this long has failed. */
+        const val NEVER_BY_ITSELF_MILLIS = 30_000L
+
+        /** How long a thread of a stub takes to end after it was told to. */
+        const val SLOW_END_MILLIS = 200L
     }
 }

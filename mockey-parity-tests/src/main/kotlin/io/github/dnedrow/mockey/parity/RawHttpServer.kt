@@ -10,6 +10,7 @@ import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** A response that [RawHttpServer] writes exactly as given: header names and their order are kept. */
 internal class RawResponse(
@@ -42,10 +43,21 @@ internal class RawHttpServer(
         executor.execute(::acceptConnections)
     }
 
+    /**
+     * Stops the server. Its port is free when this returns, so that a server that is started next can listen
+     * on the same port, as the stubs do that listen on the ports that the fixtures name.
+     *
+     * Closing the listener does not free the port by itself: the system keeps a listener for as long as a
+     * thread waits in it for a connection, and that thread leaves it some time after the listener was
+     * closed. So the server waits until its threads have ended.
+     */
     override fun close() {
         listener.close()
         connections.forEach { it.close() }
         executor.shutdownNow()
+        check(executor.awaitTermination(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            "The threads of the stub on port ${listener.localPort} did not end within $CLOSE_TIMEOUT_SECONDS seconds."
+        }
     }
 
     private fun acceptConnections() {
@@ -127,6 +139,7 @@ internal class RawHttpServer(
 
     private companion object {
         const val BACKLOG = 50
+        const val CLOSE_TIMEOUT_SECONDS = 30L
         const val REQUEST_LINE_PARTS = 3
         val statusesWithoutBody = setOf(204, 304)
         val reasonPhrases =
