@@ -111,9 +111,8 @@ class UiPagesTest {
         val browser = browserFor(api)
 
         val answers = listOf("/nothing", "/system/more", "/assets", "/assets/", "/SYSTEM").map(browser::get)
-        val posted = browser.request("POST", "/system")
 
-        for (answer in answers + posted) {
+        for (answer in answers) {
             assertEquals(404, answer.status)
             val said = answer.page.select("main p").text()
             assertEquals("Not there - Mockey" to "The UI has no page at this address.", answer.page.title() to said)
@@ -175,7 +174,7 @@ class UiPagesTest {
 
         assertEquals(listOf(302, 200, 404, 200, 200, 200, 502, 502, 502), answers.map { it.status })
         for (answer in answers) assertFalse(secrets.any { it in answer.everything }, answer.everything)
-        assertEquals(emptyList(), answers.flatMap { it.headers["set-cookie"].orEmpty() })
+        assertTrue(answers.any { it.headers["set-cookie"] != null }, "The answers are to come with a cookie, which is looked into as well.")
         assertFalse(secrets.any { it in log }, log)
         assertEquals(List(FAILING_FROM + 1) { "Bearer $token" }, api.requests.map { it.header("authorization") })
         val reported = answers.last().page.select("main h1")

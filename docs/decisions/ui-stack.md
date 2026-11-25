@@ -108,6 +108,7 @@ refuses every other token when it starts, and says why.
 | `--port` | `MOCKEY_UI_PORT` | `8082` |
 | `--admin-url` | `MOCKEY_UI_ADMIN_URL` | `http://127.0.0.1:8081` |
 | `--admin-token` | `MOCKEY_ADMIN_TOKEN` | none |
+| `--allowed-host` | `MOCKEY_UI_ALLOWED_HOST` | none |
 | `--log-level` | `MOCKEY_UI_LOG_LEVEL` | `info` |
 
 - The admin URL says where the admin listener is, without the path of the admin API, which the UI knows.
@@ -115,6 +116,8 @@ refuses every other token when it starts, and says why.
   password, because the pages show it.
 - The variable of the admin token is the one of the server program. The token is one secret, and an
   environment that both programs start in holds it once.
+- The allowed hosts are the names under which the UI answers besides IP addresses and `localhost`. Task 13.3
+  added them, see [ui-forms.md](ui-forms.md).
 - The UI asks the server for nothing before a page is loaded, so it starts whether or not the server runs.
 - The UI warns in its log when it listens on an address that other machines reach.
 

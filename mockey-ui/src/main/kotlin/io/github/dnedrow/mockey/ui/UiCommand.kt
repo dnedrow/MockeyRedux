@@ -11,7 +11,9 @@ import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.options.RawOption
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.split
 import com.github.ajalt.clikt.parameters.options.versionOption
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
@@ -73,6 +75,19 @@ internal class UiCommand(
         }
     }
 
+    private val allowedHosts by setting(
+        "allowed-host",
+        "Name under which the UI answers, besides IP addresses and localhost. The UI answers a request for no other name, " +
+            "so that no page of another site reads or changes what the UI manages. " +
+            "The option is given once for each name, and the variable takes the names with commas between them.",
+        metavar = "name",
+        default = UiSettings.NONE,
+    ).convert {
+        val name = it.trim().lowercase()
+        if (AllowedHosts.isName(name)) name else fail(NO_NAME)
+    }.split(NAMES)
+        .multiple()
+
     private val logLevel by setting("log-level", "Level from which on messages are written to the log.")
         .choice(LogLevel.entries.associateBy { it.name.lowercase() }, ignoreCase = true)
         .default(defaults.logLevel, defaultForHelp = defaults.logLevel.name.lowercase())
@@ -103,7 +118,7 @@ internal class UiCommand(
         """.trimIndent()
 
     override fun run() {
-        val settings = UiSettings(host = host, port = port, adminUrl = adminUrl, adminToken = adminToken, logLevel = logLevel)
+        val settings = UiSettings(host, port, adminUrl, adminToken, allowedHosts.flatten().distinct(), logLevel)
         try {
             serve(settings)
         } catch (failure: StartupFailure) {
@@ -129,6 +144,11 @@ internal class UiCommand(
 
     internal companion object {
         private const val LAST_PORT = 65_535
+
+        private const val NO_NAME = "the name of a host has letters, digits, hyphens, and dots, and no scheme and no port"
+
+        /** What stands between the names of one value: a comma, with or without spaces around it. */
+        private val NAMES = Regex("""\s*,\s*""")
 
         /** The setting that has the environment variable of the server program: the token is the one of the server. */
         private const val ADMIN_TOKEN = "admin-token"

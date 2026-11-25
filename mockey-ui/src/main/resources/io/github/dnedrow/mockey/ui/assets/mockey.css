@@ -158,3 +158,79 @@ th {
 .problem {
   border-left-color: var(--bad);
 }
+
+form {
+  margin: 0 0 1rem;
+}
+
+.field {
+  margin: 0 0 1rem;
+}
+
+.field > label {
+  display: block;
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.field.check > label {
+  display: inline;
+  font-weight: 400;
+}
+
+input[type="text"],
+select,
+textarea {
+  width: 100%;
+  max-width: 48rem;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.2rem;
+}
+
+select {
+  width: auto;
+}
+
+textarea {
+  max-width: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+}
+
+[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.hint {
+  margin: 0.25rem 0 0;
+  color: var(--quiet);
+  font-size: 0.875rem;
+}
+
+.field-problem p {
+  margin: 0.25rem 0 0;
+  color: var(--bad);
+}
+
+button {
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  color: var(--paper);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 0.2rem;
+  cursor: pointer;
+}
+
+button.danger {
+  background: var(--bad);
+  border-color: var(--bad);
+}
+
+.actions {
+  margin: 1rem 0;
+}

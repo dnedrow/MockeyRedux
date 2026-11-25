@@ -2,16 +2,22 @@ package io.github.dnedrow.mockey.ui
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.FormElement
+import java.io.ByteArrayOutputStream
 import java.net.Socket
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 /**
  * A browser without scripting, as far as the tests of the UI need one. It sends one request and returns the
- * answer: it follows no redirect, and it keeps nothing from one request to the next, so that a test sees
- * each answer of the UI as it is.
+ * answer: it follows no redirect by itself, so that a test sees each answer of the UI as it is.
+ *
+ * It keeps the cookies that the UI gives it and sends them with its requests, as a browser does for the
+ * requests of a site's own pages. It sends a form of a page as a browser sends it, see [submit]. Two
+ * browsers know nothing of each other.
  */
 internal class Browser(
     private val ui: MockeyUi,
@@ -32,38 +38,90 @@ internal class Browser(
         /** Everything of the answer that reaches a browser, as one text: the status, the headers, and the body. */
         val everything: String
             get() = (listOf("$status") + headers.flatMap { (name, values) -> values.map { "$name: $it" } } + body).joinToString("\n")
+
+        /** Returns the form of the page that [selector] finds. */
+        fun form(selector: String = "main form"): FormElement = page.select(selector).single() as FormElement
+
+        /** What the page says of a form that the UI has done, or `null` when it says nothing. */
+        val notice: String?
+            get() = page.select("main .notice").singleOrNull()?.text()
+
+        /** The messages at the fields of the form of the page, by the names of the fields. */
+        val fieldProblems: Map<String, List<String>>
+            get() =
+                page.select("main .field").filter { it.select(".field-problem").isNotEmpty() }.associate { field ->
+                    val control = field.select("input, textarea, select").first()!!
+                    control.attr("name") to field.select(".field-problem p").map { it.text() }
+                }
     }
 
+    /** A file that a test chooses in a file field of a form: its name and its bytes. */
+    class Chosen(
+        val fileName: String,
+        val bytes: ByteArray,
+    )
+
     private val http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build()
+
+    /** The cookies that the browser keeps, by their names. */
+    val cookies: MutableMap<String, String> = LinkedHashMap()
 
     /** The address of the UI, as a browser writes it. */
     val address: String = "http://${ui.address.text()}"
 
-    /** Sends a request with [method] for [path], which starts with a slash and has its query string, and returns the answer. */
+    /**
+     * Sends a request with [method] for [path], which starts with a slash and has its query string, and
+     * returns the answer. The request has [body], which it declares as [contentType], when there is one.
+     */
     fun request(
         method: String,
         path: String,
         headers: Map<String, String> = emptyMap(),
+        body: ByteArray? = null,
+        contentType: String? = null,
     ): Response {
-        val request = HttpRequest.newBuilder(URI.create(address + path)).method(method, HttpRequest.BodyPublishers.noBody())
+        val publisher = if (body == null) HttpRequest.BodyPublishers.noBody() else HttpRequest.BodyPublishers.ofByteArray(body)
+        val request = HttpRequest.newBuilder(URI.create(address + path)).method(method, publisher)
+        val kept = cookies.map { (name, value) -> "$name=$value" }
+        if (kept.isNotEmpty() && "Cookie" !in headers) request.header("Cookie", kept.joinToString("; "))
+        if (contentType != null) request.header("Content-Type", contentType)
         headers.forEach { (name, value) -> request.header(name, value) }
         val response = http.send(request.build(), HttpResponse.BodyHandlers.ofString(Charsets.UTF_8))
         val byName = response.headers().map()
         val received = byName.entries.associate { (name, values) -> name.lowercase() to values.toList() }
+        received["set-cookie"].orEmpty().forEach(::keep)
         return Response(response.statusCode(), received, response.body(), address + path)
     }
 
+    /** Keeps or drops a cookie as a `Set-Cookie` header with the value [header] says. */
+    private fun keep(header: String) {
+        val (name, value) = header.substringBefore(';').split('=', limit = 2)
+        val dropped = header.split(';').any { it.trim().equals("Max-Age=0", ignoreCase = true) }
+        if (dropped) cookies.remove(name) else cookies[name] = value
+    }
+
     /**
-     * Sends a request for [target] as it is written, and returns the answer. A browser sends no address that
-     * is no URL, and neither does the HTTP client of the tests, so the request goes over a socket.
+     * Sends a request for [target] as it is written, with [headers] as they are written, and returns the
+     * answer. A browser sends no address that is no URL and names the host that it asks, and so does the
+     * HTTP client of the tests, so a request that does otherwise goes over a socket. The request states the
+     * length of its [body] unless it says in its headers how the body ends.
      */
-    fun raw(target: String): Response {
+    fun raw(
+        target: String,
+        headers: List<String> = listOf("Host: ${ui.address.text()}"),
+        method: String = "GET",
+        body: String = "",
+        statesLength: Boolean = true,
+    ): Response {
         Socket(ui.address.address, ui.address.port).use { socket ->
-            socket.getOutputStream().write("GET $target HTTP/1.1\r\nHost: ${ui.address.text()}\r\nConnection: close\r\n\r\n".toByteArray())
+            socket.soTimeout = RAW_TIMEOUT_MILLIS
+            val length = if (body.isEmpty() || !statesLength) emptyList() else listOf("Content-Length: ${body.toByteArray().size}")
+            val head = (listOf("$method $target HTTP/1.1") + headers + length + "Connection: close").joinToString("\r\n")
+            socket.getOutputStream().write("$head\r\n\r\n$body".toByteArray())
             val answer = String(socket.getInputStream().readAllBytes(), Charsets.UTF_8)
-            val head = answer.substringBefore("\r\n\r\n").split("\r\n")
-            val headers = head.drop(1).groupBy({ it.substringBefore(':').lowercase() }, { it.substringAfter(':').trim() })
-            return Response(head.first().split(' ')[1].toInt(), headers, answer.substringAfter("\r\n\r\n"), address + target)
+            val lines = answer.substringBefore("\r\n\r\n").split("\r\n")
+            val received = lines.drop(1).groupBy({ it.substringBefore(':').lowercase() }, { it.substringAfter(':').trim() })
+            return Response(lines.first().split(' ')[1].toInt(), received, answer.substringAfter("\r\n\r\n"), address + target)
         }
     }
 
@@ -72,4 +130,68 @@ internal class Browser(
         path: String,
         headers: Map<String, String> = emptyMap(),
     ): Response = request("GET", path, headers)
+
+    /** Asks for the page that [answer] sends the browser to, and returns the answer. */
+    fun follow(answer: Response): Response = get(answer.header("location")!!)
+
+    /** Sends [fields] to [path] as a form of fields, with the method POST, and returns the answer. */
+    fun post(
+        path: String,
+        fields: List<Pair<String, String>>,
+        headers: Map<String, String> = emptyMap(),
+    ): Response = request("POST", path, headers, encoded(fields).toByteArray(), "application/x-www-form-urlencoded")
+
+    /**
+     * Sends [form], which is a form of a page, as a browser sends it when its button is pressed: to the
+     * address of the form, with the fields that the form has and their values, of which [edits] replace the
+     * ones that a person changed. A field with the value `null` is not sent, as a check box that is not
+     * checked. A field of several lines is sent with a carriage return before every line feed. [files] are
+     * the files that were chosen in the file fields.
+     */
+    fun submit(
+        form: FormElement,
+        edits: Map<String, String?> = emptyMap(),
+        files: Map<String, Chosen> = emptyMap(),
+    ): Response {
+        val areas = form.select("textarea").associate { it.attr("name") to it.wholeText() }
+        val ofThePage = form.formData().filter { it.key() !in files }.map { it.key() to (areas[it.key()] ?: it.value()) }
+        val kept = ofThePage.filter { (name, _) -> name !in edits }
+        val fields = (kept + edits.mapNotNull { (name, value) -> value?.let { name to it } }).map { (name, value) -> name to asSent(value) }
+        val action = form.attr("action")
+        if (!form.attr("method").equals("post", ignoreCase = true)) return get("$action?${encoded(fields)}")
+        if (form.attr("enctype") != "multipart/form-data") return post(action, fields)
+        val boundary = "----browser${System.nanoTime()}"
+        return request("POST", action, body = parts(fields, files, boundary), contentType = "multipart/form-data; boundary=$boundary")
+    }
+
+    private fun asSent(value: String): String = value.replace("\r\n", "\n").replace("\n", "\r\n")
+
+    private fun encoded(fields: List<Pair<String, String>>): String =
+        fields.joinToString("&") { (name, value) -> "${escaped(name)}=${escaped(value)}" }
+
+    private fun escaped(text: String): String = URLEncoder.encode(text, Charsets.UTF_8)
+
+    private companion object {
+        /** For how long a request over a socket waits for its answer. An answer that does not come fails the test. */
+        const val RAW_TIMEOUT_MILLIS = 10_000
+    }
+
+    private fun parts(
+        fields: List<Pair<String, String>>,
+        files: Map<String, Chosen>,
+        boundary: String,
+    ): ByteArray {
+        val body = ByteArrayOutputStream()
+        for ((name, value) in fields) {
+            body.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
+        }
+        for ((name, file) in files) {
+            val disposition = "Content-Disposition: form-data; name=\"$name\"; filename=\"${file.fileName}\""
+            body.write("--$boundary\r\n$disposition\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray())
+            body.write(file.bytes)
+            body.write("\r\n".toByteArray())
+        }
+        body.write("--$boundary--\r\n".toByteArray())
+        return body.toByteArray()
+    }
 }

@@ -17,6 +17,7 @@ import kotlinx.html.main
 import kotlinx.html.meta
 import kotlinx.html.nav
 import kotlinx.html.p
+import kotlinx.html.role
 import kotlinx.html.stream.appendHTML
 import kotlinx.html.title
 import kotlinx.html.ul
@@ -56,12 +57,17 @@ internal object Html {
      * Returns [page] as an HTML document. [path] is the path at which the page is shown, by which the
      * navigation marks the section of the page. [adminUrl] is where the server is that the UI manages, and
      * [system] is what that server states of itself, or `null` when it stated nothing.
+     *
+     * The page says [notice] above its heading, which is what the UI says of a form that it has done, and
+     * [trouble], which is why a page that needs nothing of the server shows nothing of it.
      */
     fun document(
         page: Page,
         path: String,
         adminUrl: AdminUrl,
         system: SystemStatusDto?,
+        notice: String? = null,
+        trouble: String? = null,
     ): String =
         buildString {
             append("<!DOCTYPE html>\n")
@@ -80,6 +86,19 @@ internal object Html {
                         navigation(path)
                     }
                     main {
+                        if (notice != null) {
+                            p(classes = "notice") {
+                                role = "status"
+                                +notice
+                            }
+                        }
+                        if (trouble != null) {
+                            p(classes = "problem") {
+                                +"$trouble "
+                                a(href = "/system") { +"More about it" }
+                                +"."
+                            }
+                        }
                         h1 { +page.title }
                         page.content(this)
                     }
@@ -87,6 +106,30 @@ internal object Html {
                         p { +serverLine(adminUrl, system) }
                         p { +"Mockey UI ${UiVersion.text}" }
                     }
+                }
+            }
+        }
+
+    /**
+     * Returns a document that says [text] under [title] and nothing else: it has no navigation, names no
+     * server, and refers to nothing. It is for a request that the UI does not take for one of a browser that
+     * shows its pages.
+     */
+    fun bare(
+        title: String,
+        text: String,
+    ): String =
+        buildString {
+            append("<!DOCTYPE html>\n")
+            appendHTML(prettyPrint = false).html {
+                lang = "en"
+                head {
+                    meta(charset = "utf-8")
+                    title("$title - Mockey")
+                }
+                body {
+                    h1 { +title }
+                    p { +text }
                 }
             }
         }

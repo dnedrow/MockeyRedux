@@ -55,7 +55,10 @@ internal sealed class ApiFailure(
     /** No answer came: no connection to the server was made, or the server did not answer in time. */
     class Unreachable(
         cause: Exception,
-    ) : ApiFailure(reasonOf(cause), cause)
+    ) : ApiFailure(reasonOf(cause), cause) {
+        /** Whether the request can have reached the server, which did what it asks for then, for all that the UI knows. */
+        val mayHaveArrived: Boolean = cause !is ConnectException && cause !is HttpConnectTimeoutException
+    }
 
     /** The server asks for an admin token that the UI does not have, or it does not take the token of the UI. */
     class TokenRejected : ApiFailure("The server does not take the request without its admin token.")

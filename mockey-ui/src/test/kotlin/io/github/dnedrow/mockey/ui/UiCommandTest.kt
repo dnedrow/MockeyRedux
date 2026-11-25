@@ -59,17 +59,21 @@ class UiCommandTest {
                 "MOCKEY_UI_PORT" to "9000",
                 "MOCKEY_UI_ADMIN_URL" to "https://mockey.test/admin/",
                 "MOCKEY_ADMIN_TOKEN" to "of the variable",
+                "MOCKEY_UI_ALLOWED_HOST" to "Mockey.Corp, ui.team.example",
                 "MOCKEY_UI_LOG_LEVEL" to "DEBUG",
             )
         val ofTheServer = arrayOf("--admin-url", "http://[::1]:9081", "--admin-token", "of the option")
-        val options = arrayOf("--host", "192.0.2.1", "--port=9100", *ofTheServer, "--log-level", "warn")
+        val names = arrayOf("--allowed-host", "a.example", "--allowed-host=b.example,c.example", "--allowed-host", "a.example")
+        val options = arrayOf("--host", "192.0.2.1", "--port=9100", *ofTheServer, *names, "--log-level", "warn")
 
         val fromVariables = run(variables = variables).settings
         val fromOptions = run(*options, variables = variables).settings
 
         val behindAProxy = AdminUrl.of("https://mockey.test/admin")
-        val ofVariables = UiSettings("192.0.2.2", 9000, behindAProxy, AdminToken("of the variable"), LogLevel.DEBUG)
-        val ofOptions = UiSettings("192.0.2.1", 9100, AdminUrl.of("http://[::1]:9081"), AdminToken("of the option"), LogLevel.WARN)
+        val told = listOf("mockey.corp", "ui.team.example")
+        val ofVariables = UiSettings("192.0.2.2", 9000, behindAProxy, AdminToken("of the variable"), told, LogLevel.DEBUG)
+        val named = listOf("a.example", "b.example", "c.example")
+        val ofOptions = UiSettings("192.0.2.1", 9100, AdminUrl.of("http://[::1]:9081"), AdminToken("of the option"), named, LogLevel.WARN)
         assertEquals(ofVariables, fromVariables)
         assertEquals(ofOptions, fromOptions)
         assertEquals("https://mockey.test/admin", "${fromVariables.adminUrl}")
@@ -87,6 +91,7 @@ class UiCommandTest {
             Triple("--port=<port>", "MOCKEY_UI_PORT", "8082"),
             Triple("--admin-url=<url>", "MOCKEY_UI_ADMIN_URL", "http://127.0.0.1:8081"),
             Triple("--admin-token=<token>", "MOCKEY_ADMIN_TOKEN", "none"),
+            Triple("--allowed-host=<name>", "MOCKEY_UI_ALLOWED_HOST", "none"),
             Triple("--log-level=(error|warn|info|debug|trace)", "MOCKEY_UI_LOG_LEVEL", "info"),
         )) {
             val described = help.output.substringAfter("  $option\n", "").substringBefore("\n\n")
@@ -124,6 +129,10 @@ class UiCommandTest {
                 run("--admin-token", "two\nlines") to "the token must not hold a control character",
                 run("--admin-token", " padded") to "the token must not begin or end with a space",
                 run("--admin-token", "gro\u00dfes-geheimnis") to "the token must not hold a character beyond ASCII",
+                run("--allowed-host", "http://mockey.corp") to "the name of a host has letters, digits, hyphens, and dots",
+                run("--allowed-host", "mockey.corp:8082") to "and no scheme and no port",
+                run("--allowed-host", "mockey.corp,two words") to "--allowed-host",
+                run(variables = mapOf("MOCKEY_UI_ALLOWED_HOST" to "mockey.corp;other.corp")) to "MOCKEY_UI_ALLOWED_HOST",
                 run(variables = mapOf("MOCKEY_UI_PORT" to "-1")) to "MOCKEY_UI_PORT",
                 run(variables = mapOf("MOCKEY_ADMIN_TOKEN" to "\t")) to "MOCKEY_ADMIN_TOKEN",
                 run("--no-such-option") to "--no-such-option",

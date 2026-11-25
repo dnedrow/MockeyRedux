@@ -45,7 +45,7 @@ class UiFailurePagesTest {
         answerTimeout: Duration = Duration.ofSeconds(30),
     ): Browser {
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(url), adminToken = token?.let(::AdminToken), logLevel = LogLevel.WARN)
-        val ui = MockeyUi.start(settings) { AdminClient(it.adminUrl, it.adminToken, Duration.ofSeconds(5), answerTimeout) }
+        val ui = MockeyUi.start(settings, clientOf = { AdminClient(it.adminUrl, it.adminToken, Duration.ofSeconds(5), answerTimeout) })
         return Browser(ui.also { uis += it })
     }
 

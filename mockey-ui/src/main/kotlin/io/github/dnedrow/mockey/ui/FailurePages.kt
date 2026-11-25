@@ -21,19 +21,40 @@ internal class FailurePages(
     private val hasToken: Boolean,
 ) {
     /**
-     * Returns the page for [failure]. A page for a request that only reads has a link that asks again, when
-     * the request [canBeRepeated].
+     * Returns the page for [failure]. The request [canBeRepeated] when it asks for a page, and the page has
+     * a link that asks again then. Otherwise the request holds a form, and the page says what the UI knows
+     * of whether the server did what the form asks for.
      */
     fun of(
         failure: ApiFailure,
         canBeRepeated: Boolean,
-    ): Page =
+    ): Page {
+        val page =
+            when (failure) {
+                is ApiFailure.Unreachable -> unreachable(failure, canBeRepeated)
+                is ApiFailure.TokenRejected -> tokenRejected(canBeRepeated)
+                is ApiFailure.Incompatible -> incompatible(failure, canBeRepeated)
+                is ApiFailure.Refused -> refused(failure)
+                is ApiFailure.Failed -> failed(failure, canBeRepeated)
+            }
+        if (canBeRepeated) return page
+        val unknown = failure is ApiFailure.Failed || (failure is ApiFailure.Unreachable && failure.mayHaveArrived)
+        return Page(page.title, page.status) {
+            page.content(this)
+            p(classes = "problem") { +(if (unknown) MAYBE_CHANGED else UNCHANGED) }
+        }
+    }
+
+    /**
+     * Returns what is the matter with the server, in a sentence, for a page that shows something although
+     * the server gave nothing for it.
+     */
+    fun inASentence(failure: ApiFailure): String =
         when (failure) {
-            is ApiFailure.Unreachable -> unreachable(failure, canBeRepeated)
-            is ApiFailure.TokenRejected -> tokenRejected(canBeRepeated)
-            is ApiFailure.Incompatible -> incompatible(failure, canBeRepeated)
-            is ApiFailure.Refused -> refused(failure)
-            is ApiFailure.Failed -> failed(failure, canBeRepeated)
+            is ApiFailure.Unreachable -> "The UI cannot reach the server at $adminUrl."
+            is ApiFailure.TokenRejected -> "The server at $adminUrl does not take the UI for one that may manage it."
+            is ApiFailure.Incompatible -> "The server at $adminUrl is not compatible with this UI."
+            is ApiFailure.Refused, is ApiFailure.Failed -> "The server at $adminUrl does not state what a server states of itself."
         }
 
     /** The scenario "Server is down": the page says that the server at the configured address cannot be reached. */
@@ -107,6 +128,12 @@ internal class FailurePages(
             p { +"The log of the server says more." }
             again(canBeRepeated)
         }
+
+    private companion object {
+        const val UNCHANGED = "Nothing was changed."
+        const val MAYBE_CHANGED =
+            "The UI does not know whether the server did what the form asks for. The pages of the UI show what the server holds now."
+    }
 
     /** Names the setting [name] by its option and its environment variable. */
     private fun FlowContent.setting(name: String) {

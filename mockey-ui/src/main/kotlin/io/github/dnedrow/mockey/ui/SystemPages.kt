@@ -1,10 +1,17 @@
 package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.SystemStatusDto
+import io.ktor.server.routing.get
 import kotlinx.html.code
 import kotlinx.html.dd
 import kotlinx.html.dl
 import kotlinx.html.dt
+
+/** The area of the pages about the server itself. */
+internal val SystemArea =
+    Area { routing, ui ->
+        routing.get("/system") { ui.show(call) { _, system -> SystemPages.status(system) } }
+    }
 
 /** The pages about the server itself. */
 internal object SystemPages {

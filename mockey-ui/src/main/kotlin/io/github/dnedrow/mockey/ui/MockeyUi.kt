@@ -67,7 +67,8 @@ internal class MockeyUi private constructor(
          * before a page is loaded, so it starts whether or not that server runs.
          *
          * The UI asks the server through the client that [clientOf] makes for the settings, and it closes
-         * that client when it stops.
+         * that client when it stops. Its pages are those of [areas], and it takes a form of at most
+         * [formLimit] bytes.
          *
          * @throws StartupFailure when the address of the UI is not known, or when the UI cannot accept
          *   connections on its address and port.
@@ -75,6 +76,8 @@ internal class MockeyUi private constructor(
         fun start(
             settings: UiSettings,
             clientOf: (UiSettings) -> AdminClient = { AdminClient(it.adminUrl, it.adminToken) },
+            areas: List<Area> = UiApplication.AREAS,
+            formLimit: Long = FormReader.LIMIT,
         ): MockeyUi {
             UiLogging.configure(settings.logLevel)
             log.info("Mockey UI {} starts with these settings:", UiVersion.text)
@@ -84,7 +87,8 @@ internal class MockeyUi private constructor(
             if (!address.address.isLoopbackAddress) log.warn(BEYOND_LOOPBACK, address.address.hostAddress)
 
             val client = clientOf(settings)
-            val application = UiApplication(settings.adminUrl, client, hasToken = settings.adminToken != null)
+            val hosts = AllowedHosts.of(settings)
+            val application = UiApplication(settings.adminUrl, client, settings.adminToken != null, hosts, areas, formLimit)
             val server =
                 embeddedServer(
                     Netty,

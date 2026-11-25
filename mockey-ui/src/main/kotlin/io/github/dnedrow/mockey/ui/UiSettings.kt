@@ -17,6 +17,8 @@ internal data class UiSettings(
     val adminUrl: AdminUrl = AdminUrl.DEFAULT,
     /** The admin token of that server, which the UI presents with every request to the admin API, or `null` when it presents none. */
     val adminToken: AdminToken? = null,
+    /** The names under which the UI answers, besides IP addresses and `localhost`, see [AllowedHosts]. */
+    val allowedHosts: List<String> = emptyList(),
     /** The level from which on messages are written to the log. */
     val logLevel: LogLevel = LogLevel.INFO,
 ) {
@@ -30,6 +32,7 @@ internal data class UiSettings(
             "port" to port.toString(),
             "admin-url" to adminUrl.toString(),
             "admin-token" to if (adminToken == null) NONE else "set",
+            "allowed-host" to allowedHosts.joinToString(", ").ifEmpty { NONE },
             "log-level" to logLevel.name.lowercase(),
         )
 

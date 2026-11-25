@@ -71,6 +71,7 @@ class MockeyUiTest {
                 "  port = 0",
                 "  admin-url = http://mockey.test:9081",
                 "  admin-token = set",
+                "  allowed-host = none",
                 "  log-level = info",
                 "The UI accepts connections at http://127.0.0.1:$port. It manages the server at http://mockey.test:9081.",
             )

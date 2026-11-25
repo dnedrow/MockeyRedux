@@ -160,6 +160,19 @@ The UI SHALL reject a state-changing request that does not carry the anti-forger
 - **WHEN** a page on another site makes the user's browser post a delete form to the UI without the anti-forgery token
 - **THEN** the UI rejects the request, and nothing is deleted
 
+### Requirement: Host names of the UI
+The UI SHALL answer only requests whose `Host` header names an IP address, `localhost` or a name under `localhost`, or a host name that the UI was configured with. It SHALL reject every other request, SHALL make no admin API call for it, and SHALL NOT disclose server data or an anti-forgery token in the response.
+
+#### Scenario: Rebound host name
+- **GIVEN** a page of another site whose host name has been made to resolve to the address of the UI
+- **WHEN** that page requests a UI page under its own host name
+- **THEN** the UI rejects the request, and the response contains no server data and no anti-forgery token
+
+#### Scenario: Configured host name
+- **GIVEN** the UI is configured with the allowed host name `mockey.example`
+- **WHEN** a browser requests a page with the `Host` header `mockey.example`
+- **THEN** the UI serves the page
+
 ### Requirement: Built-in help
 The UI SHALL include help pages that explain services, scenarios, response modes, match criteria, request rules, error scenarios, plans, twisting, tags, storage, and import. The help SHALL be available without network access beyond the UI.
 
