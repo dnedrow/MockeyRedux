@@ -7,11 +7,9 @@ defined for that URL, or it forwards the request to the real service and passes 
 The server has two listeners. The mock listener serves the mock traffic and `/status`. The admin listener
 serves the admin API, which states what the server holds and is to change what the server does.
 
-This document describes the server as it is now. The admin API is under way, and the web UI is not part of
-the server yet. The API states and changes the services with their scenarios, the plans, the twist
-configurations, the tag filter, the tags, the outbound proxy, and the history, and it empties the upstream
-session. It states the inspectors and the status of the server. It does not switch the read-only mode yet,
-and it does not reload, reset, import, or export the definitions.
+This document describes the server as it is now. The web UI is not part of the server yet. The admin API
+states and changes what the server holds: the services with their scenarios, the plans, the twist
+configurations, the tag filter, the tags, the outbound proxy, the history, and the definitions as a whole.
 
 ## Running the server
 
@@ -164,7 +162,15 @@ In this version the admin API has these operations:
 | `POST /history/{id}/replay` | Lets the server handle the request of an entry again, with the headers, the parameters, and the body that the request states in the place of those of the entry. The answer is the entry of the replay. |
 | `POST /history/{id}/scenario` | Creates a scenario that gives the response of an entry, for the service that handled the request of the entry. |
 | `GET /stats` | States for every service how many entries the history keeps of it, and when the earliest of them arrived. `?from=` and `?to=` limit the entries that count to a time range, and `?format=csv` gives the statistics as CSV. |
-| `GET /system` | States the status of the server. |
+| `GET`, `PATCH /system` | States the status of the server, and switches the read-only mode on and off. |
+| `POST /system/reload` | Puts the definitions of the definitions location in the place of those in memory. |
+| `POST /system/reset` | Removes all definitions, the tag filter, the history, and the last-used times. |
+| `DELETE /system/last-used-times` | Clears the times at which services, scenarios, and plans were last used. |
+| `GET /definitions/export` | Gives all definitions as one document, which a server takes as its initial definitions. |
+| `POST /definitions/import` | Imports a definitions document, or an export document of Mockey 2.x. `?tag=` gives tags to what the import adds. The answer is the report of the import. |
+| `GET /diagnostics` | States what deserves attention in the definitions and blocks nothing, such as a service that names an inspector which is not installed. |
+| `GET /services/{id}/schema-report` | States which scenarios of a service conform to its response schema. |
+| `GET /search` | Finds the services, scenarios, and plans that hold the text of `?term=`, without regard to letter case. |
 
 Bodies are JSON in UTF-8. A request that creates or updates something states attributes in a JSON object:
 a creation takes a default for every attribute that it does not state, and an update changes only the
@@ -173,12 +179,17 @@ identifier, and with its path in the `Location` header. A save of a plan is a cr
 name, and it is answered with the status 200 when it updates a plan. A deletion is answered with the status
 204.
 
+The import takes its document as the body of the request. The request says which document that is: a
+definitions document of this server is JSON, and an export document of Mockey 2.x is XML, which a request
+declares with the header `Content-Type: application/xml`.
+
 An answer that reports a failure is a problem document: a JSON object that states the status and says what
 is wrong. The status is 400 for a body that is no JSON object and for a query string that the operation
 does not take, 404 for what is not there, and 422 for a request that is not valid, where the document names
 every invalid member with a message. A change takes effect before its request is answered. In read-only
 mode, which is the default, it is kept in memory, and in writable mode it is stored in the definitions
-location.
+location. A request that fails because the definitions location cannot be read or written gets the status
+500, and the document says what the server could not do there.
 
 While the server has an admin token, the API takes a request only when it presents the token in the header
 `Authorization: Bearer <token>`, and it answers every other request with the status 401.
@@ -262,6 +273,11 @@ The server is in read-only mode by default: it reads the definitions location wh
 to it. What changes while the server runs is gone when it stops. In writable mode, with `--writable`, the
 server writes every change to the definitions location, which it creates when it has to. One such change
 comes with mock traffic: the service that the server defines for an unknown absolute target.
+
+The admin API switches the mode of a running server, with a `PATCH` request for `/api/v1/system`. A server
+that leaves read-only mode stores its definitions as they are, with everything that was changed before. A
+`POST` request for `/api/v1/system/reload` makes the server read the definitions location again: what was
+changed in memory and not stored is gone then, and so are the credentials of the outbound proxy.
 
 ### Initial definitions
 
@@ -455,8 +471,8 @@ could change something:
   origin reads no answer, and the browser sends none of the requests for which it asks the server first.
 - A request with a method other than `GET` and `HEAD` gets the status 403 when it carries an `Origin` header.
   A browser sends that header with every such request of a page.
-- A request body is taken only as `application/json`. A browser asks the server before it sends such a body
-  for a page.
+- A request body is taken only as `application/json`, and the document of an import also as XML. A browser
+  asks the server before it sends such a body for a page.
 
 One way stays open for reading. A page whose name is made to stand for the loopback address, after the
 browser has loaded it, is of one origin with the admin listener for that browser. Such a page reads what the

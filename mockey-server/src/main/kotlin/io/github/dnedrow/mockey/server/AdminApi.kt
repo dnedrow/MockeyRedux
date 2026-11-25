@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.api.AdminApiJson
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
+import io.github.dnedrow.mockey.core.storage.StorageException
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -42,7 +43,9 @@ import java.time.Instant
  *    apart, so that an escaped slash stays in its segment. A malformed escape gets the status 400.
  * 6. The query string is taken apart, see [queryOf]. A malformed escape in it gets the status 400, and so
  *    does a parameter that the operation does not take.
- * 7. The operation answers, see [AdminRoute.handle].
+ * 7. The operation answers, see [AdminRoute.handle]. An operation that fails gets the status 500. The answer
+ *    says why when the definitions location is why: when the definitions could not be read from it or
+ *    written to it. Any other reason is in the log and not in the answer.
  *
  * The body of an answer is JSON in UTF-8. An answer that reports a failure is a problem document, see
  * [AdminProblem]. Every answer says that it is not to be stored: what the API says of the server now says
@@ -107,6 +110,10 @@ internal class AdminApi(
             throw problem
         } catch (cancellation: CancellationException) {
             throw cancellation
+        } catch (failure: StorageException) {
+            // What the storage says is about the definitions location, and it is for whoever looks after it.
+            log.error("The operation {} of the admin API failed at the definitions location.", route, failure)
+            throw AdminProblem(HttpStatusCode.InternalServerError, "$NOT_STORED ${failure.message}")
         } catch (failure: Exception) {
             // The route names its path as it is defined, and so the message holds nothing of the request.
             log.error("The operation {} of the admin API failed.", route, failure)
@@ -252,6 +259,7 @@ internal class AdminApi(
         private const val NO_RESOURCE = "The admin API has no resource at the path of the request."
         private const val NO_OPERATION = "The resource has no operation with the method of the request."
         private const val FAILED = "The server failed to handle the request. Its log says why."
+        private const val NOT_STORED = "The server could not read or write its definitions location, and nothing was changed."
 
         /**
          * Returns the admin API of a server with [settings]: the operations on the definitions and on the
@@ -271,6 +279,7 @@ internal class AdminApi(
                     AdminRouting(engine).routes +
                     AdminUpstream(engine).routes +
                     AdminHistory(engine).routes +
+                    AdminDefinitions(engine).routes +
                     AdminSystem(engine, since, settings.definitions, mock).routes
             return AdminApi(settings.adminToken, settings.maxRequestBody, routes)
         }

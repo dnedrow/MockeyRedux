@@ -166,15 +166,7 @@ internal class AdminRequest(
      */
     suspend fun jsonObject(): JsonObject {
         requireJson()
-        val text =
-            try {
-                Charsets.UTF_8
-                    .newDecoder()
-                    .decode(ByteBuffer.wrap(body()))
-                    .toString()
-            } catch (_: CharacterCodingException) {
-                throw AdminProblem(HttpStatusCode.BadRequest, "The body of the request is not encoded as UTF-8.")
-            }
+        val text = Document(body(), isXml = false).text()
         if (text.isBlank()) throw AdminProblem(HttpStatusCode.BadRequest, "The request has no body. The operation takes a JSON object.")
         val json =
             try {
@@ -184,6 +176,30 @@ internal class AdminRequest(
             }
         return (json as? JsonObject)?.takeIf(::isJson)
             ?: throw AdminProblem(HttpStatusCode.BadRequest, "The body of the request is no JSON object.")
+    }
+
+    /**
+     * Returns the body of the request as a document: its bytes, and whether the request declares them as
+     * XML. The request has to declare its body as JSON in UTF-8, as every other body of the API is declared,
+     * or as XML, with the media type `application/xml` or `text/xml`. An XML document says itself in which
+     * charset it is written, so a charset that the request declares for it does not count.
+     *
+     * A browser asks the server before it sends a body of one of these types for a web page, see
+     * [requireJson], so the API takes XML here without opening a way for a page.
+     *
+     * @throws AdminProblem with the status 415 for a body that the request declares as neither, with the
+     *   status 413 for a body that is longer than the server takes, and with the status 400 for a request
+     *   without a body.
+     */
+    suspend fun document(): Document {
+        val contentTypes = call.request.headers.getAll(HttpHeaders.ContentType)
+        val isXml = mediaTypeOf(contentTypes.orEmpty()) in XML
+        if (hasBody && !isXml && !declaresJson(contentTypes.orEmpty())) {
+            throw AdminProblem(HttpStatusCode.UnsupportedMediaType, NOT_DECLARED_AS_A_DOCUMENT)
+        }
+        val bytes = body()
+        if (bytes.isEmpty()) throw AdminProblem(HttpStatusCode.BadRequest, "The request has no body. The operation takes a document.")
+        return Document(bytes, isXml)
     }
 
     /**
@@ -205,15 +221,20 @@ internal class AdminRequest(
 
     /** Returns whether [contentTypes], the values of the `Content-Type` headers of a request, are one that names JSON in UTF-8. */
     private fun declaresJson(contentTypes: List<String>): Boolean {
-        val type =
-            try {
-                ContentType.parse(contentTypes.singleOrNull() ?: return false)
-            } catch (_: BadContentTypeFormatException) {
-                return false
-            }
-        val charset = type.parameter("charset")
-        return type.withoutParameters() == ContentType.Application.Json && (charset == null || charset.equals("utf-8", ignoreCase = true))
+        val charset = contentTypeOf(contentTypes)?.parameter("charset")
+        return mediaTypeOf(contentTypes) == ContentType.Application.Json && (charset == null || charset.equals("utf-8", ignoreCase = true))
     }
+
+    /** Returns the media type that [contentTypes] name, without its parameters, or `null` when they do not name one type. */
+    private fun mediaTypeOf(contentTypes: List<String>): ContentType? = contentTypeOf(contentTypes)?.withoutParameters()
+
+    /** Returns the one content type that [contentTypes] are, the values of the `Content-Type` headers of a request, or `null`. */
+    private fun contentTypeOf(contentTypes: List<String>): ContentType? =
+        try {
+            contentTypes.singleOrNull()?.let(ContentType::parse)
+        } catch (_: BadContentTypeFormatException) {
+            null
+        }
 
     /**
      * Returns whether [element] is JSON throughout. The parser takes any text without quotes for a value,
@@ -258,12 +279,39 @@ internal class AdminRequest(
         const val NOT_DECLARED_AS_JSON =
             "The body of a request to the admin API is JSON in UTF-8, and the request has to say so " +
                 "with the header Content-Type: application/json."
+        const val NOT_DECLARED_AS_A_DOCUMENT =
+            "The body of the request is a document, and the request has to say which: JSON in UTF-8, " +
+                "with the header Content-Type: application/json, or XML, with the header Content-Type: application/xml."
+
+        /** The media types that declare a body as XML. */
+        val XML = setOf(ContentType.Application.Xml, ContentType.Text.Xml)
 
         val BOOLEANS = setOf("true", "false")
 
         /** A number as JSON writes it. */
         val NUMBER = Regex("""-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?""")
     }
+}
+
+/** A document that a request holds as its body: its [bytes], and whether the request declares it as XML, and not as JSON. */
+internal class Document(
+    val bytes: ByteArray,
+    val isXml: Boolean,
+) {
+    /**
+     * Returns the document as text, which its bytes are in UTF-8.
+     *
+     * @throws AdminProblem with the status 400 when the bytes are no text in UTF-8.
+     */
+    fun text(): String =
+        try {
+            Charsets.UTF_8
+                .newDecoder()
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        } catch (_: CharacterCodingException) {
+            throw AdminProblem(HttpStatusCode.BadRequest, "The body of the request is not encoded as UTF-8.")
+        }
 }
 
 /**

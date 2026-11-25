@@ -7,6 +7,7 @@ import io.github.dnedrow.mockey.api.MergeReportDto
 import io.github.dnedrow.mockey.api.MergedScenarioDto
 import io.github.dnedrow.mockey.api.ProblemDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
+import io.github.dnedrow.mockey.api.SchemaReportDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.Definitions
@@ -566,6 +567,64 @@ class AdminServicesTest {
         assertEquals(before, engine.definitions)
     }
 
+    // The schema report
+
+    /**
+     * Task 12.7: what the response schema of a service says of the response bodies of its scenarios, one by
+     * one and in their order. The report is there whether or not the schema is enabled.
+     */
+    @Test
+    fun theSchemaReportSaysWhichScenariosConformToTheResponseSchemaOfTheirService() {
+        val schema = """{"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}"""
+        val defined = service("Customers", "customer/{id}") { it.copy(responseSchema = schema) }
+        val found = scenario(defined, "found", """{"id": 7}""")
+        val lost = scenario(defined, "lost", """{"name": "nobody"}""")
+        val broken = scenario(defined, "broken", "no JSON")
+
+        val answer = send("GET", "services/${defined.id.value}/schema-report")
+
+        assertEquals("HTTP/1.1 200 OK", answer.statusLine, "$answer")
+        assertTrue(answer.body.startsWith("""{"type":"checked","scenarios":["""), answer.body)
+        val report = answer.decoded<SchemaReportDto>() as SchemaReportDto.Checked
+        val conformance = listOf(found.id.value to true, lost.id.value to false, broken.id.value to false)
+        assertEquals(conformance, report.scenarios.map { it.scenarioId to it.conforms })
+        assertEquals(listOf("found", "lost", "broken"), report.scenarios.map { it.scenarioName })
+        assertEquals(listOf(true, false, false), report.scenarios.map { it.violations.isEmpty() })
+        assertEquals(services, listOf(current(defined)))
+    }
+
+    /** A schema that cannot be applied is reported as such, and no scenario is checked against it. */
+    @Test
+    fun aSchemaReportSaysWhenTheSchemaCannotBeApplied() {
+        val ofAnOldDialect = service("Customers", "customer/{id}") { it.copy(responseSchema = """{"${'$'}schema": "$DRAFT_3#"}""") }
+        val ofNoSchema = service("Orders", "orders") { it.copy(responseSchema = "no JSON") }
+        scenario(ofAnOldDialect, "found", "{}")
+        scenario(ofNoSchema, "listed", "[]")
+
+        val unsupported = send("GET", "services/${ofAnOldDialect.id.value}/schema-report")
+        val unusable = send("GET", "services/${ofNoSchema.id.value}/schema-report")
+
+        assertEquals(200 to """{"type":"unsupportedDialect","dialect":"$DRAFT_3"}""", unsupported.status to unsupported.body)
+        assertEquals(SchemaReportDto.UnsupportedDialect(DRAFT_3), unsupported.decoded<SchemaReportDto>())
+        val notRead = SchemaReportDto.UnusableSchema(listOf("The schema cannot be read as JSON."))
+        assertEquals(200 to notRead, unusable.status to unusable.decoded<SchemaReportDto>())
+    }
+
+    /** The report is a resource of a service with a response schema. Without a schema there is nothing to report. */
+    @Test
+    fun aServiceWithoutAResponseSchemaHasNoSchemaReport() {
+        val defined = service("Customers", "customer/{id}")
+        scenario(defined, "found")
+
+        val answer = send("GET", "services/${defined.id.value}/schema-report")
+        val ofNoService = send("GET", "services/$MISSING/schema-report")
+        val changing = send("POST", "services/${defined.id.value}/schema-report")
+
+        assertProblem(answer, 404, "Not Found", "The service 'Customers' has no response schema.")
+        assertNoService(ofNoService)
+        assertEquals(405 to listOf("GET, HEAD"), changing.status to changing.headerValues("Allow"))
+    }
+
     // A service that is not there
 
     /** The scenario "Unknown resource", for every operation on one service. */
@@ -590,5 +649,8 @@ class AdminServicesTest {
 
     private companion object {
         const val MISSING = "no-such-identifier"
+
+        /** A dialect of JSON Schema that is older than the ones that the engine reads, as a report names it. */
+        const val DRAFT_3 = "http://json-schema.org/draft-03/schema"
     }
 }

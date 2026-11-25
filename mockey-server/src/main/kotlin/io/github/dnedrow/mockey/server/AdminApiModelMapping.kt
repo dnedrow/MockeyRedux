@@ -1,17 +1,17 @@
 package io.github.dnedrow.mockey.server
 
-import io.github.dnedrow.mockey.api.DefinitionDocumentDto
-import io.github.dnedrow.mockey.api.DefinitionSettingsDto
 import io.github.dnedrow.mockey.api.DerivedRealUrlDto
+import io.github.dnedrow.mockey.api.DiagnosticDto
 import io.github.dnedrow.mockey.api.HeaderDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
 import io.github.dnedrow.mockey.api.HistoryStatisticsDto
+import io.github.dnedrow.mockey.api.ImportItemDto
+import io.github.dnedrow.mockey.api.ImportReportDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.MergeReportDto
 import io.github.dnedrow.mockey.api.MergedScenarioDto
 import io.github.dnedrow.mockey.api.NameValueDto
 import io.github.dnedrow.mockey.api.OutboundProxyAttributesDto
-import io.github.dnedrow.mockey.api.OutboundProxyDefinitionDto
 import io.github.dnedrow.mockey.api.OutboundProxyDto
 import io.github.dnedrow.mockey.api.PlanApplyReportDto
 import io.github.dnedrow.mockey.api.PlanAttributesDto
@@ -24,10 +24,12 @@ import io.github.dnedrow.mockey.api.RecordedScenarioDto
 import io.github.dnedrow.mockey.api.RecordedServiceDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
 import io.github.dnedrow.mockey.api.ScenarioAttributesDto
+import io.github.dnedrow.mockey.api.ScenarioConformanceDto
 import io.github.dnedrow.mockey.api.ScenarioDto
 import io.github.dnedrow.mockey.api.ScenarioReferenceDto
+import io.github.dnedrow.mockey.api.SchemaReportDto
+import io.github.dnedrow.mockey.api.SearchResultDto
 import io.github.dnedrow.mockey.api.ServiceAttributesDto
-import io.github.dnedrow.mockey.api.ServiceDefinitionDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.ServiceStatisticsDto
 import io.github.dnedrow.mockey.api.TwistAttributesDto
@@ -35,13 +37,21 @@ import io.github.dnedrow.mockey.api.TwistConfigurationDto
 import io.github.dnedrow.mockey.api.TwistPairDto
 import io.github.dnedrow.mockey.api.UnresolvedPlanScenarioDto
 import io.github.dnedrow.mockey.core.definitions.DerivedRealUrl
+import io.github.dnedrow.mockey.core.definitions.Diagnostic
+import io.github.dnedrow.mockey.core.definitions.DiagnosticKind
+import io.github.dnedrow.mockey.core.definitions.ImportItem
+import io.github.dnedrow.mockey.core.definitions.ImportItemKind
+import io.github.dnedrow.mockey.core.definitions.ImportReport
 import io.github.dnedrow.mockey.core.definitions.MergeReport
 import io.github.dnedrow.mockey.core.definitions.PlanApplyReport
+import io.github.dnedrow.mockey.core.definitions.ScenarioConformance
+import io.github.dnedrow.mockey.core.definitions.SchemaReport
+import io.github.dnedrow.mockey.core.definitions.SearchResult
+import io.github.dnedrow.mockey.core.definitions.SearchResultType
 import io.github.dnedrow.mockey.core.history.HistoryEntry
 import io.github.dnedrow.mockey.core.history.HistoryStatistics
 import io.github.dnedrow.mockey.core.history.Outcome
 import io.github.dnedrow.mockey.core.history.RecordedBody
-import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.model.MatchCriterion
 import io.github.dnedrow.mockey.core.model.OutboundProxy
@@ -55,11 +65,11 @@ import io.github.dnedrow.mockey.core.model.ScenarioId
 import io.github.dnedrow.mockey.core.model.ScenarioReference
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.ServiceId
-import io.github.dnedrow.mockey.core.model.Settings
 import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistConfiguration
 import io.github.dnedrow.mockey.core.model.TwistId
 import io.github.dnedrow.mockey.core.model.TwistPair
+import io.github.dnedrow.mockey.legacy.xml.LegacyImportReport
 import java.util.Base64
 
 internal fun Service.toAdminDto(): ServiceDto =
@@ -147,48 +157,6 @@ internal fun Service.with(attributes: ServiceAttributesDto): Service =
         responseSchema = attributes.responseSchema,
         responseSchemaEnabled = attributes.responseSchemaEnabled,
     )
-
-internal fun Service.toDefinitionDto(): ServiceDefinitionDto =
-    ServiceDefinitionDto(
-        id = id.value,
-        name = name,
-        mockUrl = mockUrl,
-        description = description,
-        realUrls = realUrls,
-        defaultRealUrlIndex = defaultRealUrlIndex,
-        responseMode = responseMode.toDto(),
-        delayMillis = delayMillis,
-        tags = tags.toList(),
-        scenarios = scenarios.map(Scenario::toAdminDto),
-        defaultScenarioId = defaultScenarioId?.value,
-        errorScenarioId = errorScenarioId?.value,
-        requestRules = requestRules,
-        requestRulesEnabled = requestRulesEnabled,
-        inspectorName = inspectorName,
-        responseSchema = responseSchema,
-        responseSchemaEnabled = responseSchemaEnabled,
-    )
-
-internal fun ServiceDefinitionDto.toModel(): Service =
-    ServiceDto(
-        id = id,
-        name = name,
-        mockUrl = mockUrl,
-        description = description,
-        realUrls = realUrls,
-        defaultRealUrlIndex = defaultRealUrlIndex,
-        responseMode = responseMode,
-        delayMillis = delayMillis,
-        tags = tags,
-        scenarios = scenarios,
-        defaultScenarioId = defaultScenarioId,
-        errorScenarioId = errorScenarioId,
-        requestRules = requestRules,
-        requestRulesEnabled = requestRulesEnabled,
-        inspectorName = inspectorName,
-        responseSchema = responseSchema,
-        responseSchemaEnabled = responseSchemaEnabled,
-    ).toModel()
 
 internal fun Scenario.toAdminDto(): ScenarioDto =
     ScenarioDto(
@@ -314,26 +282,6 @@ internal fun TwistConfigurationDto.toModel(): TwistConfiguration =
         pairs = pairs.map(TwistPairDto::toModel),
     )
 
-internal fun Definitions.toDefinitionDocumentDto(): DefinitionDocumentDto =
-    DefinitionDocumentDto(
-        services = services.map(Service::toDefinitionDto),
-        plans = plans.map(Plan::toAdminDto),
-        twists = twists.map(TwistConfiguration::toAdminDto),
-        settings = settings.toDefinitionSettingsDto(),
-    )
-
-internal fun DefinitionDocumentDto.toModel(): Definitions {
-    require(formatVersion == DEFINITION_FORMAT_VERSION) {
-        "Unsupported definitions format version: $formatVersion."
-    }
-    return Definitions(
-        services = services.map(ServiceDefinitionDto::toModel),
-        plans = plans.map(PlanDto::toModel),
-        twists = twists.map(TwistConfigurationDto::toModel),
-        settings = settings.toModel(),
-    )
-}
-
 /**
  * Returns what the admin API states of the outbound proxy, which is `null` when there are no settings: its
  * URL, whether it is enabled, the user name of its credentials, and whether they hold a password. The
@@ -406,29 +354,77 @@ internal fun HistoryStatistics.toAdminDto(): HistoryStatisticsDto =
         to = to?.toString(),
     )
 
-private fun Settings.toDefinitionSettingsDto(): DefinitionSettingsDto =
-    DefinitionSettingsDto(
-        enabledTwistId = enabledTwistId?.value,
-        outboundProxy = outboundProxy?.let { OutboundProxyDefinitionDto(it.url, it.enabled) },
-        universalErrorServiceId = universalErrorScenario?.serviceId?.value,
-        universalErrorScenarioId = universalErrorScenario?.scenarioId?.value,
-        defaultPlanId = defaultPlanId?.value,
+/** Returns the diagnostic as the admin API states it. */
+internal fun Diagnostic.toAdminDto(): DiagnosticDto =
+    DiagnosticDto(
+        kind = kind.toDto(),
+        serviceId = serviceId.value,
+        serviceName = serviceName,
+        message = message,
+        otherServiceId = otherServiceId?.value,
+        scenarioIds = scenarioIds.map { it.value },
     )
 
-internal fun DefinitionSettingsDto.toModel(): Settings {
-    require((universalErrorServiceId == null) == (universalErrorScenarioId == null)) {
-        "A universal error service and scenario identifier must be supplied together."
-    }
-    return Settings(
-        enabledTwistId = enabledTwistId?.let(::TwistId),
-        outboundProxy = outboundProxy?.let { OutboundProxy(it.url, it.enabled) },
-        universalErrorScenario =
-            universalErrorServiceId?.let {
-                ScenarioReference(ServiceId(it), ScenarioId(requireNotNull(universalErrorScenarioId)))
-            },
-        defaultPlanId = defaultPlanId?.let(::PlanId),
+/** Returns the result of a search as the admin API states it. */
+internal fun SearchResult.toAdminDto(): SearchResultDto = SearchResultDto(type.toDto(), id, name, serviceId?.value, serviceName)
+
+/** Returns the report of an import of a definitions document of this system as the admin API states it. */
+internal fun ImportReport.toAdminDto(): ImportReportDto =
+    ImportReportDto(
+        additions = additions.map(ImportItem::toAdminDto),
+        conflicts = conflicts.map(ImportItem::toAdminDto),
+        appliedDefaultPlan = appliedDefaultPlan?.toAdminDto(),
     )
-}
+
+/**
+ * Returns the report of an import of a document of Mockey 2.x as the admin API states it: the report of the
+ * engine, and besides what the import could not read of the document, and the rule sets that are not well
+ * formed among what it added.
+ */
+internal fun LegacyImportReport.toAdminDto(): ImportReportDto =
+    imported.toAdminDto().copy(issues = issues.map { it.message }, unreadableRuleSets = unreadableRuleSets.map(Diagnostic::toAdminDto))
+
+/** Returns what the response schema of a service says of its scenarios, as the admin API states it. */
+internal fun SchemaReport.toAdminDto(): SchemaReportDto =
+    when (this) {
+        is SchemaReport.Checked -> SchemaReportDto.Checked(scenarios.map(ScenarioConformance::toAdminDto))
+        is SchemaReport.UnsupportedDialect -> SchemaReportDto.UnsupportedDialect(dialect)
+        is SchemaReport.UnusableSchema -> SchemaReportDto.UnusableSchema(problems)
+    }
+
+private fun ScenarioConformance.toAdminDto(): ScenarioConformanceDto =
+    ScenarioConformanceDto(scenarioId.value, scenarioName, conforms, violations)
+
+private fun ImportItem.toAdminDto(): ImportItemDto = ImportItemDto(kind.toDto(), name, message, serviceName)
+
+/** Returns the kind of a diagnostic as the admin API names it. The names stay when those of the engine change. */
+private fun DiagnosticKind.toDto(): String =
+    when (this) {
+        DiagnosticKind.SHARED_MOCK_URL -> "sharedMockUrl"
+        DiagnosticKind.SHARED_REAL_URL -> "sharedRealUrl"
+        DiagnosticKind.DUPLICATE_SCENARIOS -> "duplicateScenarios"
+        DiagnosticKind.UNKNOWN_INSPECTOR -> "unknownInspector"
+        DiagnosticKind.UNREADABLE_RULE_SET -> "unreadableRuleSet"
+        DiagnosticKind.SCHEMA_VIOLATION -> "schemaViolation"
+    }
+
+/** Returns the kind of what a search found as the admin API names it. */
+private fun SearchResultType.toDto(): String =
+    when (this) {
+        SearchResultType.SERVICE -> "service"
+        SearchResultType.SCENARIO -> "scenario"
+        SearchResultType.PLAN -> "plan"
+    }
+
+/** Returns the kind of a part of an imported document as the admin API names it. */
+private fun ImportItemKind.toDto(): String =
+    when (this) {
+        ImportItemKind.SERVICE -> "service"
+        ImportItemKind.SCENARIO -> "scenario"
+        ImportItemKind.PLAN -> "plan"
+        ImportItemKind.TWIST_CONFIGURATION -> "twistConfiguration"
+        ImportItemKind.SETTING -> "setting"
+    }
 
 private fun PlanItem.toAdminDto(): PlanItemDto = PlanItemDto(serviceName, scenarioName, responseMode.toDto(), delayMillis)
 
@@ -472,5 +468,3 @@ private fun MatchCriterionDto.toModel(): MatchCriterion =
 private fun ResponseMode.toDto(): ResponseModeDto = ResponseModeDto.valueOf(name)
 
 private fun ResponseModeDto.toModel(): ResponseMode = ResponseMode.valueOf(name)
-
-private const val DEFINITION_FORMAT_VERSION = 1

@@ -232,7 +232,7 @@ Indicative resource map (the OpenAPI document is the contract):
 
 | Area | Resources |
 |------|-----------|
-| System | `system` (status, read-only mode), `system/reset`, `system/upstream-session`, `diagnostics`, `search` |
+| System | `system` (status, read-only mode), `system/reload`, `system/reset`, `system/upstream-session`, `system/last-used-times`, `diagnostics`, `search` |
 | Services | `services`, `services/{id}`, `.../duplicate`, `.../merge`, `.../schema-report`, `services/real-urls/derive` |
 | Scenarios | `services/{id}/scenarios`, `services/{id}/scenarios/{scenarioId}`, `universal-error-scenario` |
 | Plans | `plans`, `plans/{id}`, `.../save`, `.../apply`, `default-plan` |

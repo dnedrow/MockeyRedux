@@ -5,9 +5,8 @@ configurations, and settings. This document describes how they move over, what t
 Mockey 2.x have become, what behaves differently, and what is gone.
 
 It describes the server as it is now. The server answers mock traffic, and its admin API states and changes
-what the server holds. The API does not switch the read-only mode yet, and it does not reload, reset, import,
-or export the definitions. The web UI and the automation endpoints of Mockey 2.x are not part of the server
-yet, see "What is gone".
+what the server holds. The web UI and the automation endpoints of Mockey 2.x are not part of the server yet,
+see "What is gone".
 
 ## Importing the definitions
 
@@ -118,6 +117,17 @@ Run the command while no server in writable mode uses the definitions location: 
 definitions in memory and writes its own changes to the location. A server sees what was imported when it
 starts.
 
+### Importing into a server that runs
+
+A server that runs takes an export document of Mockey 2.x through its admin API. The document is the body of
+a `POST` request for `/api/v1/definitions/import`, which declares it as XML with the header `Content-Type:
+application/xml`. Tags go into the query string, as in `?tag=imported`. The import follows the same rules,
+and the answer is its report as JSON, with the same four parts. In read-only mode the server keeps what it
+imported in memory.
+
+Only a document is imported this way, and not a definitions directory: the server reads no file of its
+machine for a request, also not one that a document refers to.
+
 ### Starting from a document without importing it
 
 The server also takes a source of Mockey 2.x as its initial definitions, which it reads at every start. In
@@ -183,8 +193,8 @@ of a migrated installation meet first:
 
 - The admin pages and the automation endpoints on the port of the mock traffic. Administration has a
   listener of its own, which only programs on the same machine reach by default (DEV-26). In this version the
-  admin API does not import or export definitions yet, the server has no web UI, and the automation endpoints
-  `/config/service`, `/plan/setup`, `/definitions`, and `/home` answer with the status 404.
+  server has no web UI, and the automation endpoints `/config/service`, `/plan/setup`, `/definitions`, and
+  `/home` answer with the status 404.
 - Opening a browser when the server starts, and the option `-H` with it (DEV-25).
 - Loading definitions from any file or URL of the server's machine while the server runs, as `/home?action=init`
   and the upload page did. Files and URLs are sources at startup and for the import command (DEV-27).

@@ -70,6 +70,10 @@ Ways 1 and 2, together.
   before, so a body that is too long gets the same answer. A request without a body has nothing to declare.
 - `curl` declares a body that it is given with `-d` as a form. It takes `-H 'Content-Type: application/json'`,
   or `--json` in the place of `-d`.
+- One operation takes a body that is no JSON: the import of task 12.7 takes an export document of
+  Mockey 2.x, which is XML. `AdminRequest.document` takes such a body when the request declares it as
+  `application/xml` or `text/xml`, and a body of JSON as before. Neither XML type is one of the three types
+  that a browser sends without asking, so way 1 holds for the import as it does for every other body.
 
 ## What this does not cover
 

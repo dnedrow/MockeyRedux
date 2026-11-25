@@ -3,6 +3,7 @@ package io.github.dnedrow.mockey.server
 import io.github.dnedrow.mockey.api.AdminApiJson
 import io.github.dnedrow.mockey.api.FieldErrorDto
 import io.github.dnedrow.mockey.api.HistoryEntryDto
+import io.github.dnedrow.mockey.api.ImportReportDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.PlanApplyReportDto
 import io.github.dnedrow.mockey.api.PlanDto
@@ -21,6 +22,7 @@ import io.github.dnedrow.mockey.core.model.ResponseMode
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistPair
+import io.github.dnedrow.mockey.server.TestDefinitions.orders
 import kotlinx.coroutines.runBlocking
 import java.net.InetSocketAddress
 import java.net.URI
@@ -281,6 +283,10 @@ class ServerAdminApiTest {
                 "/api/v1/history/0" to 404,
                 "/api/v1/stats" to 200,
                 "/api/v1/stats?format=csv" to 200,
+                "/api/v1/definitions/export" to 200,
+                "/api/v1/diagnostics" to 200,
+                "/api/v1/search?term=customer" to 200,
+                "/api/v1/services/${customers.value}/schema-report" to 404,
                 "/api/v1/system" to 200,
                 "/api/v1/services?name=customers&tag=team-a" to 200,
                 "/api/v1/services/no-such-service" to 404,
@@ -414,6 +420,11 @@ class ServerAdminApiTest {
                 Triple("POST", "history/1/scenario", ""),
                 Triple("DELETE", "history/1", ""),
                 Triple("DELETE", "history", ""),
+                Triple("PATCH", "system", """{"readOnly":true}"""),
+                Triple("POST", "system/reload", ""),
+                Triple("DELETE", "system/last-used-times", ""),
+                Triple("POST", "definitions/import", """{"formatVersion":1,"plans":[{"id":"p1","name":"Night"}]}"""),
+                Triple("POST", "system/reset", ""),
             )
 
         val ofMock = RawHttp.get(server.listeners.mock.address, "/service/customer/7")
@@ -598,6 +609,86 @@ class ServerAdminApiTest {
         assertEquals(listOf(ofTheReplay, entry), listed)
         assertEquals(201 to StoredDefinitions.CUSTOMER, saved.status to saved.decoded<ScenarioDto>().responseBody)
         assertEquals(listOf("found", "lost", "recorded"), read(server).single().scenarios.map { it.name })
+    }
+
+    /**
+     * The scenario "Import a legacy export document", on a server: the answer is the report, what was added
+     * carries the tag, and the mock endpoint answers with the imported service as its default plan sets it.
+     * An export of the server holds what was imported.
+     */
+    @Test
+    fun anExportDocumentOfMockey2IsImportedThroughTheApiAndTheMockEndpointAnswersWithIt() {
+        val server = start(settings())
+        val mock = server.listeners.mock.address
+        val document = LegacySources.export(withDefaultPlan = true)
+        val asXml = RawHttp.request("POST", "/api/v1/definitions/import?tag=migrated", listOf("Content-Type: application/xml"), document)
+
+        val before = RawHttp.get(mock, "/service/legacy/orders")
+        val imported = RawHttp.exchange(server.listeners.admin.address, asXml)
+        val ofMock = RawHttp.get(mock, "/service/legacy/orders")
+        val exported = server.asked("GET", "definitions/export")
+
+        assertEquals(404, before.status)
+        assertEquals("HTTP/1.1 200 OK", imported.statusLine, "$imported")
+        val report = imported.decoded<ImportReportDto>()
+        val added = listOf("service" to "Legacy Orders", "scenario" to "silver", "scenario" to "gold", "plan" to "Gold path")
+        assertEquals(added + ("setting" to "default plan"), report.additions.map { it.kind to it.name })
+        assertEquals("Gold path", report.appliedDefaultPlan?.plan?.name)
+        val legacy = read(server).last()
+        assertEquals("Legacy Orders" to listOf("migrated"), legacy.name to legacy.tags.toList())
+        assertEquals(200 to LegacySources.GOLD_ORDERS, ofMock.status to ofMock.body)
+        assertEquals(200 to true, exported.status to ("Legacy Orders" in exported.body && "Customers" in exported.body))
+    }
+
+    /**
+     * The scenario "Leave read-only mode", on a server: what was changed in read-only mode is in the
+     * definitions location when the request is answered, the status says that the mode is off, and the
+     * next server starts with it.
+     */
+    @Test
+    fun aServerThatLeavesReadOnlyModeThroughTheApiStoresWhatWasChangedBefore() {
+        val definitions = definitionsLocation()
+        val first = start(settings(definitions))
+        val stored = stateOf(first, definitions).stored
+
+        val created = first.asked("POST", "services", """{"name":"Orders","mockUrl":"orders"}""")
+        val afterTheChange = stateOf(first, definitions).stored
+        val switched = first.asked("PATCH", "system", """{"readOnly":false}""")
+        val status = first.asked("GET", "system").decoded<SystemStatusDto>()
+        first.close()
+        val second = start(settings(definitions))
+
+        assertEquals(201 to stored, created.status to afterTheChange)
+        assertEquals("HTTP/1.1 200 OK", switched.statusLine, "$switched")
+        assertEquals(false to false, switched.decoded<SystemStatusDto>().readOnly to status.readOnly)
+        assertEquals(listOf("Customers", "Orders"), read(second).map { it.name })
+        assertEquals(true, second.asked("GET", "system").decoded<SystemStatusDto>().readOnly)
+    }
+
+    /**
+     * A reload puts the definitions of the definitions location in the place of those in memory, and a reset
+     * leaves none. The mock endpoint answers by the definitions as they are after each.
+     */
+    @Test
+    fun aServerReloadsAndResetsItsDefinitionsThroughTheApi() {
+        val definitions = definitionsLocation()
+        val server = start(settings(definitions))
+        val mock = server.listeners.mock.address
+        TestDefinitions.store(definitions) { orders() }
+
+        val beforeTheReload = RawHttp.get(mock, "/service/orders")
+        val reloaded = server.asked("POST", "system/reload")
+        val afterTheReload = RawHttp.get(mock, "/service/orders")
+        val reset = server.asked("POST", "system/reset")
+        val afterTheReset = listOf("/service/orders", "/service/customer/7").map { RawHttp.get(mock, it).status }
+
+        assertEquals(listOf<Int?>(204, 204), listOf(reloaded.status, reset.status))
+        assertEquals(404, beforeTheReload.status)
+        assertEquals(200 to TestDefinitions.SILVER_ORDERS, afterTheReload.status to afterTheReload.body)
+        assertEquals(listOf<Int?>(404, 404), afterTheReset)
+        assertEquals(emptyList(), read(server))
+        assertEquals(2, server.asked("GET", "history").decoded<List<HistoryEntryDto>>().size)
+        assertContains(stateOf(server, definitions).stored.keys, "mockey.json")
     }
 
     /** The scenario "Unknown resource". */

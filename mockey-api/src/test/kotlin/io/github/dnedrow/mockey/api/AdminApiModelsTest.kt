@@ -50,28 +50,6 @@ class AdminApiModelsTest {
             ),
         )
         assertShape(
-            ServiceDefinitionDto("svc1", "service", "/service/example"),
-            setOf(
-                "id",
-                "name",
-                "mockUrl",
-                "description",
-                "realUrls",
-                "defaultRealUrlIndex",
-                "responseMode",
-                "delayMillis",
-                "tags",
-                "scenarios",
-                "defaultScenarioId",
-                "errorScenarioId",
-                "requestRules",
-                "requestRulesEnabled",
-                "inspectorName",
-                "responseSchema",
-                "responseSchemaEnabled",
-            ),
-        )
-        assertShape(
             ScenarioAttributesDto(),
             setOf("name", "responseBody", "statusCode", "headers", "matchCriterion", "methodRestriction", "delayMillis", "tags"),
         )
@@ -107,15 +85,6 @@ class AdminApiModelsTest {
         assertShape(TwistPairDto("from", "to"), setOf("origination", "destination"))
         assertShape(TwistConfigurationDto("t1", "twist"), setOf("id", "name", "pairs"))
         assertShape(TwistAttributesDto(), setOf("name", "pairs"))
-        assertShape(OutboundProxyDefinitionDto("http://proxy", true), setOf("url", "enabled"))
-        assertShape(
-            DefinitionSettingsDto(),
-            setOf("enabledTwistId", "outboundProxy", "universalErrorServiceId", "universalErrorScenarioId", "defaultPlanId"),
-        )
-        assertShape(
-            DefinitionDocumentDto(),
-            setOf("formatVersion", "services", "plans", "twists", "settings"),
-        )
         assertShape(OutboundProxyDto("http://proxy", true, "user", true), setOf("url", "enabled", "username", "passwordSet"))
         assertShape(OutboundProxyAttributesDto("http://proxy", true, "user", "secret"), setOf("url", "enabled", "username", "password"))
         assertShape(TagFilterDto(listOf("orders")), setOf("tags"))
@@ -174,7 +143,10 @@ class AdminApiModelsTest {
             setOf("plan", "skippedItems", "unresolvedScenarios"),
         )
         assertShape(ImportItemDto("service", "service", "added"), setOf("kind", "name", "message", "serviceName"))
-        assertShape(ImportReportDto(emptyList(), emptyList()), setOf("additions", "conflicts", "appliedDefaultPlan"))
+        assertShape(
+            ImportReportDto(emptyList(), emptyList()),
+            setOf("additions", "conflicts", "appliedDefaultPlan", "issues", "unreadableRuleSets"),
+        )
         assertShape<SchemaReportDto>(SchemaReportDto.Checked(emptyList()), setOf("type", "scenarios"))
         assertShape<SchemaReportDto>(SchemaReportDto.UnsupportedDialect("draft"), setOf("type", "dialect"))
         assertShape<SchemaReportDto>(SchemaReportDto.UnusableSchema(listOf("invalid")), setOf("type", "problems"))
@@ -185,6 +157,7 @@ class AdminApiModelsTest {
             ScenarioConformanceDto("s1", "scenario", true, emptyList()),
             setOf("scenarioId", "scenarioName", "conforms", "violations"),
         )
+        assertShape(SystemAttributesDto(readOnly = false), setOf("readOnly"))
         assertShape(
             SystemStatusDto(
                 "3.0",

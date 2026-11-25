@@ -42,6 +42,7 @@ internal class AdminServices(
                 AdminResponse.created(copy.toAdminDto(), "services", copy.id.value)
             },
             AdminRoute(HttpMethod.Post, "services/{serviceId}/merge") { merge() },
+            AdminRoute(HttpMethod.Get, "services/{serviceId}/schema-report") { schemaReport() },
             AdminRoute(HttpMethod.Post, "services/real-urls/derive") {
                 val request = body(RealUrlDerivationRequestDto.serializer())
                 val derived = engine.services.deriveRealUrls(request.expression, request.replacements).orProblem()
@@ -105,6 +106,21 @@ internal class AdminServices(
         val unknown = sources.indices.filter { sources[it] == null }.map { FieldErrorDto("sourceIds[$it]", NO_SUCH_SERVICE) }
         if (unknown.isNotEmpty()) throw AdminProblem.invalid(unknown)
         val report = engine.services.merge(destination.id, sources.filterNotNull().map { it.id }).orProblem()
+        return AdminResponse.json(report.toAdminDto())
+    }
+
+    /**
+     * Answers with what the response schema of the service of the request says of the response bodies of
+     * its scenarios. The report is there while the service has a response schema, whether or not the
+     * schema is enabled.
+     *
+     * @throws AdminProblem with the status 404 when the service has no response schema.
+     */
+    private fun AdminRequest.schemaReport(): AdminResponse {
+        val service = service(parameter("serviceId"))
+        val report =
+            engine.services.schemaReport(service.id)
+                ?: throw AdminProblem(HttpStatusCode.NotFound, "The service '${service.name}' has no response schema.")
         return AdminResponse.json(report.toAdminDto())
     }
 

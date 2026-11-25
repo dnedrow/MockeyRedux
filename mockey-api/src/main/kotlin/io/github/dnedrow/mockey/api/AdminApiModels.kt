@@ -151,28 +151,6 @@ public data class DerivedRealUrlDto(
     public val realUrl: String,
 )
 
-/** A persisted service definition without its derived effective response mode. */
-@Serializable
-public data class ServiceDefinitionDto(
-    public val id: String,
-    public val name: String,
-    public val mockUrl: String,
-    public val description: String? = null,
-    public val realUrls: List<String> = emptyList(),
-    public val defaultRealUrlIndex: Int = 0,
-    public val responseMode: ResponseModeDto = ResponseModeDto.PROXY,
-    public val delayMillis: Long = 0,
-    public val tags: List<String> = emptyList(),
-    public val scenarios: List<ScenarioDto> = emptyList(),
-    public val defaultScenarioId: String? = null,
-    public val errorScenarioId: String? = null,
-    public val requestRules: String? = null,
-    public val requestRulesEnabled: Boolean = false,
-    public val inspectorName: String? = null,
-    public val responseSchema: String? = null,
-    public val responseSchemaEnabled: Boolean = false,
-)
-
 /** The settings of one service held by a plan. */
 @Serializable
 public data class PlanItemDto(
@@ -247,33 +225,6 @@ public data class TwistConfigurationDto(
 public data class TwistAttributesDto(
     public val name: String = "",
     public val pairs: List<TwistPairDto> = emptyList(),
-)
-
-/** A proxy setting in an exportable definition document; credentials are deliberately excluded. */
-@Serializable
-public data class OutboundProxyDefinitionDto(
-    public val url: String,
-    public val enabled: Boolean,
-)
-
-/** Persistent definition settings. Runtime-only state and proxy credentials are not included. */
-@Serializable
-public data class DefinitionSettingsDto(
-    public val enabledTwistId: String? = null,
-    public val outboundProxy: OutboundProxyDefinitionDto? = null,
-    public val universalErrorServiceId: String? = null,
-    public val universalErrorScenarioId: String? = null,
-    public val defaultPlanId: String? = null,
-)
-
-/** All persisted definitions in the portable JSON document format. */
-@Serializable
-public data class DefinitionDocumentDto(
-    public val formatVersion: Int = 1,
-    public val services: List<ServiceDefinitionDto> = emptyList(),
-    public val plans: List<PlanDto> = emptyList(),
-    public val twists: List<TwistConfigurationDto> = emptyList(),
-    public val settings: DefinitionSettingsDto = DefinitionSettingsDto(),
 )
 
 /**
@@ -496,12 +447,18 @@ public data class ImportItemDto(
     public val serviceName: String? = null,
 )
 
-/** The complete report of a definitions import. */
+/**
+ * The complete report of a definitions import. Every part of the document is among the additions or among
+ * the conflicts. The import of a document of Mockey 2.x names besides what it could not read of the document,
+ * in [issues], and the rule sets that are not well formed among what it added, in [unreadableRuleSets].
+ */
 @Serializable
 public data class ImportReportDto(
     public val additions: List<ImportItemDto>,
     public val conflicts: List<ImportItemDto>,
     public val appliedDefaultPlan: PlanApplyReportDto? = null,
+    public val issues: List<String> = emptyList(),
+    public val unreadableRuleSets: List<DiagnosticDto> = emptyList(),
 )
 
 /** The result of checking service scenarios against a response JSON Schema. */
@@ -533,6 +490,12 @@ public data class ScenarioConformanceDto(
     public val scenarioName: String,
     public val conforms: Boolean,
     public val violations: List<String>,
+)
+
+/** The attributes of the server that a request sets. The read-only mode is the only one. */
+@Serializable
+public data class SystemAttributesDto(
+    public val readOnly: Boolean = true,
 )
 
 /** Server status and runtime settings made available to admin clients. */
