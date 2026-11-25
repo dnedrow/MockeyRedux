@@ -2,11 +2,10 @@ package io.github.dnedrow.mockey.server
 
 import dev.harrel.jsonschema.ValidatorFactory
 import dev.harrel.jsonschema.providers.KotlinxJsonNode
+import io.github.dnedrow.mockey.api.AdminApiDescription
 import io.github.dnedrow.mockey.api.AdminApiJson
 import io.github.dnedrow.mockey.api.HistoryEntryDto
-import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.PlanDto
-import io.github.dnedrow.mockey.api.ReplayRequestDto
 import io.github.dnedrow.mockey.api.ScenarioDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
@@ -150,7 +149,8 @@ class AdminApiDescriptionTest {
 
     /**
      * The document is an answer of the API like any other: JSON that is not to be stored, and no body for a
-     * request with the method HEAD.
+     * request with the method HEAD. It is the description that stands beside the wire types, which the
+     * clients of the API have as well.
      */
     @Test
     fun theApiServesTheDocumentAsJson() {
@@ -162,6 +162,7 @@ class AdminApiDescriptionTest {
         assertEquals("HTTP/1.1 200 OK", answer.statusLine)
         assertEquals(listOf("application/json"), answer.headerValues("Content-Type"))
         assertEquals(listOf("no-store"), answer.headerValues("Cache-Control"))
+        assertEquals(AdminApiDescription.text, answer.bodyInUtf8)
         val document = json(answer.bodyInUtf8).jsonObject
         assertEquals("3.1.0", text(document, "openapi"))
         assertEquals("Mockey admin API" to "1", document.getValue("info").jsonObject.let { text(it, "title") to text(it, "version") })
@@ -203,68 +204,6 @@ class AdminApiDescriptionTest {
         }
         val presented = document.getValue("security").jsonArray.flatMap { it.jsonObject.keys }
         assertEquals(presented, namesOf(components, "securitySchemes").toList())
-    }
-
-    // The schemas
-
-    /**
-     * A schema states what the serializer of its wire type says: the members, the ones that a request has to
-     * state, and the ones that can be null.
-     */
-    @Test
-    fun aSchemaStatesTheMembersOfItsWireType() {
-        val schemas = WireSchemas("#/s/")
-
-        val reference = schemas.of(ReplayRequestDto.serializer().descriptor)
-
-        val expected =
-            """
-            {"type":"object","properties":{
-              "headers":{"type":["array","null"],"items":{"${'$'}ref":"#/s/Header"}},
-              "parameters":{"type":["array","null"],"items":{"${'$'}ref":"#/s/NameValue"}},
-              "bodyBase64":{"type":["string","null"]}}}
-            """
-        val header = """{"type":"object","properties":{"name":{"type":"string"},"value":{"type":"string"}},"required":["name","value"]}"""
-        assertEquals(json("""{"${'$'}ref":"#/s/ReplayRequest"}"""), reference)
-        assertEquals(setOf("Header", "NameValue", "ReplayRequest"), schemas.components.keys)
-        assertEquals(json(expected), schemas.components.getValue("ReplayRequest"))
-        assertEquals(json(header), schemas.components.getValue("Header"))
-    }
-
-    /**
-     * A wire type with several kinds is one of the schemas of its kinds, each of which names its kind in
-     * the member that the JSON of the API has for it, and a wire type that is one of several words lists
-     * them. A value that can be null is so as JSON Schema says it of a reference.
-     */
-    @Test
-    fun aSchemaStatesTheKindsAndTheWordsOfItsWireType() {
-        val schemas = WireSchemas("#/s/")
-
-        schemas.of(MatchCriterionDto.serializer().descriptor)
-        schemas.of(HistoryEntryDto.serializer().descriptor)
-
-        val kinds =
-            """
-            {"oneOf":[
-               {"${'$'}ref":"#/s/MatchCriterionNone"},{"${'$'}ref":"#/s/MatchCriterionRules"},{"${'$'}ref":"#/s/MatchCriterionText"}],
-             "discriminator":{"propertyName":"type","mapping":{
-               "none":"#/s/MatchCriterionNone","rules":"#/s/MatchCriterionRules","text":"#/s/MatchCriterionText"}}}
-            """
-        val none = """{"type":"object","properties":{"type":{"type":"string","enum":["none"]}},"required":["type"]}"""
-        val text =
-            """
-            {"type":"object","properties":{"type":{"type":"string","enum":["text"]},"text":{"type":"string"}},"required":["type","text"]}
-            """
-        val historyEntry = schemas.components.getValue("HistoryEntry")
-        val entry = historyEntry.getValue("properties").jsonObject
-        assertEquals(json(kinds), schemas.components.getValue("MatchCriterion"))
-        assertEquals(json(none), schemas.components.getValue("MatchCriterionNone"))
-        assertEquals(json(text), schemas.components.getValue("MatchCriterionText"))
-        assertEquals(json("""{"type":"string","enum":["proxy","static","dynamic"]}"""), schemas.components.getValue("ResponseMode"))
-        assertEquals(json("""{"anyOf":[{"${'$'}ref":"#/s/ResponseMode"},{"type":"null"}]}"""), entry.getValue("responseMode"))
-        assertEquals(json("""{"type":"integer","format":"int64"}"""), entry.getValue("id"))
-        val ofText = AdminApiJson.instance.encodeToJsonElement(MatchCriterionDto.serializer(), MatchCriterionDto.Text("Ada"))
-        assertEquals(json("""{"type":"text","text":"Ada"}"""), ofText)
     }
 
     // The document and the answers

@@ -1,5 +1,6 @@
 package io.github.dnedrow.mockey.server
 
+import io.github.dnedrow.mockey.api.AdminApiDescription
 import io.github.dnedrow.mockey.api.AdminApiJson
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.storage.StorageException
@@ -242,7 +243,7 @@ internal class AdminApi(
 
     internal companion object {
         /** The path prefix of the admin API. It states the version of the API. */
-        const val PREFIX = "/api/v1"
+        const val PREFIX = AdminApiDescription.PREFIX
 
         private val log = LoggerFactory.getLogger(AdminApi::class.java)
 
@@ -261,6 +262,13 @@ internal class AdminApi(
         private const val NO_OPERATION = "The resource has no operation with the method of the request."
         private const val FAILED = "The server failed to handle the request. Its log says why."
         private const val NOT_STORED = "The server could not read or write its definitions location, and nothing was changed."
+
+        /**
+         * The operation that answers with the description of the API in OpenAPI format. The description stands
+         * beside the wire types, so that the clients of the API have it as well, see [AdminApiDescription].
+         */
+        private val description =
+            AdminRoute(HttpMethod.Get, AdminApiDescription.PATH) { AdminResponse(HttpStatusCode.OK, AdminApiDescription.text) }
 
         /**
          * Returns the admin API of a server with [settings]: the operations on the definitions and on the
@@ -282,7 +290,7 @@ internal class AdminApi(
                     AdminHistory(engine).routes +
                     AdminDefinitions(engine).routes +
                     AdminSystem(engine, since, settings.definitions, mock).routes +
-                    AdminApiDescription.routes
+                    description
             return AdminApi(settings.adminToken, settings.maxRequestBody, routes)
         }
     }

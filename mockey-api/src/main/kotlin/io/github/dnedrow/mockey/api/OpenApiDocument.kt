@@ -1,9 +1,5 @@
-package io.github.dnedrow.mockey.server
+package io.github.dnedrow.mockey.api
 
-import io.github.dnedrow.mockey.api.AdminApiJson
-import io.github.dnedrow.mockey.api.ProblemDto
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -67,29 +63,29 @@ internal object OpenApiDocument {
             "A server without an admin token takes a request without one."
 
     /** The answers that report a failure, by their statuses: the name of each among the components, and what it says. */
-    private val problems: Map<HttpStatusCode, Pair<String, String>> =
+    private val problems: Map<Int, Pair<String, String>> =
         linkedMapOf(
-            HttpStatusCode.BadRequest to
+            Status.BAD_REQUEST to
                 (
                     "BadRequest" to
                         "The request is not written as the operation takes one. Its path or its query string has a malformed " +
                         "escape, its query string has a parameter or a value that the operation does not take, or its body is " +
                         "missing or is no JSON object."
                 ),
-            HttpStatusCode.Unauthorized to ("Unauthorized" to "The server has an admin token, and the request does not present it."),
-            HttpStatusCode.Forbidden to
+            Status.UNAUTHORIZED to ("Unauthorized" to "The server has an admin token, and the request does not present it."),
+            Status.FORBIDDEN to
                 (
                     "Forbidden" to
                         "The request carries an Origin header, as the request of a web page does. " +
                         "The API takes a request that can change something only from a program."
                 ),
-            HttpStatusCode.NotFound to ("NotFound" to "What the request names is not there."),
-            HttpStatusCode.PayloadTooLarge to ("PayloadTooLarge" to "The body of the request is longer than the server takes."),
-            HttpStatusCode.UnsupportedMediaType to
+            Status.NOT_FOUND to ("NotFound" to "What the request names is not there."),
+            Status.PAYLOAD_TOO_LARGE to ("PayloadTooLarge" to "The body of the request is longer than the server takes."),
+            Status.UNSUPPORTED_MEDIA_TYPE to
                 ("UnsupportedMediaType" to "The request does not declare its body as what the operation takes."),
-            HttpStatusCode.UnprocessableEntity to
+            Status.UNPROCESSABLE to
                 ("Unprocessable" to "The request is not valid. The problem names every invalid member with a message."),
-            HttpStatusCode.InternalServerError to
+            Status.SERVER_ERROR to
                 (
                     "ServerError" to
                         "The server failed to handle the request. The problem says why when the definitions location could " +
@@ -106,7 +102,7 @@ internal object OpenApiDocument {
             put("openapi", VERSION)
             putJsonObject("info") {
                 put("title", "Mockey admin API")
-                put("version", AdminApi.PREFIX.substringAfterLast("/v"))
+                put("version", AdminApiDescription.PREFIX.substringAfterLast("/v"))
                 put("description", ABOUT)
                 putJsonObject("license") {
                     put("name", "GNU General Public License v2.0 or later")
@@ -115,7 +111,7 @@ internal object OpenApiDocument {
             }
             putJsonArray("servers") {
                 addJsonObject {
-                    put("url", AdminApi.PREFIX)
+                    put("url", AdminApiDescription.PREFIX)
                     put("description", "The admin listener of the server that gave this document.")
                 }
             }
@@ -155,7 +151,7 @@ internal object OpenApiDocument {
         for (area in areas) {
             for (operation in area.operations) {
                 val ofPath = paths.getOrPut("/${operation.path}") { linkedMapOf() }
-                val before = ofPath.put(operation.method.value.lowercase(), operationOf(area, operation, schemas))
+                val before = ofPath.put(operation.method.lowercase(), operationOf(area, operation, schemas))
                 check(before == null) { "The description of the admin API has the operation $operation twice." }
             }
         }
@@ -181,23 +177,22 @@ internal object OpenApiDocument {
                 }
             }
             putJsonObject("responses") {
-                for (answer in operation.answers) put("${answer.status.value}", answerOf(answer, schemas))
+                for (answer in operation.answers) put("${answer.status}", answerOf(answer, schemas))
                 for (status in problemsOf(operation)) {
-                    putJsonObject("${status.value}") { put(REFERENCE, RESPONSES + problems.getValue(status).first) }
+                    putJsonObject("$status") { put(REFERENCE, RESPONSES + problems.getValue(status).first) }
                 }
             }
         }
     }
 
     /** Returns the statuses with which [operation] reports a failure, in their order, as the description of this object says. */
-    private fun problemsOf(operation: DescribedOperation): List<HttpStatusCode> {
-        val ofEvery = listOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.InternalServerError)
-        val ofAChange = listOf(HttpStatusCode.Forbidden).filter { operation.method != HttpMethod.Get }
-        val ofAResource = listOf(HttpStatusCode.NotFound).filter { operation.pathParameters.isNotEmpty() }
-        val ofABody =
-            listOf(HttpStatusCode.PayloadTooLarge, HttpStatusCode.UnsupportedMediaType, HttpStatusCode.UnprocessableEntity)
-                .filter { operation.body != null }
-        return (ofEvery + ofAChange + ofAResource + ofABody + operation.problems).distinct().sortedBy { it.value }
+    private fun problemsOf(operation: DescribedOperation): List<Int> {
+        val ofEvery = listOf(Status.BAD_REQUEST, Status.UNAUTHORIZED, Status.SERVER_ERROR)
+        val ofAChange = listOf(Status.FORBIDDEN).filter { operation.method != "GET" }
+        val ofAResource = listOf(Status.NOT_FOUND).filter { operation.pathParameters.isNotEmpty() }
+        val ofAnyBody = listOf(Status.PAYLOAD_TOO_LARGE, Status.UNSUPPORTED_MEDIA_TYPE, Status.UNPROCESSABLE)
+        val ofABody = ofAnyBody.filter { operation.body != null }
+        return (ofEvery + ofAChange + ofAResource + ofABody + operation.problems).distinct().sorted()
     }
 
     /** Returns the parameter [name] of a path, which every request has. */
@@ -262,7 +257,7 @@ internal object OpenApiDocument {
     ): JsonObject =
         buildJsonObject {
             put("description", says)
-            if (name == problems.getValue(HttpStatusCode.Unauthorized).first) {
+            if (name == problems.getValue(Status.UNAUTHORIZED).first) {
                 putJsonObject("headers") {
                     putJsonObject("WWW-Authenticate") {
                         put("description", "The scheme by which a request presents the admin token.")

@@ -1,37 +1,5 @@
-package io.github.dnedrow.mockey.server
+package io.github.dnedrow.mockey.api
 
-import io.github.dnedrow.mockey.api.DerivedRealUrlDto
-import io.github.dnedrow.mockey.api.DiagnosticDto
-import io.github.dnedrow.mockey.api.HistoryEntryAttributesDto
-import io.github.dnedrow.mockey.api.HistoryEntryDto
-import io.github.dnedrow.mockey.api.HistoryStatisticsDto
-import io.github.dnedrow.mockey.api.ImportReportDto
-import io.github.dnedrow.mockey.api.InspectorDto
-import io.github.dnedrow.mockey.api.MergeReportDto
-import io.github.dnedrow.mockey.api.OutboundProxyAttributesDto
-import io.github.dnedrow.mockey.api.OutboundProxyDto
-import io.github.dnedrow.mockey.api.PlanApplyReportDto
-import io.github.dnedrow.mockey.api.PlanAttributesDto
-import io.github.dnedrow.mockey.api.PlanDto
-import io.github.dnedrow.mockey.api.PlanReferenceDto
-import io.github.dnedrow.mockey.api.PlanSaveRequestDto
-import io.github.dnedrow.mockey.api.RealUrlDerivationRequestDto
-import io.github.dnedrow.mockey.api.ReplayRequestDto
-import io.github.dnedrow.mockey.api.ScenarioAttributesDto
-import io.github.dnedrow.mockey.api.ScenarioDto
-import io.github.dnedrow.mockey.api.ScenarioReferenceDto
-import io.github.dnedrow.mockey.api.SchemaReportDto
-import io.github.dnedrow.mockey.api.SearchResultDto
-import io.github.dnedrow.mockey.api.ServiceAttributesDto
-import io.github.dnedrow.mockey.api.ServiceDto
-import io.github.dnedrow.mockey.api.ServiceMergeRequestDto
-import io.github.dnedrow.mockey.api.SystemAttributesDto
-import io.github.dnedrow.mockey.api.SystemStatusDto
-import io.github.dnedrow.mockey.api.TagFilterDto
-import io.github.dnedrow.mockey.api.TwistAttributesDto
-import io.github.dnedrow.mockey.api.TwistConfigurationDto
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -43,20 +11,24 @@ import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.serializer
 
 /**
- * The description of the admin API, which the API serves in OpenAPI format at [PATH], see
- * [OpenApiDocument].
+ * The description of the admin API, which a server serves in OpenAPI format at [PATH] below [PREFIX], see
+ * [OpenApiDocument]. It stands beside the wire types, so that a client of the API has it as well, and can
+ * hold its requests against it.
  *
- * The description is written apart from the routes of the API. It says of every operation what a client has
- * to know and a route does not say: what the operation does, what its parameters mean, and which wire types
- * its bodies are. A test compares the operations of the description with the routes of the API, in both
- * directions, so that neither has an operation that the other lacks.
+ * The description is written apart from the routes of the server. It says of every operation what a client
+ * has to know and a route does not say: what the operation does, what its parameters mean, and which wire
+ * types its bodies are. A test of the server compares the operations of the description with the routes of
+ * the server, in both directions, so that neither has an operation that the other lacks.
  *
  * The schemas of the bodies are not written. They are made from the wire types, see [WireSchemas], so they
  * state what the API reads and writes.
  */
-internal object AdminApiDescription {
+public object AdminApiDescription {
+    /** The path prefix of the admin API. It states the version of the API. */
+    public const val PREFIX: String = "/api/v1"
+
     /** The path of the description below the prefix of the API. */
-    const val PATH = "openapi.json"
+    public const val PATH: String = "openapi.json"
 
     /** The schema of a parameter whose value is any text, and of one that a request can have several times, with a text each. */
     private val anyText = buildJsonObject { put("type", "string") }
@@ -99,7 +71,7 @@ internal object AdminApiDescription {
         }
 
     /** What the description says of the parameters that the paths of operations have, by their names. Every request has them. */
-    val pathParameters: Map<String, DescribedParameter> =
+    internal val pathParameters: Map<String, DescribedParameter> =
         listOf(
             DescribedParameter("serviceId", "The identifier of a service.", anyText, isRequired = true),
             DescribedParameter("scenarioId", "The identifier of a scenario of the service.", anyText, isRequired = true),
@@ -110,13 +82,14 @@ internal object AdminApiDescription {
         ).associateBy { it.name }
 
     /** The areas of the API with the operations of each, in the order in which the description has them. */
-    val areas: List<DescribedArea> = listOf(services(), scenarios(), plans(), routing(), upstream(), history(), definitions(), system())
+    internal val areas: List<DescribedArea> =
+        listOf(services(), scenarios(), plans(), routing(), upstream(), history(), definitions(), system())
 
-    /** The description as a JSON text. It is the same for every server of this version, so it is made once. */
-    val text: String by lazy { Json.encodeToString(JsonObject.serializer(), OpenApiDocument.of(areas)) }
+    /** The description as a document of OpenAPI. It is the same for every server of this version, so it is made once. */
+    public val document: JsonObject by lazy { OpenApiDocument.of(areas) }
 
-    /** The route of the operation that answers with the description. */
-    val routes: List<AdminRoute> = listOf(AdminRoute(HttpMethod.Get, PATH) { AdminResponse(HttpStatusCode.OK, text) })
+    /** The description as a JSON text, which is what a server answers with. */
+    public val text: String by lazy { Json.encodeToString(JsonObject.serializer(), document) }
 
     private fun services() =
         DescribedArea(
@@ -192,7 +165,7 @@ internal object AdminApiDescription {
             },
             get("universal-error-scenario", "getUniversalErrorScenario", "States which scenario is the universal error scenario.") {
                 details = "While no scenario is designated, the request gets the status 404."
-                problem(HttpStatusCode.NotFound)
+                problem(Status.NOT_FOUND)
                 gives<ScenarioReferenceDto>("The scenario that is designated.")
             },
             put("universal-error-scenario", "setUniversalErrorScenario", "Designates a scenario as the universal error scenario.") {
@@ -244,7 +217,7 @@ internal object AdminApiDescription {
             },
             get("default-plan", "getDefaultPlan", "States which plan is the default plan.") {
                 details = "While no plan is designated, the request gets the status 404."
-                problem(HttpStatusCode.NotFound)
+                problem(Status.NOT_FOUND)
                 gives<PlanReferenceDto>("The plan that is designated.")
             },
             put("default-plan", "setDefaultPlan", "Designates a plan as the default plan.") {
@@ -438,39 +411,39 @@ internal object AdminApiDescription {
         id: String,
         summary: String,
         describe: OperationDraft.() -> Unit,
-    ) = OperationDraft(HttpMethod.Get, path, id, summary).apply(describe).described()
+    ) = OperationDraft("GET", path, id, summary).apply(describe).described()
 
     private fun post(
         path: String,
         id: String,
         summary: String,
         describe: OperationDraft.() -> Unit,
-    ) = OperationDraft(HttpMethod.Post, path, id, summary).apply(describe).described()
+    ) = OperationDraft("POST", path, id, summary).apply(describe).described()
 
     private fun put(
         path: String,
         id: String,
         summary: String,
         describe: OperationDraft.() -> Unit,
-    ) = OperationDraft(HttpMethod.Put, path, id, summary).apply(describe).described()
+    ) = OperationDraft("PUT", path, id, summary).apply(describe).described()
 
     private fun patch(
         path: String,
         id: String,
         summary: String,
         describe: OperationDraft.() -> Unit,
-    ) = OperationDraft(HttpMethod.Patch, path, id, summary).apply(describe).described()
+    ) = OperationDraft("PATCH", path, id, summary).apply(describe).described()
 
     private fun delete(
         path: String,
         id: String,
         summary: String,
         describe: OperationDraft.() -> Unit,
-    ) = OperationDraft(HttpMethod.Delete, path, id, summary).apply(describe).described()
+    ) = OperationDraft("DELETE", path, id, summary).apply(describe).described()
 
     /** What is written of an operation, until it is [described]. */
     internal class OperationDraft(
-        private val method: HttpMethod,
+        private val method: String,
         private val path: String,
         private val id: String,
         private val summary: String,
@@ -478,7 +451,7 @@ internal object AdminApiDescription {
         private val query = mutableListOf<DescribedParameter>()
         private var body: DescribedBody? = null
         private val answers = mutableListOf<DescribedAnswer>()
-        private val problems = mutableSetOf<HttpStatusCode>()
+        private val problems = mutableSetOf<Int>()
 
         /** What a sentence does not say of the operation. */
         var details: String? = null
@@ -516,23 +489,23 @@ internal object AdminApiDescription {
         inline fun <reified T> gives(
             description: String,
             vararg others: DescribedContent,
-        ) = gives(HttpStatusCode.OK, description, serializer<T>(), others.toList())
+        ) = gives(Status.OK, description, serializer<T>(), others.toList())
 
         /** The operation answers with the status 201, with JSON of the wire type [T], and with where the new resource is. */
-        inline fun <reified T> creates(description: String) = gives(HttpStatusCode.Created, description, serializer<T>(), emptyList())
+        inline fun <reified T> creates(description: String) = gives(Status.CREATED, description, serializer<T>(), emptyList())
 
         /**
          * The operation answers with [status] and with JSON of the wire type that [wireType] serializes, or
          * with one of [others]. An answer with the status 201 says where the new resource is.
          */
         fun gives(
-            status: HttpStatusCode,
+            status: Int,
             description: String,
             wireType: KSerializer<*>,
             others: List<DescribedContent>,
         ) {
             val content = listOf(DescribedContent(DescribedContent.JSON, wireType)) + others
-            answers += DescribedAnswer(status, description, content, isLocated = status == HttpStatusCode.Created)
+            answers += DescribedAnswer(status, description, content, isLocated = status == Status.CREATED)
         }
 
         /** The operation answers with the status 200 and with a document of one of [content]. */
@@ -540,22 +513,22 @@ internal object AdminApiDescription {
             description: String,
             vararg content: DescribedContent,
         ) {
-            answers += DescribedAnswer(HttpStatusCode.OK, description, content.toList())
+            answers += DescribedAnswer(Status.OK, description, content.toList())
         }
 
         /** The operation answers with the status 204, without a body. */
         fun givesNothing() {
-            answers += DescribedAnswer(HttpStatusCode.NoContent, "The operation was done.")
+            answers += DescribedAnswer(Status.NO_CONTENT, "The operation was done.")
         }
 
         /** The operation reports a failure with [status], which does not follow from the form of the operation. */
-        fun problem(status: HttpStatusCode) {
+        fun problem(status: Int) {
             problems += status
         }
 
         /** Returns the operation as it was written. */
         fun described(): DescribedOperation {
-            val inTheirOrder = answers.sortedBy { it.status.value }
+            val inTheirOrder = answers.sortedBy { it.status }
             return DescribedOperation(method, path, id, summary, details, query.toList(), body, inTheirOrder, problems.toSet())
         }
     }
@@ -585,7 +558,7 @@ internal class DescribedArea(
  * from its form, see [OpenApiDocument].
  */
 internal class DescribedOperation(
-    val method: HttpMethod,
+    val method: String,
     val path: String,
     val id: String,
     val summary: String,
@@ -593,13 +566,13 @@ internal class DescribedOperation(
     val query: List<DescribedParameter>,
     val body: DescribedBody?,
     val answers: List<DescribedAnswer>,
-    val problems: Set<HttpStatusCode>,
+    val problems: Set<Int>,
 ) {
     /** The names of the parameters of the path, in their order. */
     val pathParameters: List<String> = path.split('/').filter { it.startsWith("{") }.map { it.removeSurrounding("{", "}") }
 
     /** Returns the method and the path, as a route names its operation. */
-    override fun toString(): String = "${method.value} $path"
+    override fun toString(): String = "$method $path"
 }
 
 /**
@@ -626,7 +599,7 @@ internal class DescribedBody(
  * resource that the operation created in its `Location` header.
  */
 internal class DescribedAnswer(
-    val status: HttpStatusCode,
+    val status: Int,
     val description: String,
     val content: List<DescribedContent> = emptyList(),
     val isLocated: Boolean = false,
@@ -645,4 +618,19 @@ internal class DescribedContent(
         const val XML = "application/xml"
         const val CSV = "text/csv"
     }
+}
+
+/** The statuses of the answers that the description names. */
+internal object Status {
+    const val OK = 200
+    const val CREATED = 201
+    const val NO_CONTENT = 204
+    const val BAD_REQUEST = 400
+    const val UNAUTHORIZED = 401
+    const val FORBIDDEN = 403
+    const val NOT_FOUND = 404
+    const val PAYLOAD_TOO_LARGE = 413
+    const val UNSUPPORTED_MEDIA_TYPE = 415
+    const val UNPROCESSABLE = 422
+    const val SERVER_ERROR = 500
 }
