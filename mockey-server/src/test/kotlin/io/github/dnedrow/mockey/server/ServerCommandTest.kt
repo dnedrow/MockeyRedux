@@ -439,6 +439,19 @@ class ServerCommandTest {
     }
 
     @Test
+    fun aServerThatDoesNotStartEndsTheProgramWithItsReasonAndAnotherStatus() {
+        val output = StringBuilder()
+        val errors = StringBuilder()
+        val command = ServerCommand({ null }, output, errors) { throw StartupFailure("The server has a reason not to start.") }
+
+        val status = command.execute(listOf("--mock-port", "9100"))
+
+        assertEquals(1, status)
+        assertEquals("Error: The server has a reason not to start.\n", errors.toString())
+        assertEquals("", output.toString())
+    }
+
+    @Test
     fun noMessageOfTheCommandHoldsTheAdminToken() {
         val token = "tk-4c1e9a70b2d853f6"
         val ofVariable = mapOf("MOCKEY_ADMIN_TOKEN" to token)

@@ -25,7 +25,8 @@ internal object HttpEngine {
 
     /**
      * Creates a server that listens on [host] and [port] once it is started, and that runs [module]. The port
-     * 0 stands for a port that the system picks.
+     * 0 stands for a port that the system picks. [configure] sets what one server needs beyond the settings
+     * that all of them have.
      *
      * The server is never in the development mode of Ktor, whatever the system property of that mode says.
      */
@@ -33,6 +34,7 @@ internal object HttpEngine {
         host: String,
         port: Int,
         module: suspend Application.() -> Unit,
+        configure: NettyApplicationEngine.Configuration.() -> Unit = {},
     ): HttpServer =
         embeddedServer(
             Netty,
@@ -46,5 +48,6 @@ internal object HttpEngine {
                 this.port = port
             }
             maxInitialLineLength = MAX_REQUEST_LINE_LENGTH
+            configure()
         }
 }

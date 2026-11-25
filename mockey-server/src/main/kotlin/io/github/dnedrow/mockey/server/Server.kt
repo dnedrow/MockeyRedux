@@ -1,15 +1,13 @@
 package io.github.dnedrow.mockey.server
 
-import org.slf4j.LoggerFactory
-
-private val log = LoggerFactory.getLogger("io.github.dnedrow.mockey.server.Server")
+import java.util.concurrent.CountDownLatch
 
 /**
- * Runs the server program with [settings]: it sets the level of the log and writes the settings in effect
- * to it.
+ * Runs the server program with [settings]: it starts the server and serves until the process is ended.
+ *
+ * @throws StartupFailure when the server does not start.
  */
 internal fun serve(settings: ServerSettings) {
-    ServerLogging.configure(settings.logLevel)
-    log.info("{} {} starts with these settings:", PROGRAM_NAME, ServerVersion.text)
-    settings.summary().forEach { (name, value) -> log.info("  {} = {}", name, value) }
+    MockeyServer.start(settings)
+    CountDownLatch(1).await()
 }

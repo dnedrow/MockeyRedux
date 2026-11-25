@@ -29,7 +29,8 @@ import kotlin.time.Duration
  *
  * The help option prints every setting with its option, its environment variable, and its default, and the
  * version option prints the version. Both end the program without a call of [serve], as does a value that
- * cannot be used, which is reported with the option or the variable that it came from.
+ * cannot be used, which is reported with the option or the variable that it came from. A server that does
+ * not start is reported with its reason, see [StartupFailure].
  *
  * @param environment gives the value of an environment variable, or `null` when it is not set.
  * @param output receives the help and the version.
@@ -165,7 +166,7 @@ internal class ServerCommand(
         """.trimIndent()
 
     override fun run() {
-        serve(
+        val settings =
             ServerSettings(
                 mockHost = mockHost,
                 mockPort = mockPort,
@@ -185,8 +186,12 @@ internal class ServerCommand(
                 forwardUnknownTargets = forwardUnknownTargets,
                 logLevel = logLevel,
                 shutdownGracePeriod = shutdownGracePeriod,
-            ),
-        )
+            )
+        try {
+            serve(settings)
+        } catch (failure: StartupFailure) {
+            throw CliktError("Error: ${failure.message}", failure)
+        }
     }
 
     /**
@@ -213,7 +218,8 @@ internal class ServerCommand(
 
 /**
  * Runs the program with the arguments [argv] and returns its exit status: 0 after the server has run, after
- * the help, and after the version, and another number when the arguments cannot be used.
+ * the help, and after the version, and another number when the arguments cannot be used or the server does
+ * not start.
  */
 internal fun ServerCommand.execute(argv: List<String>): Int =
     try {

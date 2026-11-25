@@ -136,6 +136,16 @@ The listeners (task 11.2):
 - Each listener is a server with one connector. No route needs a guard, and none is ever guarded by `port`.
 - A listener that cannot be bound shows as a `BindException` from `start`. The server names the address and
   the port itself, because the exception does not.
+- Before it does anything else, the server binds a socket of its own to the address and the port of each
+  listener and closes it again. A port that is in use shows at once that way, and not after the 4 seconds of
+  the engine, and it shows before the server has stored anything. The failure of `start` is handled as well,
+  for a port that another program takes in between.
+- A listener is bound to one address. The server looks up a name itself, once, so that the rule about an
+  admin listener beyond the loopback address holds for the address that is bound.
+- Where a machine has IPv6, the Java runtime binds the address `0.0.0.0` as all addresses of IPv4 and of
+  IPv6: a listener on `0.0.0.0` answered a request to `[::1]`, and its socket stated its address as
+  `[0:0:0:0:0:0:0:0]`. The log states the address of a listener as it was set. This was seen on macOS and is
+  not asserted, because it depends on the machine.
 
 The mock endpoint (tasks 11.3 and 11.4):
 

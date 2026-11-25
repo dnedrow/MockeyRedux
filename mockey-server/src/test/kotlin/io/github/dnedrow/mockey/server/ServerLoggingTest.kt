@@ -26,6 +26,9 @@ class ServerLoggingTest {
     private val logger = LoggerFactory.getLogger("io.github.dnedrow.mockey.server.ServerLoggingTest")
     private val levelBefore = ServerLogging.level()
 
+    /** Settings with which a server of a test starts whatever else listens on this machine. */
+    private val onFreePorts = ServerSettings(mockHost = "127.0.0.1", mockPort = 0, adminPort = 0)
+
     @AfterTest
     fun restoreTheLevel() {
         ServerLogging.configure(levelBefore)
@@ -86,29 +89,56 @@ class ServerLoggingTest {
     }
 
     @Test
-    fun theServerSetsTheLevelOfItsSettingsAndWritesTheSettingsToTheLog() {
-        val settings = ServerSettings(mockPort = 9100, logLevel = LogLevel.WARN, tagFilter = Tags.of("regression"))
+    fun theServerSetsTheLevelOfItsSettingsAndWritesTheSettingsToTheLogFirst() {
+        val settings = onFreePorts.copy(logLevel = LogLevel.WARN, tagFilter = Tags.of("regression"))
         ServerLogging.configure(LogLevel.TRACE)
 
-        val quiet = standardOutputOf { serve(settings) }
-        val log = standardOutputOf { serve(settings.copy(logLevel = LogLevel.INFO)) }
+        val quiet = standardOutputOf { MockeyServer.start(settings).close() }
+        val log = standardOutputOf { MockeyServer.start(settings.copy(logLevel = LogLevel.INFO)).close() }
 
         assertEquals("", quiet)
         assertEquals(LogLevel.INFO, ServerLogging.level())
-        val messages = log.lines().filter { it.isNotEmpty() }.map { it.substringAfter(" - ") }
+        val lines = log.lines().filter { it.isNotEmpty() }
         val expected =
             listOf("mockey-server ${System.getProperty("mockey.version")} starts with these settings:") +
                 settings.copy(logLevel = LogLevel.INFO).summary().map { (name, value) -> "  $name = $value" }
-        assertEquals(expected, messages)
-        assertContains(messages, "  mock-port = 9100")
-        assertContains(messages, "  tag-filter = regression")
-        assertTrue(log.lines().filter { it.isNotEmpty() }.all { " INFO  [" in it && "i.g.dnedrow.mockey.server.Server - " in it }, log)
+        assertEquals(expected, lines.take(expected.size).map { it.substringAfter(" - ") })
+        assertContains(expected, "  mock-port = 0")
+        assertContains(expected, "  tag-filter = regression")
+        assertTrue(lines.take(expected.size).all { " INFO  [" in it && " i.g.d.mockey.server.MockeyServer - " in it }, log)
+    }
+
+    @Test
+    fun theServerWritesToTheLogWhereItsListenersAcceptConnections() {
+        var ports = 0 to 0
+        val log =
+            standardOutputOf {
+                MockeyServer.start(onFreePorts).use { server ->
+                    ports = server.listeners.mock.address.port to server.listeners.admin.address.port
+                }
+            }
+
+        val (mockPort, adminPort) = ports
+        val start = " INFO  [${Thread.currentThread().name}] i.g.d.mockey.server.MockeyServer - "
+        assertContains(log, start + "The mock listener accepts connections on 127.0.0.1:$mockPort.\n")
+        assertContains(log, start + "The admin listener accepts connections on 127.0.0.1:$adminPort.\n")
+        assertFalse(" WARN " in log, log)
+    }
+
+    /** Returns the settings that the command line makes of [arguments] and of the [environment]. */
+    private fun settingsOf(
+        vararg arguments: String,
+        environment: Map<String, String> = emptyMap(),
+    ): ServerSettings {
+        val settings = mutableListOf<ServerSettings>()
+        assertEquals(0, ServerCommand(environment::get) { settings += it }.execute(arguments.asList()))
+        return settings.single()
     }
 
     /**
-     * The scenario "Secrets are not logged", as far as the program goes at this point: it starts at the most
-     * verbose level with an admin token, given both ways, and an engine forwards a request through an
-     * outbound proxy that takes credentials.
+     * The scenario "Secrets are not logged", as far as the server goes at this point: it runs at the most
+     * verbose level with an admin token, given both ways, and gets requests that present the tokens, and an
+     * engine forwards a request through an outbound proxy that takes credentials.
      */
     @Test
     fun theMostVerboseLogHoldsNeitherTheAdminTokenNorTheProxyPassword() {
@@ -122,8 +152,24 @@ class ServerLoggingTest {
             val log =
                 standardOutputOf {
                     val environment = mapOf("MOCKEY_ADMIN_TOKEN" to tokenOfVariable)
-                    assertEquals(0, ServerCommand(environment::get).execute(listOf("--log-level", "trace", "--admin-token", token)))
-                    assertEquals(0, ServerCommand(environment::get).execute(listOf("--log-level", "trace")))
+                    val arguments = arrayOf("--log-level", "trace", "--mock-host", "127.0.0.1", "--mock-port", "0", "--admin-port", "0")
+                    val withBoth = settingsOf(*arguments, "--admin-token", token, environment = environment)
+                    val withTheVariable = settingsOf(*arguments, environment = environment)
+                    for ((settings, presented) in listOf(withBoth to token, withTheVariable to tokenOfVariable)) {
+                        assertTrue(settings.adminToken!!.matches(presented))
+                        MockeyServer.start(settings).use { server ->
+                            for (listener in listOf(server.listeners.mock, server.listeners.admin)) {
+                                val address = RawHttp.loopback(listener.address.port)
+                                val answer =
+                                    RawHttp.get(
+                                        address,
+                                        "/api/v1/status?token=$presented",
+                                        listOf("Authorization: Bearer $presented"),
+                                    )
+                                assertEquals(404, answer.status)
+                            }
+                        }
+                    }
                     runBlocking {
                         MockeyEngine.create().use { engine ->
                             engine.updateOutboundProxy { OutboundProxy(proxy.url, enabled = true, credentials = proxyCredentials) }
