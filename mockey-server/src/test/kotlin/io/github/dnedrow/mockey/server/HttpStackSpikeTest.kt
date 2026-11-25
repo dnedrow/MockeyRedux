@@ -401,7 +401,7 @@ class HttpStackSpikeTest {
         assertEquals(listOf("/service/caf\u00E9", "/service/caf\uFFFD"), onCio)
     }
 
-    // The routing of Ktor, which the mock endpoint does without
+    // The routing of Ktor, which the mock endpoint and the admin API do without
 
     @Test
     fun theRoutingOfKtorDropsEmptyPathSegmentsAndRefusesAMalformedPercentEscape() {
@@ -429,6 +429,46 @@ class HttpStackSpikeTest {
             assertEquals(listOf("a/b", "x=a/b"), routed.toList(), "$engine")
             routed.clear()
         }
+    }
+
+    /**
+     * What task 12.2 found of the routing, on the engine of the server and with the log at its most verbose
+     * level. The routing writes the path of every request to the log. It answers a path with a malformed
+     * escape with the request target, and it writes that target to the log with its query string. It takes
+     * an escaped character of a path for the character, it knows no request target that is a URL, and it has
+     * no answer to a `HEAD` request for a route of `GET`.
+     *
+     * The routing writes the paths to the log only when the level is set before it is installed, as it is
+     * in the server.
+     */
+    @Test
+    fun theRoutingOfKtorWritesTheRequestTargetToTheLogAndTakesNoTargetThatIsAUrl() {
+        val module: suspend Application.() -> Unit = { routing { get("/p/{x}") { call.respondText("routed") } } }
+        val requests =
+            listOf(
+                request("GET", "/p/in-the-path?q=in-the-query"),
+                request("GET", "/p/%zz?q=after-the-escape"),
+                request("GET", "/%70/x"),
+                request("GET", "http://mockey.test/p/x"),
+                request("HEAD", "/p/x"),
+            )
+        val levelBefore = ServerLogging.level()
+        var answers = emptyList<Answer>()
+
+        val log =
+            try {
+                ServerLogging.configure(LogLevel.TRACE)
+                TestLog.of { start(Engine.NETTY, module).use { server -> answers = requests.map { exchange(server.port, it) } } }
+            } finally {
+                ServerLogging.configure(levelBefore)
+            }
+
+        assertEquals(listOf(OK, "HTTP/1.1 400 Bad Request", OK, NOT_FOUND), answers.take(4).map { it.statusLine })
+        assertNotEquals(OK, answers.last().statusLine, "The answer to the HEAD request")
+        assertEquals("Url decode failed for /p/%zz?q=after-the-escape", answers[1].body)
+        assertContains(log, "io.ktor.server.routing.Routing - Trace for [p, in-the-path]")
+        assertContains(log, "BadRequestException: Url decode failed for /p/%zz?q=after-the-escape")
+        assertFalse("in-the-query" in log, "The routing writes the query string of a request that it takes to the log")
     }
 
     // Listeners

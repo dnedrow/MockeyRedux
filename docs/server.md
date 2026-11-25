@@ -4,12 +4,12 @@
 server, at a path under `/service/`, and the server answers with a scenario of the service that it has
 defined for that URL, or it forwards the request to the real service and passes the answer on.
 
-The server has two listeners. The mock listener serves the mock traffic and `/status`. The admin listener is
-for the admin API, which changes what the server does.
+The server has two listeners. The mock listener serves the mock traffic and `/status`. The admin listener
+serves the admin API, which states what the server holds and is to change what the server does.
 
-This document describes the server as it is now. The admin API and the web UI are not part of it yet: the
-admin listener answers every request with the status 404, and the definitions of the server are the ones that
-it loads and imports when it starts.
+This document describes the server as it is now. The admin API is under way, and the web UI is not part of
+the server yet. The API states the services, the plans, the history, and the status of the server, and it
+changes nothing. So the definitions of the server are the ones that it loads and imports when it starts.
 
 ## Running the server
 
@@ -124,8 +124,17 @@ all addresses of the machine, because mock traffic often comes from other machin
 address `0.0.0.0` stands for all addresses of IPv4. On a machine that has IPv6 as well, the Java runtime
 makes the listener accept connections on the addresses of both.
 
-The admin listener is for the admin API. By default it accepts connections on port 8081 on the loopback
-address `127.0.0.1`, so that only programs on the same machine reach it.
+The admin listener serves the admin API, which is the path `/api/v1` with every path below it. It answers
+every other path with the status 404, and the mock listener serves nothing of the admin API. By default the
+admin listener accepts connections on port 8081 on the loopback address `127.0.0.1`, so that only programs
+on the same machine reach it.
+
+In this version the admin API answers `GET` requests for `/api/v1/services`, for a service by its
+identifier at `/api/v1/services/{id}`, and for `/api/v1/plans`, `/api/v1/history`, and `/api/v1/system`,
+which is the status of the server. Its answers are JSON. An answer that reports a failure is a problem
+document: a JSON object that states the status and says what is wrong. While the server has an admin token,
+the API takes a request only when it presents the token in the header `Authorization: Bearer <token>`, and
+it answers every other request with the status 401.
 
 The server does not start with an admin listener that other machines can reach and no admin token: whoever
 reaches the admin API can change the definitions and make the server send requests. The message names the two
@@ -307,13 +316,16 @@ The loopback address protects the admin listener from other machines, but not fr
 the default settings, a client of the mock listener reaches the admin listener through the mock endpoint:
 
 ```shell
-curl -i http://localhost:8080/service/http://127.0.0.1:8081/
+curl -i http://localhost:8080/service/http://127.0.0.1:8081/api/v1/services
 ```
 
-The answer is the one of the admin listener. The request came to it from the loopback address, where it asks
-for no token. In this version nothing is behind the admin listener. Once the admin API is, such a request
-could change the definitions. The server is to refuse such requests by itself before the admin API becomes
-part of it. Until it does, any one of these closes that way:
+The answer is the one of the admin API: the services of the server. The request came to the admin listener
+from the loopback address, where it asks for no token. In this version the admin API changes nothing, so
+such a request reads the definitions and the history, and it does no more. The answer is a mock response,
+which carries `Access-Control-Allow-Origin: *`, so a web page of another origin reads them that way as
+well. Once the API changes what the server does, such a request could change the definitions. The server is
+to refuse such requests by itself before the API changes anything. Until it does, any one of these closes
+that way:
 
 - Set an admin token. The admin API then takes no request that does not present the token, wherever the
   request comes from:

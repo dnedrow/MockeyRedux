@@ -3,18 +3,28 @@ package io.github.dnedrow.mockey.server
 import io.github.dnedrow.mockey.api.DefinitionDocumentDto
 import io.github.dnedrow.mockey.api.DefinitionSettingsDto
 import io.github.dnedrow.mockey.api.HeaderDto
+import io.github.dnedrow.mockey.api.HistoryEntryDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
+import io.github.dnedrow.mockey.api.NameValueDto
 import io.github.dnedrow.mockey.api.OutboundProxyDefinitionDto
 import io.github.dnedrow.mockey.api.OutboundProxyDto
 import io.github.dnedrow.mockey.api.OutboundProxyUpdateDto
 import io.github.dnedrow.mockey.api.PlanDto
 import io.github.dnedrow.mockey.api.PlanItemDto
+import io.github.dnedrow.mockey.api.RecordedBodyDto
+import io.github.dnedrow.mockey.api.RecordedRequestDto
+import io.github.dnedrow.mockey.api.RecordedResponseDto
+import io.github.dnedrow.mockey.api.RecordedScenarioDto
+import io.github.dnedrow.mockey.api.RecordedServiceDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
 import io.github.dnedrow.mockey.api.ScenarioDto
 import io.github.dnedrow.mockey.api.ServiceDefinitionDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
 import io.github.dnedrow.mockey.api.TwistPairDto
+import io.github.dnedrow.mockey.core.history.HistoryEntry
+import io.github.dnedrow.mockey.core.history.Outcome
+import io.github.dnedrow.mockey.core.history.RecordedBody
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.model.MatchCriterion
@@ -34,6 +44,7 @@ import io.github.dnedrow.mockey.core.model.Tags
 import io.github.dnedrow.mockey.core.model.TwistConfiguration
 import io.github.dnedrow.mockey.core.model.TwistId
 import io.github.dnedrow.mockey.core.model.TwistPair
+import java.util.Base64
 
 internal fun Service.toAdminDto(): ServiceDto =
     ServiceDto(
@@ -215,6 +226,37 @@ internal fun OutboundProxyUpdateDto.toModel(): OutboundProxy {
     )
 }
 
+/**
+ * Returns the history entry as the admin API states it. The time is in ISO 8601. A body is in Base64,
+ * because it can hold any bytes, and it is what the entry holds of the body, which can be its start alone.
+ */
+internal fun HistoryEntry.toAdminDto(): HistoryEntryDto =
+    HistoryEntryDto(
+        id = id.value,
+        time = time.toString(),
+        clientAddress = clientAddress,
+        request =
+            RecordedRequestDto(
+                method = request.method,
+                url = request.url,
+                query = request.query,
+                headers = request.headers.map(Header::toAdminDto),
+                parameters = request.parameters.map { NameValueDto(it.name, it.value) },
+                cookies = request.cookies.map { NameValueDto(it.name, it.value) },
+                body = request.body.toAdminDto(),
+            ),
+        response = RecordedResponseDto(response.status, response.headers.map(Header::toAdminDto), response.body.toAdminDto()),
+        target = target,
+        targetBeforeTwisting = targetBeforeTwisting,
+        service = service?.let { RecordedServiceDto(it.id.value, it.name, it.tags.toList()) },
+        responseMode = responseMode?.toDto(),
+        scenario = scenario?.let { RecordedScenarioDto(it.id.value, it.name, it.tags.toList()) },
+        outcome = outcome.toDto(),
+        inspectionMessages = inspectionMessages,
+        explanation = explanation,
+        flagged = flagged,
+    )
+
 private fun Settings.toDefinitionSettingsDto(): DefinitionSettingsDto =
     DefinitionSettingsDto(
         enabledTwistId = enabledTwistId?.value,
@@ -246,6 +288,19 @@ private fun PlanItemDto.toModel(): PlanItem = PlanItem(serviceName, scenarioName
 private fun Header.toAdminDto(): HeaderDto = HeaderDto(name, value)
 
 private fun HeaderDto.toModel(): Header = Header(name, value)
+
+private fun RecordedBody.toAdminDto(): RecordedBodyDto = RecordedBodyDto(Base64.getEncoder().encodeToString(bytes), size, isCut)
+
+/** Returns the outcome as the admin API names it. The names stay when those of the engine change. */
+private fun Outcome.toDto(): String =
+    when (this) {
+        Outcome.SCENARIO_SERVED -> "scenarioServed"
+        Outcome.ERROR_SCENARIO_SERVED -> "errorScenarioServed"
+        Outcome.NO_SCENARIO_MATCHED -> "noScenarioMatched"
+        Outcome.PROXIED -> "proxied"
+        Outcome.UPSTREAM_FAILED -> "upstreamFailed"
+        Outcome.NO_SERVICE_MATCHED -> "noServiceMatched"
+    }
 
 private fun TwistPair.toAdminDto(): TwistPairDto = TwistPairDto(origination, destination)
 

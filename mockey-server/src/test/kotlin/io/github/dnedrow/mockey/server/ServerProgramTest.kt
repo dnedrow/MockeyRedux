@@ -90,11 +90,11 @@ class ServerProgramTest {
     }
 
     /**
-     * The scenario "Defaults", as far as the server goes. It takes the two default ports, which have to be
-     * free. The program finds its definitions in the default location, under its working directory.
+     * The scenario "Defaults". It takes the two default ports, which have to be free. The program finds its
+     * definitions in the default location, under its working directory.
      */
     @Test
-    fun theProgramStartedWithoutSettingsServesMockTrafficOnAllAddressesAtPort8080AndListensOnLoopbackAtPort8081() {
+    fun theProgramStartedWithoutSettingsServesMockTrafficOnAllAddressesAtPort8080AndTheAdminApiOnLoopbackAtPort8081() {
         TestEnvironment.needs(
             TestEnvironment.isFree("0.0.0.0", 8080) && TestEnvironment.isFree("127.0.0.1", 8081),
             "the ports 8080 and 8081 free",
@@ -113,7 +113,11 @@ class ServerProgramTest {
             assertEquals(200, status.status)
             assertTrue(status.body.startsWith("""{"status":"running","since":""""), status.body)
             assertEquals(404, RawHttp.get(listening.admin, "/status").status)
-            assertEquals(404, RawHttp.get(listening.admin, "/api/v1").status)
+            val ofApi = RawHttp.get(listening.admin, "/api/v1/services")
+            val ofApiOnMock = RawHttp.get(listening.mock, "/api/v1/services")
+            assertEquals(200, ofApi.status)
+            assertContains(ofApi.body, "\"name\":\"Customers\"")
+            assertEquals(404 to "", ofApiOnMock.status to ofApiOnMock.body)
             assertContains(messages(program.output), "The mock listener accepts connections on 0.0.0.0:8080.")
             assertContains(messages(program.output), "The admin listener accepts connections on 127.0.0.1:8081.")
             assertEquals("", program.errors)
@@ -204,7 +208,8 @@ class ServerProgramTest {
 
     /**
      * The scenario "Secrets are not logged" for the admin token: the program runs at the most verbose level
-     * with a token from both sources and gets requests that present the tokens.
+     * with a token from both sources and gets requests that present the tokens, to the admin API as well,
+     * which takes the token of the option.
      */
     @Test
     fun theProgramWritesItsLogToTheStandardOutputWithoutTheAdminToken() {
@@ -215,9 +220,11 @@ class ServerProgramTest {
 
         ServerProgram.start(*arguments, variables = mapOf("MOCKEY_ADMIN_TOKEN" to ofVariable)).use { program ->
             val listening = program.listening()
-            for (token in listOf(ofVariable, ofOption)) {
+            // The option comes before the variable, so its token is the token of the server.
+            for ((token, ofApi) in listOf(ofVariable to 401, ofOption to 200)) {
                 val presenting = listOf("Authorization: Bearer $token")
-                assertEquals(404, RawHttp.get(listening.admin, "/api/v1/status?token=$token", presenting).status)
+                assertEquals(ofApi, RawHttp.get(listening.admin, "/api/v1/system?token=$token", presenting).status)
+                assertEquals(401, RawHttp.get(listening.admin, "/api/v1/services?token=$token").status)
                 assertEquals(404, RawHttp.get(listening.mock, "/service/customer/7?token=$token", presenting).status)
                 assertEquals(404, RawHttp.get(listening.mock, "/service/$token").status)
                 assertEquals(200, RawHttp.get(listening.mock, "/status?token=$token", presenting).status)

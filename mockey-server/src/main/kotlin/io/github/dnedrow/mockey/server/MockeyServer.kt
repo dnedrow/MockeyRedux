@@ -13,7 +13,8 @@ import kotlin.time.Duration
  * The server while it runs: its engine, and its two listeners, which accept connections from the moment
  * that [start] returns. [since] is the time at which the server started.
  *
- * The mock listener serves the mock endpoint and `/status`. The admin listener serves nothing of them.
+ * The mock listener serves the mock endpoint and `/status`. The admin listener serves the admin API, and
+ * neither listener serves what the other one does.
  */
 internal class MockeyServer private constructor(
     val engine: MockeyEngine,
@@ -57,9 +58,6 @@ internal class MockeyServer private constructor(
     internal companion object {
         private val log = LoggerFactory.getLogger(MockeyServer::class.java)
 
-        /** The module of a listener that has nothing to serve: Ktor answers a request that nothing handles with the status 404. */
-        private val nothing: suspend Application.() -> Unit = {}
-
         /**
          * Starts the server with [settings]: it sets the level of the log, writes the settings in effect to
          * the log, creates the engine with the definitions that the server starts with, see [ServerEngine],
@@ -89,7 +87,9 @@ internal class MockeyServer private constructor(
             val mockModule = mockListenerModule(MockEndpoint(engine, settings.maxRequestBody, clock), StatusEndpoint(since))
             val listeners =
                 try {
-                    Listeners.start(addresses, mockModule, adminModule = nothing)
+                    Listeners.start(addresses, mockModule) { mock ->
+                        adminListenerModule(AdminApi.of(engine, settings, since, mock.address))
+                    }
                 } catch (failure: StartupFailure) {
                     engine.close()
                     throw failure
@@ -119,6 +119,17 @@ internal class MockeyServer private constructor(
             {
                 intercept(ApplicationCallPipeline.Call) {
                     if (!status.handle(call)) mock.handle(call)
+                }
+            }
+
+        /**
+         * Returns the module of the admin listener: the admin [api] for the path `/api/v1` and every path
+         * below it. Ktor answers every other request with the status 404.
+         */
+        fun adminListenerModule(api: AdminApi): suspend Application.() -> Unit =
+            {
+                intercept(ApplicationCallPipeline.Call) {
+                    api.handle(call)
                 }
             }
     }

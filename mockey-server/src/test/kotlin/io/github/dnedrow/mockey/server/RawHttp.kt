@@ -44,12 +44,22 @@ internal object RawHttp {
         val headers: List<String> = head.drop(1)
         val body: String = text.substringAfter(CRLF + CRLF, missingDelimiterValue = "")
 
+        /** The body as the text that its bytes are in UTF-8. */
+        val bodyInUtf8: String
+            get() = String(body.toByteArray(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8)
+
         /** Returns the values of the headers with [name], in their order. */
         fun headerValues(name: String): List<String> =
             headers.filter { it.substringBefore(':').equals(name, ignoreCase = true) }.map { it.substringAfter(':').trim() }
 
         override fun toString(): String = if (nothing) "nothing" else "$statusLine $headers [$body]"
     }
+
+    /**
+     * Returns [text] as a client writes it in UTF-8 for [request]: with one character for each of its bytes.
+     * A text of ASCII is what it is.
+     */
+    fun utf8(text: String): String = String(text.toByteArray(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1)
 
     /**
      * Returns the bytes of a request as a client writes them to a connection. Every character of the request

@@ -137,7 +137,8 @@ class ServerLoggingTest {
      * The scenario "Secrets are not logged", as far as the server goes at this point: it runs at the most
      * verbose level with an admin token, given both ways, and with an outbound proxy that takes credentials.
      * It gets requests that present the token in every part of them, and it forwards them through the
-     * proxy. The log holds nothing of a request.
+     * proxy. The admin API takes a request that presents the token in its header, and it refuses one that
+     * has the token in its query string alone. The log holds nothing of a request.
      */
     @Test
     fun theMostVerboseLogHoldsNeitherTheAdminTokenNorTheProxyPassword() {
@@ -167,7 +168,8 @@ class ServerLoggingTest {
                                     )
                                 }
                             }
-                            val ofAdmin = RawHttp.get(server.listeners.admin.address, "/api/v1/status?token=$presented", presenting)
+                            val ofAdmin = RawHttp.get(server.listeners.admin.address, "/api/v1/system?token=$presented", presenting)
+                            val withoutHeader = RawHttp.get(server.listeners.admin.address, "/api/v1/services?token=$presented")
                             val ofMock =
                                 RawHttp.get(
                                     server.listeners.mock.address,
@@ -175,7 +177,7 @@ class ServerLoggingTest {
                                     presenting,
                                 )
                             val ofStatus = RawHttp.get(server.listeners.mock.address, "/status?token=$presented", presenting)
-                            assertEquals(404, ofAdmin.status)
+                            assertEquals(200 to 401, ofAdmin.status to withoutHeader.status)
                             assertEquals(200 to StubProxy.ANSWER, ofMock.status to ofMock.body)
                             assertEquals(200, ofStatus.status)
                         }

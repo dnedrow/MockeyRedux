@@ -252,20 +252,21 @@ internal class Listeners private constructor(
         }
 
         /**
-         * Starts the two listeners on [addresses]. The mock listener runs [mockModule], and the admin listener
-         * runs [adminModule].
+         * Starts the two listeners on [addresses]. The mock listener runs [mockModule]. The admin listener
+         * runs the module that [adminModule] returns for the mock listener, which accepts connections by
+         * then: what the admin listener serves says where the mock endpoint is.
          *
          * @throws StartupFailure when a listener cannot be bound. No listener accepts connections then.
          */
         fun start(
             addresses: ListenerAddresses,
             mockModule: suspend Application.() -> Unit,
-            adminModule: suspend Application.() -> Unit,
+            adminModule: (mock: Listener) -> suspend Application.() -> Unit,
         ): Listeners {
             val mock = Listener.start(ListenerKind.MOCK, addresses.mock, mockModule)
             val admin =
                 try {
-                    Listener.start(ListenerKind.ADMIN, addresses.admin, adminModule)
+                    Listener.start(ListenerKind.ADMIN, addresses.admin, adminModule(mock))
                 } catch (failure: StartupFailure) {
                     mock.stop()
                     throw failure

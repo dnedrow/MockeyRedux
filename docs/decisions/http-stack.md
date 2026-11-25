@@ -236,6 +236,40 @@ Stopping (task 11.7):
   shows it by holding the event loop. It was found when the test that expected a refusal failed in the
   continuous integration, where other tasks of the build kept the processors busy.
 
+The admin API (task 12.2):
+
+- Design decision 19 expected the admin listener to use the routing of Ktor and its plugins. It uses
+  neither. The admin API is one interceptor of the call phase of the application, as the mock endpoint is.
+  It reads the target from `call.request.local.uri`, and it finds the operation of a request in a table of
+  routes of its own. A request for a path that is not under `/api/v1` still gets the status 404 with no body
+  from Ktor.
+- What speaks against the routing was run on the Netty engine, and `HttpStackSpikeTest` shows it:
+  - With the log at the level of traces, the routing writes the path of every request to the log. It does
+    so when the level is set before the routing is installed, as it is when the server starts.
+  - It answers a path with a malformed escape with a text that repeats the request target, and it writes
+    that target with its query string to the log, at the level of debug messages. The server never writes
+    the admin token to its log (`server-runtime`: Logging), also when a client sends the token where it
+    does not belong, which the tests of the log do.
+  - It knows no request target that is a URL: a request for `http://mockey.test/p/x` does not reach the
+    route `/p/{x}`. `/status` and the mock endpoint take such a target.
+  - It has no answer to a `HEAD` request for a route of `GET`.
+- The routing takes `/a//b` for `/a/b`, as the spike of task 11.0 showed, and it takes an escaped character
+  of a path for the character. Whether a request is for the admin API decides whether it has to present the
+  admin token, and with the routing that would be for the routing to say, and not for a look at the path.
+  The admin API takes a path as it was sent: `//api/v1` and `/%61pi/v1` are not its prefix, and a segment of
+  a route that stands for itself is not decoded. Only what a path has at a parameter of its route is decoded,
+  after the path is taken apart at its slashes.
+- The admin API hands a `HEAD` request to the operation for `GET`. The engine leaves the body out of the
+  answer and states its length.
+- The API reads the body of a request from `call.request.receiveChannel()`, as the mock endpoint does and
+  for the same reason: the log gets nothing of a request at any level.
+- Netty hands each byte of a header on as one character, as it does with the bytes of a request target. The
+  API compares the admin token with the bytes that a client sent, so that a token with a character beyond
+  ASCII is found. It reads what a path has at a parameter as UTF-8, for a client that does not escape such
+  a character.
+- The plugins of Ktor would compare a token, read a body as JSON, and write a problem document. The API does
+  that itself, and the server needs no further library for it.
+
 ## What differs from the HTTP server of legacy
 
 Legacy runs on Jetty 7.0.0.RC5, as the `pom.properties` files in its jar say. The differences below come

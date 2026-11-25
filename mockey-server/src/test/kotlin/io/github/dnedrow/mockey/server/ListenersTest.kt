@@ -52,7 +52,7 @@ class ListenersTest {
     private fun start(settings: ServerSettings): Listeners {
         val addresses = ListenerAddresses.of(settings)
         Listeners.requireFree(addresses)
-        return Listeners.start(addresses, answering(MOCK), answering(ADMIN)).also { started += it }
+        return Listeners.start(addresses, answering(MOCK)) { answering(ADMIN) }.also { started += it }
     }
 
     /** Returns a socket that listens on [host] and a port that the system picks, as another program would. */
@@ -183,6 +183,26 @@ class ListenersTest {
         assertTrue(listeners.mock.address.address.isLoopbackAddress && listeners.admin.address.address.isLoopbackAddress)
     }
 
+    /** What the admin listener serves says where the mock endpoint is, also when the system picked the port of the mock listener. */
+    @Test
+    fun theModuleOfTheAdminListenerIsMadeForAMockListenerThatAcceptsConnections() {
+        val addresses = ListenerAddresses.of(ServerSettings(mockHost = "127.0.0.1", mockPort = 0, adminPort = 0))
+        var ofMockThen: String? = null
+        var portThen = 0
+
+        val listeners =
+            Listeners
+                .start(addresses, answering(MOCK)) { mock ->
+                    portThen = mock.address.port
+                    ofMockThen = answerOnLoopback(portThen)
+                    answering(ADMIN)
+                }.also { started += it }
+
+        assertEquals(MOCK, ofMockThen)
+        assertEquals(listeners.mock.address.port, portThen)
+        assertNotEquals(0, portThen)
+    }
+
     @Test
     fun theListenersTakeThePortsOfTheSettings() {
         val (mockPort, adminPort) = RawHttp.freePorts(2)
@@ -245,7 +265,7 @@ class ListenersTest {
         repeat(8) { round ->
             val addresses = ListenerAddresses.of(settings)
             Listeners.requireFree(addresses)
-            val listeners = Listeners.start(addresses, answering(MOCK), answering(ADMIN))
+            val listeners = Listeners.start(addresses, answering(MOCK)) { answering(ADMIN) }
             try {
                 assertEquals(MOCK to ADMIN, answerOnLoopback(mockPort) to answerOnLoopback(adminPort), "Round $round")
             } finally {
@@ -339,7 +359,7 @@ class ListenersTest {
         val inUse = blocker("127.0.0.1").localPort
         val addresses = ListenerAddresses.of(ServerSettings(mockHost = "127.0.0.1", mockPort = mockPort, adminPort = inUse))
 
-        val refusal = assertFailsWith<StartupFailure> { Listeners.start(addresses, answering(MOCK), answering(ADMIN)) }
+        val refusal = assertFailsWith<StartupFailure> { Listeners.start(addresses, answering(MOCK)) { answering(ADMIN) } }
 
         assertEquals(
             "The admin listener cannot accept connections on 127.0.0.1:$inUse: Address already in use. " +
@@ -376,7 +396,7 @@ class ListenersTest {
             }
         }
         val addresses = ListenerAddresses.of(ServerSettings(mockHost = "127.0.0.1", mockPort = 0, adminPort = 0))
-        val listeners = Listeners.start(addresses, slowToEnd, answering(ADMIN))
+        val listeners = Listeners.start(addresses, slowToEnd) { answering(ADMIN) }
         val inProgress = CompletableFuture.supplyAsync { RawHttp.get(listeners.mock.address) }
         val handlerAtWork = atWork.await(AT_ONCE_MILLIS, TimeUnit.MILLISECONDS)
 

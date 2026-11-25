@@ -141,12 +141,20 @@ class MockeyServerTest {
 
         fun permissions(answer: RawHttp.Answer) = answer.headers.filter { it.startsWith("access-control-", ignoreCase = true) }
 
-        for ((request, bytes) in requests) {
-            val ofAdmin = RawHttp.exchange(server.listeners.admin.address, bytes)
-
-            assertEquals(404, ofAdmin.status, request)
-            assertEquals(emptyList(), permissions(ofAdmin), request)
-        }
+        val ofAdmin = requests.mapValues { (_, bytes) -> RawHttp.exchange(server.listeners.admin.address, bytes) }
+        assertEquals(
+            mapOf<String, Int?>(
+                "GET /" to 404,
+                "GET /api/v1/services" to 200,
+                "POST /api/v1/services" to 405,
+                "OPTIONS /api/v1/services" to 405,
+                "GET /status" to 404,
+                "GET /service/customer/7" to 404,
+                "OPTIONS /service/customer/7" to 404,
+            ),
+            ofAdmin.mapValues { (_, answer) -> answer.status },
+        )
+        assertEquals(requests.mapValues { emptyList<String>() }, ofAdmin.mapValues { (_, answer) -> permissions(answer) })
         val ofMock = requests.mapValues { (_, bytes) -> permissions(RawHttp.exchange(server.listeners.mock.address, bytes)) }
         val forMockTraffic = listOf("Access-Control-Allow-Origin: *")
         assertEquals(
