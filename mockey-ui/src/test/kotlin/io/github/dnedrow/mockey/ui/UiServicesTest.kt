@@ -60,8 +60,10 @@ class UiServicesTest {
         private val row: Element,
     ) {
         private val cells = row.select("td")
-        private val head: Element = row.select("th").first()!!
-        val name: String = head.ownText().trim()
+
+        /** The link of the name, which leads to the page of the service. */
+        val link: Element = row.select("th a:not(.marker)").single()
+        val name: String = link.text()
         val marker: Element? = row.select("th a.marker").first()
         val url: String = cells[0].text()
         val setMode: List<String> = cells[1].select("button[aria-pressed=true]").map { it.text() }
@@ -619,14 +621,13 @@ class UiServicesTest {
             val diagnostics = browser.get("/diagnostics")
 
             val cells = overview.page.select("main table.services tbody tr").single()
-            val head = cells.select("th").first()!!
-            val name = head.textNodes().first()
+            val name = cells.select("th a:not(.marker)").single()
             val scenarioNames = cells.select("option").map { it.wholeText() }
             val ofDiagnostics = diagnostics.page.select("main section").single()
             val diagnostic = ofDiagnostics.select("li").single()
             val shown =
                 mapOf(
-                    "the name" to name.wholeText.removeSuffix(" "),
+                    "the name" to name.wholeText(),
                     "the scenarios" to scenarioNames.toSet().single(),
                     "the tag" to cells.select("a.tag").single().wholeText(),
                     "the time" to cells.select("td").last()!!.wholeText(),
@@ -670,7 +671,7 @@ class UiServicesTest {
             assertEquals(tags.joinToString(" "), page.select("main form.filter [name=tag]").attr("value"), text)
             assertEquals("No service carries one of the tags ${tags.joinToString(", ")}.", counted(page), text)
             val addresses = page.select("main [href], main [action]").map { it.attr("href") + it.attr("action") }
-            assertEquals(listOf("/services", "/services"), addresses, text)
+            assertEquals(listOf("/services", "/services", "/service/new"), addresses, text)
             val elements = page.select("main *").map { it.tagName() }
             assertEquals(setOf("h1", "form", "div", "label", "input", "p", "button", "a"), elements.toSet(), text)
             assertEquals(emptyList(), Hostile.UNWRITTEN.filter { it in answer.body }, text)

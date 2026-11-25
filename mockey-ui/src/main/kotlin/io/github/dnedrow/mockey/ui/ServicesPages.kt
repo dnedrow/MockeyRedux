@@ -75,9 +75,6 @@ internal val ServicesArea =
 private const val NO_MODE = "The form names no response mode."
 private const val NO_SCENARIO = "The form names no scenario."
 
-/** What separates the tags of a text, as a server reads tags: whitespace of any kind. */
-private val BETWEEN_TAGS = Regex("""[\s\p{Z}]+""")
-
 /**
  * Returns the tags that the address of the request names, see [ServicesPages.TAG]: each in lower case, as a
  * server holds a tag, and each once. A parameter can hold several tags with spaces between them, which is
@@ -85,7 +82,15 @@ private val BETWEEN_TAGS = Regex("""[\s\p{Z}]+""")
  */
 private fun ApplicationCall.tagsOfAddress(): List<String> {
     val stated = request.queryParameters.getAll(ServicesPages.TAG).orEmpty()
-    return stated.flatMap { it.lowercase().split(BETWEEN_TAGS) }.filter { it.isNotEmpty() }.distinct()
+    return stated.flatMap { tagsIn(it.lowercase()) }.distinct()
+}
+
+/** Shows [tags], each as a link to the overview of the services that carry it. */
+internal fun FlowOrPhrasingContent.tagLinksOf(tags: List<String>) {
+    for ((index, tag) in tags.withIndex()) {
+        if (index > 0) +" "
+        a(href = Address.of(ServicesPages.OVERVIEW, ServicesPages.TAG to tag), classes = "tag") { +tag }
+    }
 }
 
 /** The pages about the services. */
@@ -161,6 +166,7 @@ internal object ServicesPages {
                     a(href = OVERVIEW) { +"Show all services" }
                 }
             }
+            p(classes = "actions") { a(href = ServicePages.NEW) { +"New service" } }
             if (services.isEmpty()) return@Page
             div(classes = "scroll") {
                 table(classes = "services") {
@@ -208,7 +214,7 @@ internal object ServicesPages {
      * Returns how [service] answers while it does not answer in the mode that it is set to, as the end of a
      * sentence. A service without a scenario forwards every request, whatever its mode is.
      */
-    private fun otherwiseOf(service: ServiceDto): String {
+    fun otherwiseOf(service: ServiceDto): String {
         val now = "as in ${Modes.nameOf(service.effectiveResponseMode)} mode for now"
         return if (service.scenarios.isEmpty()) "$now, because it has no scenario to answer with" else now
     }
@@ -224,7 +230,7 @@ internal object ServicesPages {
         tr {
             id = Address.anchorOf(KIND, service.id)
             th(scope = ThScope.row) {
-                +service.name
+                a(href = ServicePages.addressOf(service.id)) { +service.name }
                 if (diagnostics > 0) {
                     +" "
                     a(href = DiagnosticsPages.addressOf(service.id), classes = "marker") {
@@ -315,14 +321,6 @@ internal object ServicesPages {
                     +"Set"
                 }
             }
-        }
-    }
-
-    /** Shows [tags], each as a link to the overview of the services that carry it. */
-    private fun FlowOrPhrasingContent.tagLinksOf(tags: List<String>) {
-        for ((index, tag) in tags.withIndex()) {
-            if (index > 0) +" "
-            a(href = Address.of(OVERVIEW, TAG to tag), classes = "tag") { +tag }
         }
     }
 

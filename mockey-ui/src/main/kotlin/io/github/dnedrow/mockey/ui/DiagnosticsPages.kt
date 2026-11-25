@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.DiagnosticDto
 import io.ktor.server.routing.get
+import kotlinx.html.a
 import kotlinx.html.h2
 import kotlinx.html.id
 import kotlinx.html.li
@@ -61,7 +62,7 @@ internal object DiagnosticsPages {
             for (ofService in byService.sortedWith(BY_NAME)) {
                 section(classes = "diagnostics") {
                     id = Address.anchorOf(KIND, ofService.first().serviceId)
-                    h2 { +ofService.first().serviceName }
+                    h2 { a(href = ServicePages.addressOf(ofService.first().serviceId)) { +ofService.first().serviceName } }
                     ul {
                         for (diagnostic in ofService) {
                             li {

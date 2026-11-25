@@ -10,11 +10,13 @@ import kotlinx.html.a
 import kotlinx.html.button
 import kotlinx.html.checkBoxInput
 import kotlinx.html.div
+import kotlinx.html.fieldSet
 import kotlinx.html.fileInput
 import kotlinx.html.form
 import kotlinx.html.hiddenInput
 import kotlinx.html.id
 import kotlinx.html.label
+import kotlinx.html.legend
 import kotlinx.html.option
 import kotlinx.html.p
 import kotlinx.html.role
@@ -187,6 +189,30 @@ internal fun FlowContent.checkField(
             htmlFor = idOf(name)
             +label
         }
+        notesOf(name, hint, messages)
+    }
+}
+
+/**
+ * A field that is made of several controls, such as the rows of a list, which [controls] writes. The group
+ * is called [label], and it shows [hint] and what the server has against [apis], which are the members of a
+ * request to the admin API that the group is for. [name] is the name of its controls in the form.
+ */
+internal fun FlowContent.fieldGroup(
+    state: FormState,
+    name: String,
+    label: String,
+    apis: List<String>,
+    hint: String? = null,
+    controls: FlowContent.() -> Unit,
+) {
+    val messages = apis.flatMap(state::messagesAt)
+    fieldSet(classes = "field") {
+        val ofHint = "${idOf(name)}-hint".takeIf { hint != null }
+        val describing = listOfNotNull(ofHint, "${idOf(name)}-problem".takeIf { messages.isNotEmpty() })
+        if (describing.isNotEmpty()) attributes["aria-describedby"] = describing.joinToString(" ")
+        legend { +label }
+        controls()
         notesOf(name, hint, messages)
     }
 }

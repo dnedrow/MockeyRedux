@@ -184,6 +184,7 @@ form {
 
 .field.check > label {
   display: inline;
+  margin-left: 0.35rem;
   font-weight: 400;
 }
 
@@ -210,7 +211,9 @@ textarea {
   font-size: 0.9em;
 }
 
-[aria-invalid="true"] {
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
   border-color: var(--bad);
 }
 
@@ -241,7 +244,64 @@ button.danger {
 }
 
 .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
   margin: 1rem 0;
+}
+
+form.inline {
+  margin: 0;
+}
+
+/* A button beside links does something on the spot. It is no louder than they are. */
+form.inline button {
+  color: var(--accent);
+  background: var(--paper);
+}
+
+fieldset.field {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+fieldset.field > legend {
+  margin: 0 0 0.25rem;
+  padding: 0;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 48rem;
+  margin: 0 0 0.375rem;
+}
+
+.row input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lines {
+  white-space: pre-line;
+}
+
+ul.plain {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mark {
+  padding: 0.05rem 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--quiet);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
 }
 
 .tag {

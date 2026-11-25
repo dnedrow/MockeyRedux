@@ -44,4 +44,45 @@ internal object Hostile {
 
     /** How an address of a page of the UI is written, whatever it holds: a path, and parameters with their escapes. */
     val SAFE_ADDRESS = Regex("/[A-Za-z0-9._~%/-]*(\\?[A-Za-z0-9._~%=&-]*)?")
+
+    /** How a link of a page is written: an address of the UI, and after it a place of the page that it leads to. */
+    val SAFE_LINK = Regex("/[A-Za-z0-9._~%/-]*(\\?[A-Za-z0-9._~%=&-]*)?(#[A-Za-z0-9._~-]*)?")
+
+    /** How the identifier of an element of a page is written. */
+    val SAFE_ID = Regex("[A-Za-z0-9._~-]+")
+
+    /** The elements that the pages of the UI are made of, below the frame of every page. */
+    val ELEMENTS =
+        setOf("h1", "h2", "p", "a", "form", "div", "label", "input", "button", "table", "thead", "tbody", "tr", "th", "td", "code")
+            .plus(setOf("select", "option", "span", "time", "section", "ul", "li", "dl", "dt", "dd", "fieldset", "legend"))
+            .plus(setOf("textarea", "pre"))
+
+    /** The attributes that the pages of the UI are written with. */
+    val ATTRIBUTES =
+        setOf("class", "id", "href", "action", "method", "enctype", "type", "name", "value", "for", "scope", "role", "rows")
+            .plus(setOf("selected", "checked", "disabled", "datetime", "aria-label", "aria-pressed", "aria-describedby", "aria-invalid"))
+
+    /** Returns how a client of the admin API writes [identifier] as a segment of a path, which is how an address of the UI writes it. */
+    fun written(identifier: String): String = Address.of("/x", "id" to identifier).substringAfter("id=")
+
+    /**
+     * Returns what [answer] has that a page of the UI does not have, whatever a server states: an element or
+     * an attribute that the UI does not write, a bracket of content that is written as it is, and an address
+     * or an identifier that is not written as the UI writes one. A page that shows content as text has none
+     * of it.
+     */
+    fun moreThanText(answer: Browser.Response): List<String> {
+        val page = answer.page
+        val within = page.select("main *")
+        val elements = within.map { it.tagName() }.toSet() - ELEMENTS
+        val attributes = within.flatMap { element -> element.attributes().map { it.key } }.toSet() - ATTRIBUTES
+        val links = page.select("[href], [action]").map { it.attr("href") + it.attr("action") }
+        val ids = page.select("[id]").map { it.id() }
+        return elements.map { "the element $it" } +
+            attributes.map { "the attribute $it" } +
+            UNWRITTEN.filter { it in answer.body }.map { "the text $it" } +
+            links.filterNot { it.isEmpty() || SAFE_LINK.matches(it) }.map { "the address $it" } +
+            ids.filterNot(SAFE_ID::matches).map { "the identifier $it" } +
+            listOf("a script").filter { page.select("script, style, base, iframe, object, embed").isNotEmpty() }
+    }
 }

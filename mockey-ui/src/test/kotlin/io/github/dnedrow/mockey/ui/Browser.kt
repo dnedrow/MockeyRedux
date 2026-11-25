@@ -154,20 +154,26 @@ internal class Browser(
      *
      * [pressed] is the button of the form that is pressed, which is its first one unless a test presses
      * another. Of the buttons of a form, a browser sends the one that was pressed, when it has a name.
+     *
+     * [rows] are the values of the fields that the form has more than once under one name, such as the rows
+     * of a list, in the order of the form. They take the place of the values that the page gave those fields.
      */
     fun submit(
         form: FormElement,
         edits: Map<String, String?> = emptyMap(),
         files: Map<String, Chosen> = emptyMap(),
         pressed: Element? = form.select(BUTTONS).firstOrNull(),
+        rows: Map<String, List<String>> = emptyMap(),
     ): Response {
         val areas = form.select("textarea").associate { it.attr("name") to it.wholeText() }
         val data = form.formData().map { it.key() to it.value() }.toMutableList()
         form.select(BUTTONS).forEach { data.remove(it.attr("name") to it.attr("value")) }
         if (pressed != null && pressed.hasAttr("name")) data += pressed.attr("name") to pressed.attr("value")
         val ofThePage = data.filter { (name, _) -> name !in files }.map { (name, value) -> name to (areas[name] ?: value) }
-        val kept = ofThePage.filter { (name, _) -> name !in edits }
-        val fields = (kept + edits.mapNotNull { (name, value) -> value?.let { name to it } }).map { (name, value) -> name to asSent(value) }
+        val kept = ofThePage.filter { (name, _) -> name !in edits && name !in rows }
+        val edited = edits.mapNotNull { (name, value) -> value?.let { name to it } }
+        val ofRows = rows.flatMap { (name, values) -> values.map { name to it } }
+        val fields = (kept + edited + ofRows).map { (name, value) -> name to asSent(value) }
         val action = form.attr("action")
         if (!form.attr("method").equals("post", ignoreCase = true)) return get("$action?${encoded(fields)}")
         if (form.attr("enctype") != "multipart/form-data") return post(action, fields)

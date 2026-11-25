@@ -16,6 +16,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.io.readByteArray
 import java.net.URLDecoder
 
+/** What separates the tags of a text, as a server reads tags: whitespace of any kind. */
+private val BETWEEN_TAGS = Regex("""[\s\p{Z}]+""")
+
+/** Returns the tags that [text] holds, each as it is written. Tags have whitespace between them. */
+internal fun tagsIn(text: String): List<String> = text.split(BETWEEN_TAGS).filter { it.isNotEmpty() }
+
 /** What a page needs of the request that it answers: the token for its forms, see [FormTokens]. */
 internal class View(
     val formToken: String,
@@ -49,6 +55,9 @@ internal class FormInput(
 
     /** Returns whether the form has the field [name], which is how it states that a check box is checked. */
     fun isChecked(name: String): Boolean = name in values
+
+    /** Returns the values of the fields with the name [name], in the order of the form, such as the rows of a list. */
+    fun all(name: String): List<String> = values[name].orEmpty()
 
     /** Returns the file that came in the field [name], or `null` when no file was chosen for it. */
     fun upload(name: String): Upload? = uploads[name]
@@ -95,6 +104,9 @@ internal class FormState(
 
     /** Returns whether the check box [name] is checked. */
     fun isChecked(name: String): Boolean = name in values
+
+    /** Returns the values of the fields with the name [name], in their order, such as the rows of a list. */
+    fun all(name: String): List<String> = values[name].orEmpty()
 
     /**
      * Returns the messages for the field that shows [apiField] of a request to the admin API, and for what

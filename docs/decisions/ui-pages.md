@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in task 13.5 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5 and 13.6 of the change `kotlin-rewrite-modular`, on 2026-11-25.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -113,7 +113,66 @@ effective mode, and says that the service has no scenario to answer with where t
   admin API has no operation for it.
 - The list has no pages and no other order. The specification asks for paging of the history only.
 - The overview does not say which services the tag filter of the server leaves out.
-- The name of a service is no link yet. Task 13.6 adds the page of a service.
+
+## The pages of a service
+
+A service has a page that shows what it is set to, and a page with the form that changes it. A form of the
+same kind creates a service. A button of the page duplicates the service, and a link leads to the step that
+asks before the service is deleted.
+
+### What was needed
+
+- The UI offers every management operation of the admin API for services (`admin-ui`: Coverage of management
+  operations). Task 13.6 names the editor with the real URLs, the rule set, the inspector, the schema, and the
+  tags, and the duplicate and the delete.
+- A form that the admin API rejects is shown again with what was entered, and with each message next to the
+  field that it concerns (`admin-ui`: Validation feedback, with the scenario "Duplicate mock URL").
+- The UI asks before it deletes a service (`admin-ui`: Confirmation of destructive actions).
+
+### Two pages
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. One page: the scenarios of the service, and below them the form. | One address for a service. | A form that is not taken is shown again below the scenarios, where what the page says of it is out of view. |
+| 2. The page of the service at `/service`, and the form at `/service/edit`. | The page of the service is short and leads on to its scenarios. The form is a page of its own, so what it is refused for is the first thing on it. | Two pages show the attributes of a service. |
+
+Way 2. The page of the service says in words what the form holds as fields: whether the server evaluates the
+rule set, and which real URL is the default one. It shows neither the rule set nor the schema, which are
+long.
+
+### The form
+
+- The form has a field for every attribute of a service but the error scenario, which task 13.7 adds with the
+  scenarios. It states each of these attributes in its request, so the server sets every one to what the form
+  holds, and a form that is sent as it is shown changes nothing.
+- A real URL has a row of its own, with a button that makes it the default one. The form has two rows more
+  than the service has real URLs, for the URLs that are entered, and a row without a URL is left out. Without
+  scripting, a form cannot grow, so a service that needs more rows is saved and edited again. The default
+  real URL is the row that is marked, by its place among the rows that have a URL.
+- A text field of several lines would take less code and would take a list that is pasted. It has no place
+  for the choice of the default one, which is what changes most often.
+- The delay is checked by the UI: a whole number of milliseconds, 0 or more. The server takes a negative
+  delay and waits as for 0.
+- The default scenario and the inspector are choices. What the service names that is not among them stays a
+  choice: an inspector that is not installed is offered with a note, and a default scenario that is none of
+  the scenarios leaves the choice at `none`, which is not stated in the request.
+- The form of a new service says that a service with a real URL can do without a name. That holds for a new
+  service only: the server derives a name when it creates a service, and not when it changes one.
+
+### Duplicating and deleting
+
+- The button that duplicates a service sends a form with the method POST. The browser is sent to the page of
+  the copy, because the copy is what is edited next: it has a name and a mock URL that the server made up.
+- The link that deletes a service leads to a page that asks and says how many scenarios go with the
+  service. Nothing is deleted before the form of that page is sent. The overview says then that the service
+  was deleted.
+
+### What the pages of a service do not have
+
+- The scenarios of the service are listed by their names, with the default one and the error scenario
+  marked. Task 13.7 adds their pages and the forms that change them.
+- The report of the response schema, the merge of services, and the derivation of real URLs are pages of
+  task 13.10.
 
 ## A look in a browser
 
@@ -122,6 +181,8 @@ is not repeated by one:
 
 - Chrome showed the overview and the page of the diagnostics from files, in a window of 1,280 pixels and in
   one of 560 pixels. In the narrow window the list scrolls sideways within the page.
+- Chrome showed the page of a service, its form, the form with the messages of a refusal, and the page that
+  asks before a service is deleted.
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
   was sent to the row of a service: the line of the page stayed at the top of the window, and the row began
   below it.
@@ -129,4 +190,6 @@ is not repeated by one:
 ## Repeating the tests
 
 Run `./gradlew :mockey-ui:test`. `UiServicesTest` reads the overview and the page of the diagnostics and sends
-the forms of the switches. `UiCrawlTest` follows every link from the first page on.
+the forms of the switches. `UiServiceTest` sends the forms of a service and reads what the admin API was
+asked for. `UiCrawlTest` follows every link from the first page on, also with a server that states content
+that is written to be read as markup.
