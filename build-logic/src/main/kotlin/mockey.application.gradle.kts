@@ -39,22 +39,24 @@ val notOfTheApplication =
 // of each name with the lines of all of them.
 val joinedOfTheLibraries = listOf("META-INF/services/**", "META-INF/io.netty.versions.properties")
 
-val libraries = configurations.runtimeClasspath
+// The jars of the libraries. The jars of the other modules are among them, and those are built before a
+// task reads them: what a task takes from here says which tasks build it.
+val libraries = configurations.runtimeClasspath.flatMap { it.elements }
 
 val joinLibraryLists = tasks.register("joinLibraryLists") {
     description = "Joins the lists that several libraries of the application have under the same name."
-    val jars = libraries.map { classpath -> classpath.files.filter { it.isFile } }
+    val jars = libraries
     val patterns = joinedOfTheLibraries
     val joined = layout.buildDirectory.dir("joined-library-lists")
     val services = objects.newInstance<FileServices>()
-    inputs.files(libraries).withPropertyName("libraries").withNormalizer(ClasspathNormalizer::class)
+    inputs.files(jars).withPropertyName("libraries").withNormalizer(ClasspathNormalizer::class)
     inputs.property("patterns", patterns)
     outputs.dir(joined).withPropertyName("joined")
     doLast {
         val directory = joined.get().asFile
         services.files.delete { delete(directory) }
         jars.get().forEach { jar ->
-            services.archives.zipTree(jar).matching { include(patterns) }.visit {
+            services.archives.zipTree(jar.asFile).matching { include(patterns) }.visit {
                 if (!isDirectory) {
                     val target = directory.resolve(path)
                     target.parentFile.mkdirs()
@@ -81,7 +83,7 @@ val runnableJar = tasks.register<Jar>("runnableJar") {
     from(sourceSets.main.map { it.output })
     from(joinLibraryLists)
     val leftOut = notOfTheApplication + joinedOfTheLibraries
-    from(libraries.map { classpath -> classpath.files.filter { it.isFile }.map { archives.zipTree(it) } }) {
+    from(libraries.map { jars -> jars.map { archives.zipTree(it.asFile) } }) {
         exclude(leftOut)
     }
     // Gradle does not see by itself that the jar is out of date when what is left out of the libraries changes.
