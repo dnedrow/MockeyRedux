@@ -34,10 +34,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
 import java.io.IOException
+import java.net.ConnectException
 import java.net.URLEncoder
 import java.net.http.HttpClient
+import java.net.http.HttpConnectTimeoutException
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.net.http.HttpTimeoutException
+import java.nio.channels.UnresolvedAddressException
 import java.time.Duration
 
 /**
@@ -51,7 +55,7 @@ internal sealed class ApiFailure(
     /** No answer came: no connection to the server was made, or the server did not answer in time. */
     class Unreachable(
         cause: Exception,
-    ) : ApiFailure("The server gave no answer: ${cause.message ?: cause.javaClass.simpleName}.", cause)
+    ) : ApiFailure(reasonOf(cause), cause)
 
     /** The server asks for an admin token that the UI does not have, or it does not take the token of the UI. */
     class TokenRejected : ApiFailure("The server does not take the request without its admin token.")
@@ -76,6 +80,33 @@ internal sealed class ApiFailure(
     class Failed(
         val problem: ProblemDto,
     ) : ApiFailure(problem.detail)
+
+    private companion object {
+        /**
+         * Returns why no answer came, as a sentence. It goes by the kind of [cause] first: for a connection
+         * that is refused, the Java runtime has a message on one system and none on another.
+         */
+        fun reasonOf(cause: Exception): String {
+            val said = cause.message
+            val unresolved = generateSequence<Throwable>(cause) { it.cause }.any { it is UnresolvedAddressException }
+            return when {
+                cause is HttpConnectTimeoutException -> "No connection to the server was made in time."
+                cause is HttpTimeoutException -> "The server did not answer in time."
+                unresolved -> "The name of its host is not known."
+                cause !is ConnectException -> "The connection failed: ${sentenceOf(said ?: cause.javaClass.simpleName)}"
+                said == null || REFUSED in said -> "Nothing accepts connections there."
+                else -> "No connection to the server could be made: ${sentenceOf(said)}"
+            }
+        }
+
+        /** What the message of the system for a refused connection holds. */
+        const val REFUSED = "refused"
+
+        /** Returns [text] with a period at its end, unless it ends a sentence already. */
+        fun sentenceOf(text: String): String = if (text.isNotEmpty() && text.last() in ENDS) text else "$text."
+
+        const val ENDS = ".?!"
+    }
 }
 
 /**
@@ -492,24 +523,24 @@ internal class AdminClient(
             if (refused.problem.status == NOT_FOUND) null else throw refused
         }
 
-    private companion object {
-        val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(5)
+    internal companion object {
+        /** The version of the admin API that the UI is a client of, as the prefix of the API names it. */
+        val VERSION = AdminApiDescription.PREFIX.substringAfterLast('/')
+
+        private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(5)
 
         /**
          * The time within which the complete answer of the server has to arrive. A replay lasts as long as
          * the real service takes that the server forwards the request to, so the time is generous.
          */
-        val ANSWER_TIMEOUT: Duration = Duration.ofMinutes(2)
+        private val ANSWER_TIMEOUT: Duration = Duration.ofMinutes(2)
 
-        /** The version of the admin API that the UI is a client of, as the prefix of the API names it. */
-        val VERSION = AdminApiDescription.PREFIX.substringAfterLast('/')
-
-        const val JSON = "application/json"
-        const val XML = "application/xml"
-        val SUCCESSES = 200..299
-        const val UNAUTHORIZED = 401
-        const val NOT_FOUND = 404
-        const val SERVER_ERRORS = 500
+        private const val JSON = "application/json"
+        private const val XML = "application/xml"
+        private val SUCCESSES = 200..299
+        private const val UNAUTHORIZED = 401
+        private const val NOT_FOUND = 404
+        private const val SERVER_ERRORS = 500
 
         /**
          * The characters that a segment of a path can hold as they are. Every other character is written as
@@ -518,7 +549,7 @@ internal class AdminClient(
         private const val UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
 
         /** Returns [text] as one segment of a path. */
-        fun asSegment(text: String): String =
+        private fun asSegment(text: String): String =
             buildString {
                 for (byte in text.toByteArray(Charsets.UTF_8)) {
                     val character = byte.toInt().toChar()
@@ -527,6 +558,6 @@ internal class AdminClient(
             }
 
         /** Returns [text] as a name or a value of a query string, as a form writes it. */
-        fun inQuery(text: String): String = URLEncoder.encode(text, Charsets.UTF_8)
+        private fun inQuery(text: String): String = URLEncoder.encode(text, Charsets.UTF_8)
     }
 }

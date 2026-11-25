@@ -66,10 +66,16 @@ internal class MockeyUi private constructor(
          * log, and starts the web server. The UI does not ask the server that it manages for anything
          * before a page is loaded, so it starts whether or not that server runs.
          *
+         * The UI asks the server through the client that [clientOf] makes for the settings, and it closes
+         * that client when it stops.
+         *
          * @throws StartupFailure when the address of the UI is not known, or when the UI cannot accept
          *   connections on its address and port.
          */
-        fun start(settings: UiSettings): MockeyUi {
+        fun start(
+            settings: UiSettings,
+            clientOf: (UiSettings) -> AdminClient = { AdminClient(it.adminUrl, it.adminToken) },
+        ): MockeyUi {
             UiLogging.configure(settings.logLevel)
             log.info("Mockey UI {} starts with these settings:", UiVersion.text)
             settings.summary().forEach { (name, value) -> log.info("  {} = {}", name, value) }
@@ -77,8 +83,8 @@ internal class MockeyUi private constructor(
             requireFree(address)
             if (!address.address.isLoopbackAddress) log.warn(BEYOND_LOOPBACK, address.address.hostAddress)
 
-            val client = AdminClient(settings.adminUrl, settings.adminToken)
-            val application = UiApplication(settings.adminUrl, client)
+            val client = clientOf(settings)
+            val application = UiApplication(settings.adminUrl, client, hasToken = settings.adminToken != null)
             val server =
                 embeddedServer(
                     Netty,

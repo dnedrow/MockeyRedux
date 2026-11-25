@@ -330,10 +330,10 @@ class AdminClientTest {
         val notConnected = assertFailsWith<ApiFailure.Unreachable> { runBlocking { notThere.getSystem() } }
         val notAnswered = assertFailsWith<ApiFailure.Unreachable> { runBlocking { impatient.getSystem() } }
 
-        for (failure in listOf(refused, notConnected, notAnswered)) {
-            assertTrue(failure.message.orEmpty().startsWith("The server gave no answer: "), failure.message)
-        }
-        assertEquals("The server gave no answer: request timed out.", notAnswered.message)
+        assertEquals("Nothing accepts connections there.", refused.message)
+        assertEquals("The server did not answer in time.", notAnswered.message)
+        // An address that is no machine gives no connection in time, or none at all where the system knows no way there.
+        assertTrue(notConnected.message.orEmpty().startsWith("No connection to the server "), notConnected.message)
         assertEquals(listOf("GET system"), slow.requests.map { it.line })
     }
 

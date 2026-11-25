@@ -178,8 +178,8 @@ class UiPagesTest {
         assertEquals(emptyList(), answers.flatMap { it.headers["set-cookie"].orEmpty() })
         assertFalse(secrets.any { it in log }, log)
         assertEquals(List(FAILING_FROM + 1) { "Bearer $token" }, api.requests.map { it.header("authorization") })
-        val reported = answers.last().page.select("main .problem")
-        assertEquals("The server does not take the request without its admin token.", reported.text())
+        val reported = answers.last().page.select("main h1")
+        assertEquals("The server does not take the admin token of the UI", reported.text())
     }
 
     // The files of the UI

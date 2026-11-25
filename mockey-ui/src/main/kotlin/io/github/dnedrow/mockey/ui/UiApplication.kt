@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory
  *
  * The UI shows what the server at [adminUrl] holds, which it asks for through [client] when a page is
  * loaded. It keeps nothing of it. Every page begins with what the server states of itself, so that a page
- * shows the data of a server that the UI can manage, or says that there is none.
+ * shows the data of a server that the UI can manage, or says why it shows none, see [FailurePages].
  *
  * The UI uses the routing of Ktor, where the server program does not, see `docs/decisions/ui-stack.md`:
  * the paths of the UI are its own, they hold no secret, and a browser is what reads its answers.
@@ -40,7 +40,10 @@ import org.slf4j.LoggerFactory
 internal class UiApplication(
     private val adminUrl: AdminUrl,
     private val client: AdminClient,
+    hasToken: Boolean,
 ) {
+    private val failures = FailurePages(adminUrl, hasToken)
+
     /** Makes [application] the UI. */
     fun install(application: Application) {
         application.install(everyRequest)
@@ -101,22 +104,12 @@ internal class UiApplication(
         call: ApplicationCall,
         cause: Throwable,
     ): Page {
-        if (cause is ApiFailure) return gaveNothing(cause)
+        if (cause is ApiFailure) return failures.of(cause, canBeRepeated = call.request.httpMethod == HttpMethod.Get)
         if (cause is BadRequestException) return unreadable()
         // The path is logged as the request wrote it, with its escapes, so it adds no line to the log.
         log.error("The UI failed to answer the request for {}.", call.request.path(), cause)
         return Page("The UI failed", HttpStatusCode.InternalServerError) {
             p { +"The UI failed to answer this request. Its log says why." }
-        }
-    }
-
-    /** Returns the page for a request that the server gave nothing for that the UI can show, because of [failure]. */
-    private fun gaveNothing(failure: ApiFailure): Page {
-        val missing = failure is ApiFailure.Refused && failure.problem.status == HttpStatusCode.NotFound.value
-        val status = if (missing) HttpStatusCode.NotFound else HttpStatusCode.BadGateway
-        return Page(if (missing) "Not there" else "The server gave nothing to show", status) {
-            p { +"The UI asked the server at $adminUrl, and this is what came of it:" }
-            p(classes = "problem") { +failure.message.orEmpty() }
         }
     }
 

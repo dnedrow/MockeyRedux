@@ -27,9 +27,12 @@ import java.util.concurrent.Executors
  * can change something only without an `Origin` header.
  *
  * It answers the request for the status of the server with [system], unless a test told it otherwise.
+ *
+ * It listens on the loopback address, on [port], or on a port that the system picks when the port is 0.
  */
 internal class FakeAdminApi(
     private val token: String? = null,
+    port: Int = 0,
 ) : AutoCloseable {
     /**
      * A request that the API got: its [method], its [path] and its [query] as the client wrote them, its
@@ -77,7 +80,7 @@ internal class FakeAdminApi(
 
     private val answers = ConcurrentHashMap<String, (Request) -> Answer>()
     private val threads = Executors.newCachedThreadPool()
-    private val server: HttpServer = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+    private val server: HttpServer = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0)
 
     init {
         server.createContext("/") { exchange -> exchange.use(::handle) }
