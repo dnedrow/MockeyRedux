@@ -186,10 +186,14 @@ declares with the header `Content-Type: application/xml`.
 An answer that reports a failure is a problem document: a JSON object that states the status and says what
 is wrong. The status is 400 for a body that is no JSON object and for a query string that the operation
 does not take, 404 for what is not there, and 422 for a request that is not valid, where the document names
-every invalid member with a message. A change takes effect before its request is answered. In read-only
-mode, which is the default, it is kept in memory, and in writable mode it is stored in the definitions
-location. A request that fails because the definitions location cannot be read or written gets the status
-500, and the document says what the server could not do there.
+every invalid member with a message. A request that fails because the definitions location cannot be read
+or written gets the status 500, and the document says what the server could not do there.
+
+A change takes effect before its request is answered: the next request to the mock endpoint and the next
+read of the API show it. In read-only mode, which is the default, a change is kept in memory, and in
+writable mode it is stored in the definitions location. Changes that arrive at the same time are made one
+after another, and each is checked against what the ones before it left. Of two requests that create a
+service with one mock URL, one succeeds, and the other gets the status 422.
 
 While the server has an admin token, the API takes a request only when it presents the token in the header
 `Authorization: Bearer <token>`, and it answers every other request with the status 401.
