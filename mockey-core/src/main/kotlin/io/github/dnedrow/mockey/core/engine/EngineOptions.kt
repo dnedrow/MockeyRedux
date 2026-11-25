@@ -36,7 +36,8 @@ public class EngineOptions {
     /**
      * The client that sends forwarded requests to real services, or `null` for the client that the library
      * brings, which sends over HTTP. The engine closes its client when it is closed, also a client that is
-     * given here.
+     * given here. A program that puts a client of its own around the one of the library gets that one from
+     * [UpstreamClient.overHttp].
      */
     public var upstreamClient: UpstreamClient? = null
 

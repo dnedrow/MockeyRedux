@@ -142,7 +142,7 @@ internal class JdkUpstreamClient(
     ): HttpRequest {
         val body = request.body
         return try {
-            val builder = HttpRequest.newBuilder(uriOf(request.url))
+            val builder = HttpRequest.newBuilder(request.uri())
             when {
                 // Only a request that is built without a body publisher carries no Content-Length.
                 body.isEmpty() && request.method == "GET" -> builder.GET()

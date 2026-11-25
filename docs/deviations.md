@@ -29,6 +29,9 @@ Netty in the new server, see `docs/decisions/http-stack.md`. No parity case can 
 probe shows what legacy does.
 DEV-68 is the graceful shutdown that the specification asks of the server (task 11.7). It concerns the end of
 the process, which no parity case holds either.
+DEV-69 is the mark of the requests that the server forwards to the port of its own admin listener (task 12.10),
+see `docs/decisions/forwarding-to-the-admin-listener.md`. Legacy has no admin listener, and the server of a
+parity case has its admin listener on a port of its own, so no parity case forwards to that port.
 
 | ID | Legacy behavior | New behavior | Evidence |
 |---|---|---|---|
@@ -100,3 +103,4 @@ the process, which no parity case holds either.
 | DEV-66 | Jetty takes a request whose lines end with a line feed alone. It also takes a request whose `Host` header holds what no name of a host holds, such as `a/b` or `a?b`, or nothing at all, and a request with more than one `Host` header. | Each of them gets the status 400. | run: probe |
 | DEV-67 | A request for `/service`, without a slash after it, is mock traffic with an empty target, as a request for `/service/` is. | Only a path that begins with `/service/` is mock traffic. A request for `/service` gets the status 404, and the history does not record it. | run: probe |
 | DEV-68 | A signal that ends a program, such as `SIGTERM`, ends legacy at once. A request that is in progress gets no answer, and the process ends with the status of the signal, which is 143 for `SIGTERM`. | The server accepts no more connections, lets the requests that are in progress finish within the grace period, which is 10 seconds unless it is set otherwise, completes a save of the definitions that is under way, and ends with the status 0. It does so on `SIGTERM`, `SIGINT`, and `SIGHUP`. | run: probe, which sends `SIGTERM` while a request waits for the delay of its service |
+| DEV-69 | A forwarded request carries the headers of the client, and legacy adds none that tells of the forwarding, whatever the port of the real service is. Legacy serves its admin pages on the port of the mock traffic, and it forwards a mock request for a URL of its own like any other. | A request that the server forwards to a URL with the port of its own admin listener, which is 8081 unless it is set otherwise, carries the header `Mockey-Forwarded: true` in addition to the headers of the client, whatever host the URL names. The admin listener answers every request with that header with the status 403, so a mock request for the admin listener gets that status. A request that is forwarded to any other port is as before. | run: the recordings that state every header of a forwarded request, such as `proxy-headers-application`, show none that legacy adds. read: `RequestFromClient.postToRealServer`, which copies the headers of the client, and `ClientExecuteProxy.execute`, which looks at no host and no port |

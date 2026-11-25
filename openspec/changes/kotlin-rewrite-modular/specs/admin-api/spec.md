@@ -28,10 +28,37 @@ The system SHALL NOT perform an admin API operation for a request that the serve
 - **WHEN** a client sends `GET /service/http://127.0.0.1:8081/api/v1/services` to the mock listener
 - **THEN** the response has status 403, and no admin operation is performed
 
+#### Scenario: Mock request that names the admin listener by a host name
+- **GIVEN** the default settings, without an admin token
+- **WHEN** a client sends `GET /service/http://localhost:8081/api/v1/services` to the mock listener
+- **THEN** the response has status 403, and no admin operation is performed
+
 #### Scenario: Redirect to the admin listener
 - **GIVEN** a real service that answers a `GET` request with a redirect to `http://127.0.0.1:8081/api/v1/services`
 - **WHEN** a client sends a mock request that is forwarded to that service
 - **THEN** no admin operation is performed
+
+#### Scenario: Mock request that presents the access token
+- **GIVEN** an admin token is configured
+- **WHEN** a client sends a mock request for the admin listener that presents the token as a bearer token
+- **THEN** the response has status 403, and no admin operation is performed
+
+### Requirement: Mark on requests forwarded to the port of the admin listener
+The server SHALL add the header `Mockey-Forwarded` to every request that it forwards to a URL with the port of its admin listener, whatever host that URL names, and to no other request. The admin listener SHALL answer every request that carries that header with status 403, whatever its path is, and whether or not it presents the access token.
+
+#### Scenario: Real service on a port with the number of the admin listener
+- **GIVEN** the admin listener on port 8081
+- **WHEN** a mock request is forwarded to `http://api.example.com:8081/orders`
+- **THEN** the real service receives the request with the headers of the client and the header `Mockey-Forwarded`
+
+#### Scenario: Request to another port
+- **GIVEN** the admin listener on port 8081
+- **WHEN** a mock request is forwarded to `http://api.example.com/orders`
+- **THEN** the real service receives the request without a `Mockey-Forwarded` header of the server
+
+#### Scenario: Request that carries the header
+- **WHEN** a client sends a request with the header `Mockey-Forwarded` to the admin listener
+- **THEN** the response has status 403, and no admin operation is performed
 
 ### Requirement: Access token
 When an admin token is configured, the system SHALL reject with status 401 every admin API request that does not present that token as a bearer token in the `Authorization` header, and SHALL NOT perform the requested operation.

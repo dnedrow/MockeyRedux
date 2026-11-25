@@ -4,13 +4,15 @@ import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.model.OutboundProxy
 import io.github.dnedrow.mockey.core.response.MockResponse
 import java.io.IOException
+import java.net.URI
+import java.net.URISyntaxException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * Sends requests to real services. An engine forwards every request of proxy mode through one upstream client.
- * The client that the library brings sends over HTTP, and a program can put its own in that place, such as
- * one that answers without a network.
+ * The client that the library brings sends over HTTP, see [overHttp], and a program can put its own in that
+ * place, such as one that answers without a network.
  *
  * A client stands for one exchange at a time: it sends a request as it is given, and returns the answer as it
  * came. It follows no redirect and keeps no cookie. The engine does both, in the same way for every client.
@@ -26,6 +28,18 @@ public interface UpstreamClient : AutoCloseable {
 
     /** Releases what the client holds, such as its connections. The client sends no request after that. */
     override fun close() {}
+
+    public companion object {
+        /**
+         * Returns the upstream client that the library brings, which sends over HTTP. A connection to a real
+         * service has to come about within [connectTimeout].
+         *
+         * An engine that is given no client makes this client for itself. A program asks for it to put a
+         * client of its own around it: one that hands every request on to this client, and that looks at
+         * the requests or changes them on their way.
+         */
+        public fun overHttp(connectTimeout: Duration = DEFAULT_CONNECT_TIMEOUT): UpstreamClient = JdkUpstreamClient(connectTimeout)
+    }
 }
 
 /**
@@ -58,6 +72,17 @@ public class UpstreamRequest
         /** The body to send, which is empty for a request without one. Every read gives a new array. */
         public val body: ByteArray
             get() = bodyBytes.copyOf()
+
+        /**
+         * Returns the URL as a URI, which tells its parts, such as its host and its port. The client that the
+         * library brings sends the request to this URI.
+         *
+         * `java.net.URI` refuses some characters that the URL of a request can hold, such as a pipe sign or a
+         * brace. The URI has them escaped, and everything else as [url] has it.
+         *
+         * @throws URISyntaxException when [url] is no URL, also with those characters escaped
+         */
+        public fun uri(): URI = uriOf(url)
 
         /** Returns this request for another URL or with other headers. */
         internal fun copy(

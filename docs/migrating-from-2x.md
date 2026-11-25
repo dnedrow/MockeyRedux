@@ -172,6 +172,9 @@ of a migrated installation meet first:
   is no mock traffic (DEV-67).
 - Told to end, the server lets the requests in progress finish and ends with the status 0. Mockey 2.x ended
   at once (DEV-68).
+- A request that the server forwards to a URL with the port of its own admin listener, which is 8081 unless
+  it is set otherwise, carries the header `Mockey-Forwarded`. A real service on a port with that number gets
+  the header, and the admin listener of the server refuses the request (DEV-69).
 - Services, scenarios, plans, and twist configurations have identifiers that are texts and that stay. The
   numbers of Mockey 2.x, which changed with every load, identify nothing (DEV-20).
 

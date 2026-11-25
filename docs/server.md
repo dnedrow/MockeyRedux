@@ -136,6 +136,9 @@ document: a JSON object that states the status and says what is wrong. While the
 the API takes a request only when it presents the token in the header `Authorization: Bearer <token>`, and
 it answers every other request with the status 401.
 
+The admin listener takes no request that the server forwarded as mock traffic. It answers such a request
+with the status 403, with a token and without one, see "The admin listener through the mock listener".
+
 The server does not start with an admin listener that other machines can reach and no admin token: whoever
 reaches the admin API can change the definitions and make the server send requests. The message names the two
 ways on: an admin token, or the setting `--allow-unprotected-admin`. See "Security" before taking the second.
@@ -163,6 +166,10 @@ wants.
 
 A request whose body is longer than the setting `--max-request-body` allows gets the status 413. It is
 neither matched nor forwarded.
+
+To a request that it forwards to a URL with the port of its own admin listener, the server adds the header
+`Mockey-Forwarded: true`. By that header the admin listener knows the request and refuses it, see "The admin
+listener through the mock listener".
 
 The server adds five headers to every response of the mock endpoint, unless the scenario or the real service
 sets a header of the same name: `Access-Control-Allow-Origin: *`, three headers that keep the response out of
@@ -310,30 +317,7 @@ and the metadata service of a cloud provider. What comes with it:
 - Every unknown target leaves a service behind, in memory and, in writable mode, in the definitions location.
 - A service in proxy mode forwards as well, to the real URL that it is defined with.
 
-### The admin listener through the mock listener
-
-The loopback address protects the admin listener from other machines, but not from the server itself. With
-the default settings, a client of the mock listener reaches the admin listener through the mock endpoint:
-
-```shell
-curl -i http://localhost:8080/service/http://127.0.0.1:8081/api/v1/services
-```
-
-The answer is the one of the admin API: the services of the server. The request came to the admin listener
-from the loopback address, where it asks for no token. In this version the admin API changes nothing, so
-such a request reads the definitions and the history, and it does no more. The answer is a mock response,
-which carries `Access-Control-Allow-Origin: *`, so a web page of another origin reads them that way as
-well. Once the API changes what the server does, such a request could change the definitions. The server is
-to refuse such requests by itself before the API changes anything. Until it does, any one of these closes
-that way:
-
-- Set an admin token. The admin API then takes no request that does not present the token, wherever the
-  request comes from:
-
-  ```shell
-  export MOCKEY_ADMIN_TOKEN=a-long-text-that-nobody-guesses
-  mockey-server
-  ```
+Two settings limit that:
 
 - Switch the forwarding of unknown targets off. The server then forwards only to the real URLs of the
   services that are defined:
@@ -347,6 +331,52 @@ that way:
   ```shell
   mockey-server --mock-host 127.0.0.1
   ```
+
+### The admin listener through the mock listener
+
+The loopback address protects the admin listener from other machines, but not from the server itself, which
+forwards the requests of its clients from the machine of the admin listener. The server therefore keeps
+what it forwards from its own admin API. With the default settings:
+
+```shell
+mockey-server
+```
+
+```shell
+curl --write-out '\n%{http_code}\n' http://localhost:8080/service/http://127.0.0.1:8081/api/v1/services
+```
+
+```text
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"The request carries the header Mockey-Forwarded, which says that the mock endpoint of a Mockey server forwarded it. The admin listener takes no request that was forwarded.","errors":[]}
+403
+```
+
+- The server adds the header `Mockey-Forwarded: true` to every request that it forwards to a URL with the
+  port of its admin listener. Only the port of the URL counts, and not its host: an address can be written
+  in many ways, and a name can stand for any address. A request that the redirect of a real service leads to
+  such a URL gets the header as well.
+- The admin listener answers every request that carries that header with the status 403, whatever its path
+  is, and whether or not it presents the admin token. No operation of the admin API is performed for it.
+
+What follows from that:
+
+- A real service on another machine that listens on a port with the number of the admin listener gets the
+  header with every request that the server forwards to it. Nothing else changes for it. Where the header
+  is in the way, give the admin listener another port with `--admin-port`.
+- A client that sends the header to the admin listener itself is refused in the same way.
+
+The server does this for its own admin listener, at the port on which that listener accepts connections.
+What it does not cover:
+
+- A port forward, the published port of a container, or a reverse proxy in front of the admin listener leads
+  to the listener through another port, of which the server does not know. Each of them lets other machines
+  in, so give the server an admin token there, see below.
+- Other programs on the machine of the server that trust the loopback address stay within reach of the mock
+  endpoint, such as the admin listener of a second Mockey server on another port. Each of the two settings
+  above closes that way.
+
+[decisions/forwarding-to-the-admin-listener.md](decisions/forwarding-to-the-admin-listener.md) says why the
+server does it this way.
 
 ### The admin listener beyond the loopback address
 

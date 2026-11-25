@@ -14,7 +14,8 @@ import kotlin.time.Duration
  * that [start] returns. [since] is the time at which the server started.
  *
  * The mock listener serves the mock endpoint and `/status`. The admin listener serves the admin API, and
- * neither listener serves what the other one does.
+ * neither listener serves what the other one does. What the mock endpoint forwards does not get to the admin
+ * API either, see [ForwardMark].
  */
 internal class MockeyServer private constructor(
     val engine: MockeyEngine,
@@ -82,18 +83,21 @@ internal class MockeyServer private constructor(
 
             val addresses = ListenerAddresses.of(settings)
             Listeners.requireFree(addresses)
-            val engine = ServerEngine.start(settings)
+            // The port 0 stands for a port that the system picks, which the mark learns when the admin listener has started.
+            val mark = ForwardMark(addresses.admin.port.takeUnless { it == 0 })
+            val engine = ServerEngine.start(settings, mark)
             val since = clock.instant()
             val mockModule = mockListenerModule(MockEndpoint(engine, settings.maxRequestBody, clock), StatusEndpoint(since))
             val listeners =
                 try {
                     Listeners.start(addresses, mockModule) { mock ->
-                        adminListenerModule(AdminApi.of(engine, settings, since, mock.address))
+                        adminListenerModule(mark, AdminApi.of(engine, settings, since, mock.address))
                     }
                 } catch (failure: StartupFailure) {
                     engine.close()
                     throw failure
                 }
+            mark.adminListensOn(listeners.admin.address.port)
 
             log.info("The {} accepts connections on {}.", ListenerKind.MOCK.title, listeners.mock.address.text())
             log.info("The {} accepts connections on {}.", ListenerKind.ADMIN.title, listeners.admin.address.text())
@@ -125,11 +129,17 @@ internal class MockeyServer private constructor(
         /**
          * Returns the module of the admin listener: the admin [api] for the path `/api/v1` and every path
          * below it. Ktor answers every other request with the status 404.
+         *
+         * A request that carries the [mark] gets to neither: the server forwarded it as mock traffic, and
+         * the mark answers it with the status 403, see [ForwardMark].
          */
-        fun adminListenerModule(api: AdminApi): suspend Application.() -> Unit =
+        fun adminListenerModule(
+            mark: ForwardMark,
+            api: AdminApi,
+        ): suspend Application.() -> Unit =
             {
                 intercept(ApplicationCallPipeline.Call) {
-                    api.handle(call)
+                    if (!mark.refuses(call)) api.handle(call)
                 }
             }
     }

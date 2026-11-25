@@ -43,7 +43,6 @@ import io.github.dnedrow.mockey.core.storage.DefinitionStorage
 import io.github.dnedrow.mockey.core.storage.FileFault
 import io.github.dnedrow.mockey.core.storage.StorageException
 import io.github.dnedrow.mockey.core.upstream.ForwardTarget
-import io.github.dnedrow.mockey.core.upstream.JdkUpstreamClient
 import io.github.dnedrow.mockey.core.upstream.UpstreamClient
 import io.github.dnedrow.mockey.core.upstream.UpstreamSession
 import io.github.dnedrow.mockey.core.upstream.forwardTarget
@@ -134,7 +133,7 @@ public class MockeyEngine internal constructor(
     private val snapshot = AtomicReference(Snapshot(initial))
     private val clock: Clock = options.clock
     private val installedInspectors: Inspectors = options.inspectors?.let(Inspectors::of) ?: Inspectors.installed()
-    private val upstreamClient: UpstreamClient = options.upstreamClient ?: JdkUpstreamClient(options.connectTimeout)
+    private val upstreamClient: UpstreamClient = options.upstreamClient ?: UpstreamClient.overHttp(options.connectTimeout)
 
     /** Whether the upstream client is the one of the library, which the engine made, and not one that the program gave. */
     private val ownsUpstreamClient: Boolean = options.upstreamClient == null

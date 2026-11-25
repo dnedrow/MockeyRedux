@@ -40,7 +40,8 @@ class AdminSystemTest {
         definitions: Path = Path("mockey-definitions"),
     ): Listener {
         val api = AdminApi(token = null, maxRequestBody = 1_024, routes = AdminSystem(engine, since, definitions, mock).routes)
-        return Listener.start(ListenerKind.ADMIN, RawHttp.loopback(0), MockeyServer.adminListenerModule(api)).also { listeners += it }
+        val module = MockeyServer.adminListenerModule(ForwardMark(adminPort = null), api)
+        return Listener.start(ListenerKind.ADMIN, RawHttp.loopback(0), module).also { listeners += it }
     }
 
     private fun address(

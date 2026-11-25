@@ -57,7 +57,7 @@ class DefinitionsSourceTest {
         status: String = "200 OK",
         headers: List<String> = emptyList(),
         beforeAnswer: () -> Unit = {},
-    ): StubUpstream = StubUpstream(status, headers, body, beforeAnswer).also { stubs += it }
+    ): StubUpstream = StubUpstream(status, headers, body, beforeAnswer = beforeAnswer).also { stubs += it }
 
     private fun documentOf(source: String): String = assertIs<SourceDefinitions.Document>(DefinitionsSource(source).read()).text
 

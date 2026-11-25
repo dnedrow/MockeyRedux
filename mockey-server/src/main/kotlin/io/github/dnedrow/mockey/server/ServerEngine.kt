@@ -5,6 +5,7 @@ import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.storage.FileDefinitionStorage
 import io.github.dnedrow.mockey.core.storage.StorageException
+import io.github.dnedrow.mockey.core.upstream.UpstreamClient
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -26,17 +27,22 @@ internal object ServerEngine {
     private val log = LoggerFactory.getLogger(ServerEngine::class.java)
 
     /**
-     * Creates the engine that [settings] ask for, with the definitions that the server starts with.
+     * Creates the engine that [settings] ask for, with the definitions that the server starts with. The
+     * engine forwards with the upstream client of the library, and the requests that it forwards to the port
+     * of the admin listener get the [mark], see [ForwardMark].
      *
      * @throws StartupFailure when the definitions of the definitions location cannot be loaded, when the
      *   initial definitions cannot be read, and when the initial definitions would take the place of stored
      *   definitions in the definitions location. Nothing in the definitions location has changed then.
      */
-    fun start(settings: ServerSettings): MockeyEngine =
+    fun start(
+        settings: ServerSettings,
+        mark: ForwardMark,
+    ): MockeyEngine =
         runBlocking {
             val source = settings.initialDefinitions?.let(::DefinitionsSource)
             // With initial definitions the engine is in read-only mode until it has them, so that nothing is stored before.
-            val engine = created(settings, readOnly = settings.readOnly || source != null)
+            val engine = created(settings, readOnly = settings.readOnly || source != null, mark)
             try {
                 log.info("The definitions location {} holds {}.", locationOf(settings), contentOf(engine.definitions))
                 if (source != null) engine.replaceDefinitions(source, settings)
@@ -52,20 +58,25 @@ internal object ServerEngine {
     private suspend fun created(
         settings: ServerSettings,
         readOnly: Boolean,
-    ): MockeyEngine =
-        try {
+        mark: ForwardMark,
+    ): MockeyEngine {
+        val client = mark.client(UpstreamClient.overHttp(settings.upstreamConnectTimeout))
+        return try {
             MockeyEngine.create {
                 storage = FileDefinitionStorage(settings.definitions)
                 this.readOnly = readOnly
+                upstreamClient = client
                 forwardUnknownTargets = settings.forwardUnknownTargets
                 historyLimit = settings.historyLimit
                 bodyCaptureLimit = settings.bodyCaptureLimit
-                connectTimeout = settings.upstreamConnectTimeout
                 responseTimeout = settings.upstreamResponseTimeout
             }
         } catch (failure: StorageException) {
+            // No engine has come about that closes the client.
+            client.close()
             throw StartupFailure("The definitions cannot be loaded. ${failure.message}", failure)
         }
+    }
 
     /**
      * Puts the definitions of [source] in the place of the definitions of this engine, which is in read-only

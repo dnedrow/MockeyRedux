@@ -43,6 +43,9 @@ import java.time.Instant
  * [AdminProblem]. Every answer says that it is not to be stored: what the API says of the server now says
  * nothing about later. No answer carries a header that lets a page of another origin read it.
  *
+ * A request that the server forwarded as mock traffic takes none of these steps: the admin listener refuses
+ * it before the API sees it, see [ForwardMark].
+ *
  * [token] is the admin token of the server, or `null` when it has none. [maxRequestBody] is the number of
  * bytes that the body of a request may have. [routes] are the operations of the API, of which no two have
  * the same method for the same resources.

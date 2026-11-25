@@ -18,11 +18,17 @@ import kotlin.concurrent.thread
  *
  * [beforeAnswer] runs when a request has arrived, before the answer to it is written. A test that makes it
  * wait holds the answer back for as long as it likes.
+ *
+ * A test that needs the service elsewhere names the [address] and the port: another address of the machine,
+ * or a port that is no free one.
+ *
+ * @throws IOException when the service cannot be bound to [address]
  */
 internal class StubUpstream(
     private val status: String = "200 OK",
     private val headers: List<String> = listOf("Content-Type: text/plain"),
     private val body: String = "answered by the real service",
+    address: InetSocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 0),
     private val beforeAnswer: () -> Unit = {},
 ) : AutoCloseable {
     /** A request as it arrived: its method, its request target, its header lines, and its body. */
@@ -46,10 +52,15 @@ internal class StubUpstream(
 
     /** The URL of the service, without a path. */
     val origin: String
-        get() = "http://127.0.0.1:${server.localPort}"
+        get() = "http://${(server.localSocketAddress as InetSocketAddress).text()}"
 
     init {
-        server.bind(InetSocketAddress(InetAddress.getLoopbackAddress(), 0))
+        try {
+            server.bind(address)
+        } catch (failure: IOException) {
+            server.close()
+            throw failure
+        }
         thread(isDaemon = true, name = "stub-upstream") { acceptConnections() }
     }
 

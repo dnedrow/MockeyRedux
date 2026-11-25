@@ -9,6 +9,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
+import java.net.URISyntaxException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -408,6 +409,64 @@ class JdkUpstreamClientTest {
     @Test
     fun aClientThatNeverSentARequestCloses() {
         JdkUpstreamClient().close()
+    }
+
+    /** A program gets the client of the library to put its own around it, which hands every request on. */
+    @Test
+    fun theClientOfTheLibraryIsThereForAProgramThatPutsItsOwnAroundIt() {
+        StubUpstream().use { upstream ->
+            val ofTheLibrary = UpstreamClient.overHttp()
+            val closed = mutableListOf<String>()
+            val around =
+                object : UpstreamClient {
+                    override suspend fun send(request: UpstreamRequest): MockResponse {
+                        val marked = UpstreamRequest(request.method, request.url, request.headers + Header("X-Seen", "yes"), request.body)
+                        return ofTheLibrary.send(marked)
+                    }
+
+                    override fun close() {
+                        closed += "around"
+                        ofTheLibrary.close()
+                    }
+                }
+
+            val answer = runBlocking { around.send(UpstreamRequest("POST", "${upstream.origin}/orders", headers(text), allBytes)) }
+            around.close()
+
+            assertEquals(200, answer.status)
+            val arrived = upstream.requests.single()
+            assertEquals(listOf("yes"), arrived.headerValues("X-Seen"))
+            assertContentEquals(allBytes, arrived.body)
+            assertEquals(listOf("around"), closed)
+            assertFailsWith<Exception> { runBlocking { ofTheLibrary.send(UpstreamRequest("GET", "${upstream.origin}/after")) } }
+            assertEquals(1, upstream.requests.size)
+        }
+    }
+
+    /** The URI of a request is where the client of the library sends it: its host and its port are the ones of the URL. */
+    @Test
+    fun theUriOfARequestTellsTheHostAndThePortThatTheClientSendsItTo() {
+        fun uriOf(url: String) = UpstreamRequest("GET", url).uri()
+
+        StubUpstream().use { upstream ->
+            val url = "${upstream.origin}/a|b?q={x}&s=a b"
+            JdkUpstreamClient().use { it.send("GET", url) }
+
+            assertEquals("${upstream.origin}/a%7Cb?q=%7Bx%7D&s=a%20b", uriOf(url).toString())
+            assertEquals(upstream.requests.single().target, uriOf(url).rawPath + "?" + uriOf(url).rawQuery)
+            assertEquals("127.0.0.1" to upstream.port, uriOf(url).host to uriOf(url).port)
+        }
+        assertEquals("api.example.com" to 8081, uriOf("http://api.example.com:8081/orders").let { it.host to it.port })
+        assertEquals("api.example.com" to -1, uriOf("https://api.example.com/orders?a=1").let { it.host to it.port })
+        assertEquals("[::1]" to 8081, uriOf("http://[::1]:8081").let { it.host to it.port })
+        assertEquals("api.example.com" to 9000, uriOf("http://127.0.0.1:8081@api.example.com:9000/x").let { it.host to it.port })
+        // What comes before the path of such a URL is no host with a port for a URI, and the client sends no such request.
+        listOf("http://my_host:8081/orders", "http://api.example.com:port/orders").forEach { url ->
+            assertEquals(null to -1, uriOf(url).let { it.host to it.port }, url)
+        }
+        listOf("http://[::1/orders", "http://a b/orders").forEach { url ->
+            assertFailsWith<URISyntaxException>(url) { uriOf(url) }
+        }
     }
 
     /** A recording of the parity group `proxy-forwarding`: the request of the client, and what its stated new response says arrived. */

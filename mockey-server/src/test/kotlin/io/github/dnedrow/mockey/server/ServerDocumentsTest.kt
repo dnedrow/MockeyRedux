@@ -64,7 +64,7 @@ class ServerDocumentsTest {
 
         val commands = runCommandsOf(serverDocument)
 
-        assertEquals(Commands(blocks = 18, servers = 12, compared = 4), commands)
+        assertEquals(Commands(blocks = 18, servers = 12, compared = 5), commands)
     }
 
     @Test
