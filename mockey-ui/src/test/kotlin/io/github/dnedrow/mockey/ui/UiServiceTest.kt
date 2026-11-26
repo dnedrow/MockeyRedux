@@ -167,6 +167,7 @@ class UiServiceTest {
         val leading =
             mapOf(
                 "Edit" to "/service/edit?id=svc-billing",
+                "History of this service" to "/history?service=svc-billing",
                 "Delete" to "/service/delete?id=svc-billing",
                 "New scenario" to "/scenario/new?service=svc-billing",
             )

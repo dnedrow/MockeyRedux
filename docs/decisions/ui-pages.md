@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5 to 13.8 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5 to 13.9 of the change `kotlin-rewrite-modular`, on 2026-11-25.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -491,6 +491,185 @@ session. Both are about how the server reaches real services, so they share a pa
   specification lists the actions that need one, and clearing the session isn't among them. The session only
   holds cookies, and real services set them again.
 
+## The pages for the history
+
+The server records every request that reaches its mock endpoint. The UI lists these history entries, and it
+has a page for a single entry. From there, a request can be replayed with edits, and a response can be saved
+as a scenario. Entries can also be flagged and deleted.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for the history (`admin-ui`: Coverage of
+  management operations, with the scenario "Replay with edits").
+- The history filter tokens and the paging are in the page address (`admin-ui`: View state lives in the
+  address, with the scenario "Shared link").
+- The history page offers an automatic refresh that can be switched on and off, and it works with scripting
+  disabled (`admin-ui`: Live history view).
+- The UI asks for confirmation before it deletes all history (`admin-ui`: Confirmation of destructive
+  actions).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/history` | The list. The parameters `tokens`, `service`, `page`, and `refresh` say what it shows. |
+| `/history/entry?id=` | The page of an entry. |
+| `/history/replay?id=` | The form that replays the request of an entry. |
+| `/history/scenario?id=` | The form that saves the response of an entry as a scenario. |
+| `/history/flag?id=` | Flags an entry, or removes the flag (`POST`). |
+| `/history/remove?id=` | Deletes a single entry (`POST`). |
+| `/history/delete` | The confirmation step for deleting all entries, or the entries of one service with `service=`. |
+
+### The view is in the address
+
+- The address of the list holds everything that decides what the list shows: the filter tokens, the service,
+  the page, and the automatic refresh. So the same address shows the same list in another browser. Legacy
+  keeps the filter tokens in the session instead.
+- The tokens are entered in one field, with spaces between them, as in legacy. The admin API accepts a token
+  with a space in it, but the UI has no way to enter one.
+- `service` limits the list to the entries of one service. The page of a service and the statistics link to
+  such a list.
+- The buttons of a row carry the view in the address of their action. That's how the browser gets back to the
+  same list after an entry is flagged or deleted.
+
+### Paging
+
+- A page of the list has 50 entries.
+- The admin API returns the newest entries up to a maximum, and it can't skip entries. So for page N, the UI
+  asks for N × 50 + 1 entries and shows the last 50 of them. The extra entry says whether there are older
+  ones.
+- The admin API returns every entry with its bodies, and it has no way to leave them out. A late page of a
+  history with large bodies is therefore a large answer. The server bounds it: by default, it keeps 1,000
+  entries and 1 MiB of each body.
+- Every new request moves the older entries toward later pages, so a page doesn't show the same entries
+  forever.
+
+### Automatic refresh
+
+- While the automatic refresh is on, the head of the page has a `meta http-equiv="refresh"` element, and the
+  browser loads the page again every 5 seconds. That works without scripting. Task 13.12 adds the update in
+  place for browsers with scripting.
+- The refresh is switched on and off with links, because it's part of the view: `refresh=on` is in the
+  address, like the filter tokens.
+- After an entry is flagged, the browser goes back to the row of that entry. A page that reloads itself is
+  the exception: with a row in its address, it would jump back to that row on every reload.
+
+### The list
+
+- A row shows the time, the client, the method with the target, the service with the response mode, and the
+  answer: the status code, the outcome, and the scenario.
+- The row shows the target and not the URL that the client addressed, because the target is shorter. The page
+  of the entry has the URL.
+- Marks say that an entry is flagged, that its target was twisted, and how many inspection messages it has.
+- A row has a button that flags the entry and one that deletes it. Deleting a single entry doesn't ask for
+  confirmation. The specification only requires one when all history is deleted.
+
+### Deleting many entries
+
+- The confirmation page at `/history/delete` covers all entries. With `service=`, it covers the entries of
+  one service. The specification only names the deletion of all history, but both are deletions in bulk.
+- Before it asks, the page requests the newest entry that would be deleted. Without such an entry, there's
+  nothing to delete, and the page says so. The entry also gives the name of the service, even if the service
+  itself has been deleted since.
+
+### The page of an entry
+
+- The page shows when and how the request was handled, the inspection messages, the request, and the
+  response. The request has its URL with the query string, its headers, its parameters, its cookies, and its
+  body. The response has its status code, its headers, and its body.
+- The links to the service and to the scenario lead to what the entry recorded. If one of them has been
+  deleted since, its page says so.
+
+### Bodies
+
+- The admin API encodes a body in Base64, because a body can hold any bytes. The UI shows a body as text if
+  its bytes are text in the charset that the `Content-Type` header declares, or in UTF-8 if the header doesn't
+  declare one. A body with a NUL character doesn't count as text.
+- For a body that isn't text, the page says so and gives its size.
+- The server only keeps the start of a long body. Such a body can end in the middle of a character, and that
+  doesn't make it binary. The page says how much of the body the server kept.
+- The UI doesn't offer a body as a download.
+
+### Replaying a request
+
+- The form has the headers and the query parameters, each with one item per line, and the body. A page
+  without scripting can't add rows to a form, so a field of lines is the simplest way to edit a list of any
+  length.
+- The form only sends the parts that were changed (see [ui-forms.md](ui-forms.md)). Everything else is
+  replayed byte for byte. That matters for a body that isn't text, and for a query string that the server
+  would spell differently if it encoded the parameters again.
+- The query parameters are shown decoded. Some query strings can't be shown as one parameter per line: a
+  name or a value has a line break in it, a name has an equals sign in it, or a percent sign doesn't start an
+  escape. For such an entry, the form has no field for the parameters, and the replay keeps the query string.
+- The field for a body that isn't text starts empty, and the replay sends the recorded bytes unless something
+  is typed. So the form can't replace such a body with an empty one.
+- An edited body is encoded in the charset that the `Content-Type` header of the form declares, with the line
+  endings of the recorded body. The UI rejects a body with a character that the charset can't encode.
+- The server refuses to replay an entry whose body was cut, unless the replay supplies a body. For such an
+  entry, the form always sends what the body field holds.
+- After the replay, the browser is on the page of the new entry that the replay produced.
+
+### Saving a response as a scenario
+
+- The form only asks for a name. The server takes the status code, the headers, and the body from the entry,
+  and the browser ends up on the page of the new scenario, which is the form that edits everything else.
+- The server can't make a scenario from an entry without a service, or from one whose response body was cut.
+  For such an entry, the page says why and doesn't show the form. The server checks this as well.
+
+### What the history pages don't have
+
+- New entries don't appear in place yet. That's part of task 13.12.
+- The list can't be limited to the flagged entries, because the admin API has no such filter.
+- A filter token can't contain a space.
+
+## The page for the statistics
+
+The page says how many history entries the server keeps for each service. The same numbers can be
+downloaded as CSV and as JSON.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for the statistics (`admin-ui`: Coverage of
+  management operations).
+- The statistics can be limited to a time range, and they're available as JSON and as CSV
+  (`request-history`: Per-service statistics).
+- The time range is in the page address (`admin-ui`: View state lives in the address).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/statistics` | The page. The parameters `from` and `to` limit the count to a time range. |
+| `/statistics/download?format=` | The numbers as a file in the format `csv` or `json`, for the same time range. |
+
+### The page
+
+- The table lists the services by name. A row has the number of entries, a bar, and the time of the earliest
+  entry. The number links to the history of the service.
+- The bar is a `meter` element, so it needs no script and no inline style. Legacy draws a bar chart with a
+  script.
+- The admin API counts per service. A request that no service handled has a history entry, but it isn't
+  counted, and the page says so.
+
+### The time range
+
+- The two bounds are `datetime-local` fields, which browsers show with a date and time picker. They're
+  labeled as UTC, because the pages show every time in UTC: a page is made without knowing where its reader
+  is.
+- The address holds a bound the way the browser submits it, for example `2026-01-02T03:04:05`. The UI also
+  reads a time the way the pages display one, and an ISO 8601 time with an offset, so that an address that
+  someone wrote by hand works as well.
+- If a bound can't be read, the page has the status 400 and says so next to the field. It doesn't show any
+  numbers, and the server isn't asked for any.
+
+### The downloads
+
+- The UI passes on the CSV and the JSON exactly as the server sends them. The answer is marked as an
+  attachment, so a browser saves it and never reads it as a page. That's why a download can hold the server's
+  content unchanged, while a page has to show it as text.
+- Before it hands out a file, the UI asks for the status of the server, as it does for every page. An
+  unreachable or incompatible server gets its failure page, and no file.
+
 ## A look in a browser
 
 The tests read the pages without a browser. The overview was looked at once in a browser, which is no test and
@@ -505,6 +684,10 @@ is not repeated by one:
 - Chrome displayed the plan list, the page of a plan, the form for a new plan, the report of applying a plan,
   the twist list, the page of a twist configuration, the tags page with an active filter, the confirmation
   page for removing a tag, the proxy page, and the overview with its note about the tag filter.
+- Chrome displayed the history list at widths of 1,280 and 560 pixels, the page of an entry with a text body
+  and with a body that isn't text, the replay form, and the statistics page with and without a time range.
+- With the automatic refresh on, Chrome loaded a copy of the history list three times in 13 seconds. The copy
+  was served with the content security policy of the UI, so the policy doesn't get in the way of the reload.
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
   was sent to the row of a service: the line of the page stayed at the top of the window, and the row began
   below it.
@@ -515,5 +698,6 @@ Run `./gradlew :mockey-ui:test`. `UiServicesTest` reads the overview and the pag
 the forms of the switches. `UiServiceTest` sends the forms of a service and reads what the admin API was
 asked for. `UiScenarioTest` submits the scenario forms, presses the designation buttons, and checks
 which requests reached the admin API. `UiPlansTest`, `UiTwistsTest`, `UiTagsTest`, and `UiProxyTest` do the
-same for plans, twist configurations, tags, and the outbound proxy. `UiCrawlTest` follows every link from the
-first page on, also with a server that states content that is written to be read as markup.
+same for plans, twist configurations, tags, and the outbound proxy. `UiHistoryTest`, `UiHistoryEntryTest`,
+and `UiStatisticsTest` cover the history and the statistics. `UiCrawlTest` follows every link from the first
+page on, also with a server that states content that is written to be read as markup.

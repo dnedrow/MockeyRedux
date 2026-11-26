@@ -74,6 +74,35 @@ internal interface Ui {
         ask: suspend (View, SystemStatusDto) -> Page,
         act: suspend (FormInput) -> Outcome,
     )
+
+    /**
+     * Answers the request of [call] with the file that [file] returns. The browser saves the file instead
+     * of displaying it. If the server is unreachable or incompatible, the answer is the page that says so
+     * (see [FailurePages]), and no file is handed out.
+     */
+    suspend fun download(
+        call: ApplicationCall,
+        file: suspend () -> Download,
+    )
+}
+
+/**
+ * A file that the UI hands to the browser as a download: the [name] that the browser saves it under, its
+ * media [type], and its [text]. The name is one that the UI chose, so it only has letters, digits, dots,
+ * hyphens, and underscores.
+ */
+internal class Download(
+    val name: String,
+    val type: ContentType,
+    val text: String,
+) {
+    init {
+        require(NAME.matches(name)) { "The name of a download is a plain file name, and $name isn't one." }
+    }
+
+    private companion object {
+        val NAME = Regex("[A-Za-z0-9._-]+")
+    }
 }
 
 /**
@@ -259,6 +288,18 @@ internal class UiApplication(
         if (form != null && Confirmation.isGiven(form)) submit(call, act = act) else show(call, ask)
     }
 
+    override suspend fun download(
+        call: ApplicationCall,
+        file: suspend () -> Download,
+    ) {
+        // Asking for the status first gives an unreachable or incompatible server its failure page.
+        call.attributes.put(SYSTEM, client.getSystem())
+        val download = file()
+        call.response.header(HttpHeaders.CacheControl, "no-store")
+        call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"${download.name}\"")
+        call.respondText(download.text, download.type.withCharset(Charsets.UTF_8))
+    }
+
     /** Answers with the form that was not taken, as the page that [again] makes of [state]. */
     private suspend fun showAgain(
         call: ApplicationCall,
@@ -268,7 +309,7 @@ internal class UiApplication(
         val system = client.getSystem()
         call.attributes.put(SYSTEM, system)
         val page = again(View(tokens.tokenFor(call)), system, state)
-        respond(call, Page(page.title, HttpStatusCode.UnprocessableEntity, page.content))
+        respond(call, Page(page.title, HttpStatusCode.UnprocessableEntity, content = page.content))
     }
 
     /**
@@ -354,7 +395,20 @@ internal class UiApplication(
     internal companion object {
         /** The areas of the UI. */
         val AREAS: List<Area> =
-            listOf(ServicesArea, ServiceArea, ScenarioArea, DiagnosticsArea, PlansArea, TwistsArea, TagsArea, ProxyArea, SystemArea)
+            listOf(
+                ServicesArea,
+                ServiceArea,
+                ScenarioArea,
+                DiagnosticsArea,
+                HistoryArea,
+                HistoryEntryArea,
+                StatisticsArea,
+                PlansArea,
+                TwistsArea,
+                TagsArea,
+                ProxyArea,
+                SystemArea,
+            )
 
         private val log = LoggerFactory.getLogger(UiApplication::class.java)
 

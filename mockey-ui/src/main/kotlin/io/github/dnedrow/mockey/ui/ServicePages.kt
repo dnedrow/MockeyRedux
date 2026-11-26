@@ -159,6 +159,7 @@ internal object ServicePages {
             div(classes = "actions") {
                 a(href = addressOf(EDIT, service)) { +"Edit" }
                 postForm(view, addressOf(DUPLICATE, service), classes = "inline") { submit("Duplicate") }
+                a(href = HistoryPages.addressOfService(service.id)) { +"History of this service" }
                 a(href = addressOf(DELETE, service)) { +"Delete" }
             }
             dl {

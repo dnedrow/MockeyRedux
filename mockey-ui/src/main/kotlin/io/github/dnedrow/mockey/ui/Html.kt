@@ -3,6 +3,7 @@ package io.github.dnedrow.mockey.ui
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.http.HttpStatusCode
 import kotlinx.html.FlowContent
+import kotlinx.html.MetaHttpEquiv
 import kotlinx.html.a
 import kotlinx.html.body
 import kotlinx.html.footer
@@ -33,6 +34,11 @@ import kotlinx.html.ul
 internal class Page(
     val title: String,
     val status: HttpStatusCode = HttpStatusCode.OK,
+    /**
+     * The number of seconds after which the browser loads the page again, or `null` for a page that stays
+     * as it is. The reload doesn't need scripting.
+     */
+    val refresh: Int? = null,
     val content: FlowContent.() -> Unit,
 )
 
@@ -62,6 +68,7 @@ internal object Html {
     val sections: List<Section> =
         listOf(
             Section(ServicesPages.OVERVIEW, "Services", setOf(ServicePages.PAGE, ScenarioPages.PAGE, DiagnosticsPages.PATH)),
+            Section(HistoryPages.LIST, "History", setOf(StatisticsPages.PAGE)),
             Section(PlanPages.LIST, "Plans", setOf(PlanPages.PAGE)),
             Section(TwistPages.LIST, "Twisting", setOf(TwistPages.PAGE)),
             Section(TagPages.PAGE, "Tags", setOf("/tag")),
@@ -91,6 +98,12 @@ internal object Html {
                 head {
                     meta(charset = "utf-8")
                     meta(name = "viewport", content = "width=device-width, initial-scale=1")
+                    page.refresh?.let { seconds ->
+                        meta {
+                            httpEquiv = MetaHttpEquiv.refresh
+                            content = "$seconds"
+                        }
+                    }
                     title("${page.title} - Mockey")
                     link(rel = "stylesheet", href = Assets.path("mockey.css"))
                     link(rel = "icon", href = Assets.path("favicon.svg"), type = "image/svg+xml")

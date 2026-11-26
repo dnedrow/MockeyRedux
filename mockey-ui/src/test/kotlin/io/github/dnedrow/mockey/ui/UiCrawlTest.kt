@@ -62,8 +62,15 @@ class UiCrawlTest {
         val tags = listOf("happy", "nightly", "team-a")
         val ofTags = listOf("/tags") + tags.map { "/tag/remove?tag=$it" } + tags.map { "/services?tag=$it" }
         val general = setOf("/", "/services", "/service/new", "/diagnostics", "/system", "/proxy")
-        val reached = general + ofServices + ofScenarios + ofNewScenarios + ofPlans + ofTwists + ofTags
+        val lists = listOf("/history", "/history?service=svc-customers", "/history?service=svc-orders")
+        val reloading = listOf("/history?refresh=on") + lists.drop(1).map { "$it&refresh=on" }
+        val deletions = listOf("/history/delete", "/history/delete?service=svc-customers", "/history/delete?service=svc-orders")
+        val ofEntry = listOf("/history/entry", "/history/replay", "/history/scenario").map { "$it?id=7" }
+        val ofStatistics = listOf("/statistics", "/statistics/download?format=csv", "/statistics/download?format=json")
+        val ofHistory = lists + reloading + deletions + ofEntry + ofStatistics
+        val reached = general + ofServices + ofScenarios + ofNewScenarios + ofPlans + ofTwists + ofTags + ofHistory
         assertEquals(reached, found.pages.keys)
+        assertEquals(listOf(true, true), ofStatistics.drop(1).map { Hostile.isDownload(found.pages.getValue(it)) })
         assertEquals(emptyMap(), (found.pages - "/").mapValues { it.value.status }.filterValues { it != OK })
         val toPlaces = found.links.filter { it.place != null }
         val astray = toPlaces.filter { link -> found.pages.getValue(link.address).let { it.page.getElementById(link.place!!) } == null }
@@ -139,6 +146,7 @@ class UiCrawlTest {
             api.holdTwists(listOf(twist), enabled = text, paths = paths)
             api.holdTags(held, plans, paths)
             api.holdProxy(OutboundProxyDto(text, enabled = true, username = text, passwordSet = true))
+            api.holdHistory(listOf(Hostile.entry(1, text)), held)
 
             val found = Crawl.from(browser)
 
@@ -149,22 +157,28 @@ class UiCrawlTest {
             val ofPlan = setOf("/plans", "/plan", "/plan/new", "/plan/edit", "/plan/save", "/plan/delete")
             val ofRouting = setOf("/twists", "/twist", "/twist/new", "/twist/delete", "/tags", "/tag/remove")
             val general = setOf("/", "/services", "/diagnostics", "/system", "/proxy")
-            assertEquals(general + ofService + ofScenario + ofPlan + ofRouting, reached, text)
+            val ofEntry = setOf("/history/entry", "/history/replay", "/history/scenario")
+            val ofHistory = setOf("/history", "/history/delete", "/statistics", "/statistics/download") + ofEntry
+            assertEquals(general + ofService + ofScenario + ofPlan + ofRouting + ofHistory, reached, text)
             for ((address, answer) in found.pages - "/") {
                 assertEquals(OK, answer.status, "$text at $address")
-                assertEquals(emptyList(), Hostile.moreThanText(answer), "$text at $address")
+                // A download isn't read as a page, so it can hold content exactly as the server states it.
+                val isDownload = address.startsWith("/statistics/download")
+                assertEquals(isDownload, Hostile.isDownload(answer), "$text at $address")
+                if (!isDownload) assertEquals(emptyList(), Hostile.moreThanText(answer), "$text at $address")
             }
         }
         assertEquals(emptyList(), api.violations)
     }
 
-    /** Makes [api] hold the samples: services, a plan, a twist configuration, and proxy settings. */
+    /** Makes [api] hold the samples: services, a plan, a twist configuration, proxy settings, and a history entry. */
     private fun holdSamples(api: FakeAdminApi) {
         val services = api.hold(diagnostics = listOf(Samples.diagnostic))
         val plans = api.holdPlans(services)
         api.holdTwists()
         api.holdTags(services, plans)
         api.holdProxy()
+        api.holdHistory(services = services)
     }
 
     private companion object {

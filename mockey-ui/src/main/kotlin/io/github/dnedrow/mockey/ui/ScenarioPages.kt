@@ -386,7 +386,6 @@ internal object ScenarioForm {
 
     private const val INVALID_STATUS = "The status code is a whole number from 100 to 999."
     private const val INVALID_DELAY = "The delay is a whole number of milliseconds, 0 or more."
-    private const val HEADER_FORMAT = "A header has the form Name: value, for example Content-Type: text/plain."
 
     /** Returns the initial state of the form for a new scenario: status code 200 and no delay. */
     fun blank(): FormState {
@@ -407,7 +406,7 @@ internal object ScenarioForm {
             mapOf(
                 NAME to inOneLine(scenario.name),
                 STATUS to "${scenario.statusCode}",
-                HEADERS to scenario.headers.joinToString("\n") { "${it.name}: ${it.value}" },
+                HEADERS to HeaderLines.textOf(scenario.headers),
                 BODY to scenario.responseBody,
                 BODY_LINE_ENDINGS to LineEndings.styleOf(scenario.responseBody),
                 CRITERION to criterionText,
@@ -433,15 +432,11 @@ internal object ScenarioForm {
         val status = enteredStatus.toIntOrNull()?.takeIf { it in STATUS_CODES }
         val enteredDelay = input.text(DELAY).trim()
         val delay = enteredDelay.ifEmpty { "0" }.toLongOrNull()?.takeIf { it >= 0 }
-        val lines = input.lines(HEADERS).split('\n').withIndex()
-        val headerLines = lines.filter { it.value.isNotBlank() }
-        val invalidLines = headerLines.filter { it.value.substringBefore(':', "").isBlank() }
+        val enteredHeaders = HeaderLines.read(input.lines(HEADERS), "headers")
         val errors =
             buildList {
                 if (status == null && input.isChanged(STATUS)) add(FieldErrorDto("statusCode", INVALID_STATUS))
-                if (input.isChanged(HEADERS)) {
-                    invalidLines.forEach { add(FieldErrorDto("headers", "Line ${it.index + 1} is not a header. $HEADER_FORMAT")) }
-                }
+                if (input.isChanged(HEADERS)) addAll(enteredHeaders.errors)
                 if (delay == null && input.isChanged(DELAY)) add(FieldErrorDto("delayMillis", INVALID_DELAY))
             }
         if (errors.isNotEmpty()) throw InvalidInput(errors)
@@ -450,8 +445,7 @@ internal object ScenarioForm {
             if (input.isChanged(NAME)) put("name", input.text(NAME))
             if (status != null && input.isChanged(STATUS)) put("statusCode", status)
             if (input.isChanged(HEADERS)) {
-                val headers = headerLines.map { headerOf(it.value) }
-                put("headers", json.encodeToJsonElement(ListSerializer(HeaderDto.serializer()), headers))
+                put("headers", json.encodeToJsonElement(ListSerializer(HeaderDto.serializer()), enteredHeaders.headers))
             }
             if (input.isChanged(BODY)) put("responseBody", LineEndings.apply(input.text(BODY_LINE_ENDINGS), input.lines(BODY)))
             if (input.isChanged(CRITERION, CRITERION_IS_RULES)) {
@@ -462,9 +456,6 @@ internal object ScenarioForm {
             if (input.isChanged(TAGS)) put("tags", JsonArray(tagsIn(input.text(TAGS)).map(::JsonPrimitive)))
         }
     }
-
-    /** Returns the header in [line]: the name is everything before the first colon, and the value is the rest. */
-    private fun headerOf(line: String): HeaderDto = HeaderDto(line.substringBefore(':').trim(), line.substringAfter(':').trim())
 
     /**
      * Returns the match criterion from the form: none if the field is blank, a rule set if the check box is

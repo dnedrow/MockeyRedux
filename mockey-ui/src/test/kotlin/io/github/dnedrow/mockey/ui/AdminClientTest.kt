@@ -70,6 +70,7 @@ class AdminClientTest {
             val filter = TagFilterDto(listOf("team-a"))
             val filtered = "token=customer&token=%21gold&serviceId=svc-customers&after=3&max=50"
             val csv = "Service identifier,Service name,Entries\nsvc-customers,Customers,3\n"
+            val statisticsText = """{ "services": [], "oldestEntryTime": null }"""
             val document = """{"formatVersion":1,"services":[]}"""
             val ofService = "services/${customers.id}"
             val ofScenario = "$ofService/scenarios/${found.id}"
@@ -147,6 +148,9 @@ class AdminClientTest {
                     getStatistics("2026-01-01T00:00:00Z", "2026-12-31T23:59:59+01:00")
                 },
                 Function("GET stats?format=csv", FakeAdminApi.Answer(200, csv, "text/csv; charset=UTF-8"), csv) { getStatisticsAsCsv() },
+                Function("GET stats?to=2026-12-31T23%3A59%3A59Z", FakeAdminApi.Answer(200, statisticsText), statisticsText) {
+                    getStatisticsAsJson(to = "2026-12-31T23:59:59Z")
+                },
                 Function("GET definitions/export", FakeAdminApi.Answer(200, document), document) { exportDefinitions() },
                 Function("POST definitions/import?tag=imported&tag=legacy", json(importReport), importReport) {
                     importDefinitions("<mockservice/>".toByteArray(), isOfMockey2 = true, tags = listOf("imported", "legacy"))

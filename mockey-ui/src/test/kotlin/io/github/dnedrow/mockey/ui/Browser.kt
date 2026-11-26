@@ -21,7 +21,8 @@ import java.net.http.HttpResponse
  * browsers know nothing of each other.
  */
 internal class Browser(
-    private val ui: MockeyUi,
+    /** The UI that the browser talks to. A second browser for the same UI stands for another person's browser. */
+    val ui: MockeyUi,
 ) {
     /** The answer of the UI to a request: its [status], its [headers] by their names in lower case, and its [body]. */
     class Response(

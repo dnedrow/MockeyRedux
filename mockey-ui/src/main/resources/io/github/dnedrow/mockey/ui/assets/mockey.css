@@ -87,6 +87,11 @@ h2 {
   font-size: 1.25rem;
 }
 
+h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.05rem;
+}
+
 a {
   color: var(--accent);
 }
@@ -209,6 +214,15 @@ textarea {
 
 select {
   width: auto;
+}
+
+input[type="datetime-local"] {
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.2rem;
 }
 
 textarea {
@@ -510,4 +524,77 @@ section.diagnostics {
 
 section.diagnostics .kind {
   font-weight: 600;
+}
+
+/* In the history list, the request and the answer wrap. The other cells stay on one line. */
+table.history th,
+table.history td {
+  white-space: nowrap;
+}
+
+table.history td.request,
+table.history td.answer {
+  min-width: 10rem;
+  white-space: normal;
+}
+
+table.history td.answer {
+  min-width: 15rem;
+}
+
+table.history tr.flagged {
+  background: var(--band);
+}
+
+table.history tr:target {
+  outline: 2px solid var(--accent);
+}
+
+/* The link and the buttons of a row stand side by side. */
+td.entry-actions form.inline {
+  display: inline-block;
+  margin-left: 0.5rem;
+}
+
+td.entry-actions button {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.875rem;
+}
+
+/* A button that deletes a single entry is as quiet as the other buttons of its row, but it keeps its color. */
+form.inline button.danger {
+  color: var(--bad);
+}
+
+/* Names with their values, such as the headers of a request. The table is as wide as its content. */
+table.headers {
+  width: auto;
+  min-width: min(100%, 36rem);
+}
+
+table.headers td:first-child {
+  white-space: nowrap;
+}
+
+.paging {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 1rem 0;
+}
+
+.paging span {
+  color: var(--quiet);
+}
+
+/* The statistics table is as wide as its content, and its bars all have one width so that they compare. */
+table.statistics {
+  width: auto;
+  min-width: min(100%, 36rem);
+}
+
+meter {
+  width: 12rem;
+  height: 0.9rem;
+  vertical-align: middle;
 }

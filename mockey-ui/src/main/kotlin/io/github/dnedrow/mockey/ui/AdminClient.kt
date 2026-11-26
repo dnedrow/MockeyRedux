@@ -363,6 +363,12 @@ internal class AdminClient(
         to: String? = null,
     ): HistoryStatisticsDto = read(get(path("stats"), listOfNotNull(from?.let { "from" to it }, to?.let { "to" to it })))
 
+    /** Returns the statistics of the history as the JSON text that the server sends (see [getStatistics]). */
+    suspend fun getStatisticsAsJson(
+        from: String? = null,
+        to: String? = null,
+    ): String = get(path("stats"), listOfNotNull(from?.let { "from" to it }, to?.let { "to" to it })).body
+
     /** Returns the statistics of the history as CSV, see [getStatistics]. */
     suspend fun getStatisticsAsCsv(
         from: String? = null,

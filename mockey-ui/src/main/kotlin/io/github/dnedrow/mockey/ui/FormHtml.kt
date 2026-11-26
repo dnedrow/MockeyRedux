@@ -9,6 +9,7 @@ import kotlinx.html.FormMethod
 import kotlinx.html.a
 import kotlinx.html.button
 import kotlinx.html.checkBoxInput
+import kotlinx.html.dateTimeLocalInput
 import kotlinx.html.div
 import kotlinx.html.fieldSet
 import kotlinx.html.fileInput
@@ -132,6 +133,29 @@ internal fun FlowContent.passwordField(
         passwordInput(name = name) {
             id = idOf(name)
             attributes["autocomplete"] = "new-password"
+            describe()
+        }
+    }
+}
+
+/**
+ * A field for a date and a time (see [textField]). Browsers offer a picker for it, and they submit the
+ * value in the form `2026-01-02T03:04:05`, without an offset. The field shows a value only if it has that
+ * form.
+ */
+internal fun FlowContent.timeField(
+    state: FormState,
+    name: String,
+    label: String,
+    api: String = name,
+    hint: String? = null,
+) {
+    field(state, name, label, api, hint) { describe ->
+        dateTimeLocalInput(name = name) {
+            id = idOf(name)
+            value = state.value(name)
+            // Without a step, a browser leaves out the seconds.
+            attributes["step"] = "1"
             describe()
         }
     }

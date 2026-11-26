@@ -1,5 +1,14 @@
 package io.github.dnedrow.mockey.ui
 
+import io.github.dnedrow.mockey.api.HeaderDto
+import io.github.dnedrow.mockey.api.HistoryEntryDto
+import io.github.dnedrow.mockey.api.NameValueDto
+import io.github.dnedrow.mockey.api.RecordedRequestDto
+import io.github.dnedrow.mockey.api.RecordedResponseDto
+import io.github.dnedrow.mockey.api.RecordedScenarioDto
+import io.github.dnedrow.mockey.api.RecordedServiceDto
+import io.github.dnedrow.mockey.api.ResponseModeDto
+
 /**
  * Content that is written to be read as more than the text that it is, for the tests that show that the pages
  * of the UI read it as text, wherever a server states it.
@@ -55,13 +64,48 @@ internal object Hostile {
     val ELEMENTS =
         setOf("h1", "h2", "p", "a", "form", "div", "label", "input", "button", "table", "thead", "tbody", "tr", "th", "td", "code")
             .plus(setOf("select", "option", "span", "time", "section", "ul", "li", "dl", "dt", "dd", "fieldset", "legend"))
-            .plus(setOf("textarea", "pre"))
+            .plus(setOf("textarea", "pre", "h3", "meter"))
 
     /** The attributes that the pages of the UI are written with. */
     val ATTRIBUTES =
         setOf("class", "id", "href", "action", "method", "enctype", "type", "name", "value", "for", "scope", "role", "rows")
             .plus(setOf("selected", "checked", "disabled", "datetime", "aria-label", "aria-pressed", "aria-describedby", "aria-invalid"))
-            .plus("autocomplete")
+            .plus(setOf("autocomplete", "step", "min", "max"))
+
+    /** Returns the history entry [id] that states [text] wherever a history entry states a text. */
+    fun entry(
+        id: Long,
+        text: String,
+    ): HistoryEntryDto {
+        val headers = listOf(HeaderDto(text, text))
+        val pairs = listOf(NameValueDto(text, text))
+        return HistoryEntryDto(
+            id = id,
+            time = text,
+            clientAddress = text,
+            request = RecordedRequestDto(text, text, text, headers, pairs, pairs, Samples.body(text)),
+            response = RecordedResponseDto(200, headers, Samples.body(text)),
+            target = text,
+            targetBeforeTwisting = text,
+            service = RecordedServiceDto(text, text, listOf(text)),
+            responseMode = ResponseModeDto.DYNAMIC,
+            scenario = RecordedScenarioDto(text, text, listOf(text)),
+            outcome = text,
+            inspectionMessages = listOf(text),
+            explanation = text,
+            flagged = true,
+        )
+    }
+
+    /**
+     * Returns whether [answer] is a file that a browser saves instead of displaying it. A download can hold
+     * content exactly as a server states it, because the browser never reads it as a page.
+     */
+    fun isDownload(answer: Browser.Response): Boolean {
+        val type = answer.header("content-type").orEmpty()
+        val isAttachment = answer.header("content-disposition").orEmpty().startsWith("attachment")
+        return isAttachment && !type.startsWith("text/html") && answer.header("x-content-type-options") == "nosniff"
+    }
 
     /** Returns how a client of the admin API writes [identifier] as a segment of a path, which is how an address of the UI writes it. */
     fun written(identifier: String): String = Address.of("/x", "id" to identifier).substringAfter("id=")
