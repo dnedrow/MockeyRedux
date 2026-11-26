@@ -6,6 +6,7 @@ import io.github.dnedrow.mockey.core.model.Header
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.request.MockRequest
 import io.github.dnedrow.mockey.core.request.Parameter
+import io.github.dnedrow.mockey.core.storage.StorageException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -14,6 +15,10 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
 
 /**
@@ -60,6 +65,10 @@ internal class LegacyShim(
                 endpoint.answer(parametersOf(call, target, body))
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (failure: StorageException) {
+                // What the storage says is about the definitions location, and it is for whoever looks after it.
+                log.error("The request for {} of the legacy shim failed at the definitions location.", target.path, failure)
+                ShimResult.fail(NOT_STORED)
             } catch (failure: Exception) {
                 // The query string is left out, because it can hold a secret.
                 log.error("The request for {} of the legacy shim failed.", target.path, failure)
@@ -90,7 +99,8 @@ internal class LegacyShim(
 
     internal companion object {
         /** Returns the endpoints of the shim for [engine], by their paths. */
-        fun endpointsOf(engine: MockeyEngine): Map<String, ShimEndpoint> = mapOf(ShimDefinitions.PATH to ShimDefinitions(engine))
+        fun endpointsOf(engine: MockeyEngine): Map<String, ShimEndpoint> =
+            mapOf(ShimDefinitions.PATH to ShimDefinitions(engine), ShimServices.PATH to ShimServices(engine))
 
         private val log = LoggerFactory.getLogger(LegacyShim::class.java)
 
@@ -98,6 +108,8 @@ internal class LegacyShim(
         private const val ANY_URL = "http://localhost/"
 
         private const val FAILED = "The server failed to handle the request. Its log says why."
+        private const val NOT_STORED =
+            "The server could not write its definitions location, and nothing was changed. The log of the server says why."
     }
 }
 
@@ -105,6 +117,30 @@ internal class LegacyShim(
 internal fun interface ShimEndpoint {
     /** Returns the document that answers a request with [parameters]. */
     suspend fun answer(parameters: ShimParameters): JsonObject
+}
+
+/**
+ * The result envelope of Mockey 2.x, with which the endpoints of the shim that change something answer: a
+ * JSON object with the member `result`. That member has the member `success` when the request did what it
+ * asked for, and the member `fail` when it did not. Either one is a text for a person to read.
+ */
+internal object ShimResult {
+    /** Returns the answer to a request that succeeded: it says so in [text], and it states what [state] puts. */
+    fun success(
+        text: String,
+        state: JsonObjectBuilder.() -> Unit = {},
+    ): JsonObject =
+        buildJsonObject {
+            putJsonObject(RESULT) {
+                put("success", text)
+                state()
+            }
+        }
+
+    /** Returns the answer to a request that did not succeed. [text] says why. */
+    fun fail(text: String): JsonObject = buildJsonObject { putJsonObject(RESULT) { put("fail", text) } }
+
+    private const val RESULT = "result"
 }
 
 /**

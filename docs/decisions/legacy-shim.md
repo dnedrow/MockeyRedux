@@ -1,6 +1,6 @@
 # The legacy shim
 
-Decided in task 14.1 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 14.1 and 14.2 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The legacy shim answers the automation endpoints of Mockey 2.x, so that the scripts that were written for
 them keep working. It's a handler on the mock listener, and a server has it only when it's started with
@@ -50,6 +50,7 @@ section "Server".
 | Caching | `Cache-Control: no-store`. | Most requests to the shim change something, or they read what changes. |
 | Other origins | No `Access-Control-Allow-Origin`. | DEV-26. A script needs none, and a page of another origin has no business reading the definitions. |
 | A failure | The status 500 with a text that says where to look. The log names the path of the endpoint and the exception. | The log of the server gets nothing else of a request, because a query string can hold a secret. |
+| A change that can't be stored | The result envelope with `fail`, see "The result envelope". | A server in writable mode stores a change before the change takes effect, so nothing was changed, and that's an outcome that a script can read. |
 
 ## Finding a service
 
@@ -94,6 +95,60 @@ designates. The two differ for a service that someone stored by hand with a desi
 its scenarios. Such a service answers with its first scenario, and that's the scenario a script wants to
 know about.
 
+## The result envelope
+
+`/config/service`, `/plan/setup`, and `/home` answer with a JSON object that has the member `result`. That
+member has `success` when the request did what it asked for, and `fail` when it didn't, never both
+(`legacy-compatibility`: Legacy result envelope). Either one is a text for a person. A `fail` is the only
+member of its result, as the recordings state it.
+
+When a change can't be stored, the text says that nothing was changed and that the log says why. The reason
+itself goes to the log only: it's about the definitions location, and the mock listener answers everyone.
+
+## `/config/service`
+
+The endpoint changes how one service answers. A request names the service, and each of its other parameters
+says one thing about the service. What a request doesn't mention stays as it is.
+
+| Parameter | What it sets |
+|---|---|
+| `serviceResponseType` | The response mode: `proxy`, `static`, or `dynamic`, or the numbers `0`, `1`, or `2`, in any letter case. |
+| `scenarioId`, `scenarioName` | The default scenario. The identifier counts first, and then the name, as for a service. |
+| `hangTime` | The delay in milliseconds, as a whole number. |
+| `defaultUrlIndex` | The default real URL by its place in the list, counted from 1. |
+| `requestInspectorName` | The inspector. The text `null` and a blank name remove it. |
+| `requestInspectorJsonRules` | The request rules. An empty text removes them. |
+| `requestInspectorJsonRulesEnableFlag` | Whether the request rules are on. They are for `true` in any letter case, and off for every other text. |
+| `serviceSchema` | The response schema. An empty text removes it. |
+| `serviceSchemaEnableFlag` | Whether the response schema is on, read like the other flag. |
+| `transientState` | Nothing. The server has no such state for a service (DEV-22). |
+
+**A value that says nothing usable changes nothing.** That holds for a response type that is none, for a
+delay or a place that is no whole number, and for a scenario that the service doesn't have. The result still
+says `updated`. Mockey 2.x tried each parameter on its own and went on when one failed, and the recording
+`automation-config-unknown-scenario` states `updated` for a scenario name that the service doesn't have. The
+result states the service after the change, so a script can see what came of its request.
+
+**A place that the list of real URLs doesn't have gives the first URL.** Mockey 2.x stored such a place and
+forwarded to the first URL when it came to it. The core does the same when it stores the service.
+
+**Request rules that aren't a well-formed rule set fail the request.** Mockey 2.x stored every text as rules.
+The core takes a well-formed rule set only, for the admin API as well, so the result has `fail` with what is
+wrong with the rules. The change to a service is one change, so nothing else of the request is applied
+either. An answer is `updated` with everything usable applied, or `fail` with nothing changed.
+
+**The result states ten members.** They are `success`, `serviceId`, `serviceName`, `scenarioId`,
+`scenarioName`, `serviceResponseType`, `hangTime`, `requestInspectorName`, `serviceSchemaEnableFlag`, and
+`requestInspectorJsonRulesEnableFlag`. The mode, the delay, the inspector, and the scenario are stated as
+`/definitions` states them. A service without scenarios has JSON `null` for the scenario, where Mockey 2.x
+left `scenarioName` out.
+
+**A request that names no service gets a `fail`.** Mockey 2.x answered it with the status 500 and a stack
+trace (DEV-46). Its servlet has a branch for that case which nothing reached. The text of the shim starts as
+the text of that branch does, with "Unable to update service configuration.", and then says why.
+
+The second path of the servlet of Mockey 2.x, `/service_scenario`, isn't served (DEV-26).
+
 ## No admin token
 
 The shim asks for no admin token. Mockey 2.x had none, the scripts that the shim is for send none, and the
@@ -120,9 +175,11 @@ takes a token.
 ## Repeating the tests
 
 ```shell
-./gradlew :mockey-server:test --tests '*LegacyShimTest' --tests '*MockeyServerTest' --tests '*ServerProgramTest'
+./gradlew :mockey-server:test --tests '*ShimTest' --tests '*ShimServicesTest' --tests '*MockeyServerTest' --tests '*ServerProgramTest'
 ```
 
 `LegacyShimTest` sends requests to a listener that runs the module of the mock listener, with the shim and
 without it. `ShimFixture` defines the services of the parity fixture `automation.xml`, and the test compares
-the answers of `/definitions` with the ones that the recordings state.
+the answers of `/definitions` with the ones that the recordings state. `ShimServicesTest` does the same for
+`/config/service`: it sends the request of each recording, compares the answer, and compares the service
+after the request with the service that the request asks for.

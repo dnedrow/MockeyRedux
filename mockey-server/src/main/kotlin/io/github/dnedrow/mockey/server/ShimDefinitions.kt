@@ -41,15 +41,15 @@ internal class ShimDefinitions(
             put(SERVICE_ID, service.id.value)
             put("defaultScenarioId", default?.id?.value)
             put("defaultScenarioName", default?.name)
-            put("serviceResponseType", modeNameOf(service))
-            put("hangTime", service.delayMillis)
-            put("requestInspectorName", inspectorNameOf(service))
+            put(RESPONSE_TYPE, modeNameOf(service))
+            put(HANG_TIME, service.delayMillis)
+            put(INSPECTOR_NAME, inspectorNameOf(service))
             putJsonArray("scenarioArray") {
                 for (scenario in service.scenarios.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })) {
                     add(
                         buildJsonObject {
-                            put("scenarioId", scenario.id.value)
-                            put("scenarioName", scenario.name)
+                            put(SCENARIO_ID, scenario.id.value)
+                            put(SCENARIO_NAME, scenario.name)
                         },
                     )
                 }
@@ -81,4 +81,7 @@ internal fun modeNameOf(service: Service): String = service.effectiveResponseMod
  * Returns the name of the inspector of [service], as Mockey 2.x stated it. Mockey 2.x wrote the text `null`
  * for a service without an inspector, and scripts compare with that text.
  */
-internal fun inspectorNameOf(service: Service): String = service.inspectorName ?: "null"
+internal fun inspectorNameOf(service: Service): String = service.inspectorName ?: NO_INSPECTOR
+
+/** What Mockey 2.x wrote in the place of the name of an inspector for a service without one. */
+internal const val NO_INSPECTOR = "null"

@@ -140,7 +140,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 ## 14. Legacy shim (spec: legacy-compatibility)
 
 - [x] 14.1 Implement the shim as an optional server module on the mock listener that is off by default. Verify with tests for 404 responses when disabled and JSON responses when enabled.
-- [ ] 14.2 Implement `/config/service` with its parameters, the ignored `transientState` (DEV-22), and its result. Verify with tests against the result shapes recorded in task 2.8.
+- [x] 14.2 Implement `/config/service` with its parameters, the ignored `transientState` (DEV-22), and its result. Verify with tests against the result shapes recorded in task 2.8.
 - [ ] 14.3 Implement `/plan/setup` with its four actions and result, and `/definitions`. Verify with tests against the result shapes recorded in task 2.8.
 - [ ] 14.4 Implement `/home` for `init` and `deleteAllServices`, confined to the definitions location and refusing `url` (DEV-27), and the identifier round trip (DEV-20). Verify with tests for each scenario of those requirements.
 - [ ] 14.5 Add the shim to `docs/migrating-from-2x.md`: how to enable it and how it differs from Mockey 2.x. Verify that the documented requests run in a test.
