@@ -1,6 +1,6 @@
 # The legacy shim
 
-Decided in tasks 14.1 to 14.3 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 14.1 to 14.4 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The legacy shim answers the automation endpoints of Mockey 2.x, so that the scripts that were written for
 them keep working. It's a handler on the mock listener, and a server has it only when it's started with
@@ -49,6 +49,7 @@ section "Server".
 | The answer | A JSON document with the status 200, whatever came of the request. | A script reads the document, and Mockey 2.x gave it no other status to read. |
 | Caching | `Cache-Control: no-store`. | Most requests to the shim change something, or they read what changes. |
 | Other origins | No `Access-Control-Allow-Origin`. | DEV-26. A script needs none, and a page of another origin has no business reading the definitions. |
+| A request that the endpoint has no answer to | The status 404, as for a path that the mock listener doesn't serve. | Only `/home` has such requests, see "`/home`". |
 | A failure | The status 500 with a text that says where to look. The log names the path of the endpoint and the exception. | The log of the server gets nothing else of a request, because a query string can hold a secret. |
 | A change that can't be stored | The result envelope with `fail`, see "The result envelope". | A server in writable mode stores a change before the change takes effect, so nothing was changed, and that's an outcome that a script can read. |
 
@@ -194,11 +195,96 @@ own.
 The endpoint takes `transient_state` and doesn't use it (DEV-22). It takes `type` as well: Mockey 2.x
 answered with a page without `type=json`, and the shim always answers with the result envelope.
 
+## `/home`
+
+Mockey 2.x served its home page at `/home`, and a script used the path for two things. They are all that
+the endpoint answers:
+
+| Action | What it does | The text of `success` |
+|---|---|---|
+| `init` | Puts the definitions of the document that `file` names in the place of the definitions of the server. | `Loaded definitions from suite-a.xml` |
+| `deleteAllServices` | Makes a clean slate, as the reset of the admin API does: no definitions, no history, and no tag filter. | `All is deleted. You have a clean slate. Enjoy.` |
+
+Every other request to `/home` gets the status 404 and nothing else, like a request for a path that the mock
+listener doesn't serve (`legacy-compatibility`: Legacy initialization and reset endpoint). Among them is a
+request with `filterTag` and no action, which set the tag filter in Mockey 2.x. An action is named as it's
+written. The answer to the two actions is always the result envelope, also without `type=json`, where
+Mockey 2.x redirected to its home page (DEV-50).
+
+### Which document an init reads
+
+`file` names a document of Mockey 2.x inside the definitions location of the server, which is the setting
+`--definitions`. A relative name starts at that location. Mockey 2.x read any path of the machine, and with
+`url` any URL (DEV-27).
+
+**The name has to stay inside the location in two ways.** First as it's written: a name that leaves the
+location, such as `/etc/hosts` or `../other.xml`, is refused before the server looks at any file. Then by
+where the file really is: a link inside the location that leads out of it is not followed. Both get the
+same text, which says that the file isn't inside the definitions location. The server stores its own
+definitions in that location and leaves every other file there alone, so a team can keep its documents next
+to them.
+
+**`url` is refused, whatever else the request names.** No request is made to the URL.
+
+**A file that is no definitions document changes nothing.** Mockey 2.x deleted its definitions before it
+found out. The server reads the document first, and it touches its definitions only when the document
+holds some, or when the document is a definitions document that holds none. A file that doesn't exist gets
+the text of Mockey 2.x, `missing.xml does not exist. doing nothing.`, because the recording states it. So
+does every name that leads the server to no file, such as a link that leads nowhere.
+
+**The files that a document refers to are read with it, as far as they're in its own directory.** A
+definitions directory of Mockey 2.x has a main file that refers to one file for each service. Mockey 2.x
+loaded those files with the main file, and a team that keeps such a directory under version control
+initializes from its main file. Read on its own, the main file would give the plans without the services,
+and the result would still say `Loaded definitions`. The legacy import follows a reference only inside the
+directory that it imports, also where a link leads, so nothing outside the definitions location is read.
+
+### What an init changes
+
+An init changes nothing until it has read its document. Then it takes these steps:
+
+1. It switches the server to read-only mode, so that the next two steps happen in memory.
+2. It resets the server and imports the definitions of the document.
+3. It sets the tag filter of `filterTag`, where the request has one. The reset has cleared the filter, so
+   an init without `filterTag` leaves none. Mockey 2.x set the filter first and lost it in the next step
+   (DEV-49).
+4. It switches the server to the mode that the request asks for. With `transientState=true` that's read-only
+   mode, with every other `transientState` it's writable mode, and without the parameter it's the mode that
+   the server was in. The switch to writable mode stores the new definitions.
+
+**In writable mode, the definitions of the document take the place of the stored ones.** That's what the
+specification asks of an init, and it's what a reset and an import through the admin API do as well. At
+startup it's different: there the server takes initial definitions in writable mode only while the
+definitions location holds none (DEV-30). An init is a request to replace what the server holds.
+
+**The definitions location holds the old definitions or the new ones.** Steps 1 and 4 see to that: nothing
+is stored between the reset and the import. When step 4 can't store the definitions, the server holds them
+in memory, in read-only mode, and the stored ones are the old ones. The result then has `fail` with a text
+that says so, and the log says why.
+
+**Two requests take turns.** An init takes several changes of the engine, and two inits that took them
+alternately would leave the definitions of both documents. So one request at a time replaces or clears the
+definitions.
+
+**Every init gives the definitions of its document new identifiers**, as every load did in Mockey 2.x
+(DEV-20). A script reads them from `/definitions` after the init, or it names its services and plans.
+
+### What the log says
+
+The server writes a line to its log at the level of information when a request to `/home` replaces or
+clears its definitions: these requests change everything that the server answers with. The line of an init
+names the document by its path from the definitions location, as the file system has it, and says what the
+definitions hold now. What the import didn't take as the document has it follows as warnings, such as a
+reference that names nothing. A text of the document that would break a line of the log has a space in the
+place of the line break. Nothing of the request is in the log.
+
 ## No admin token
 
 The shim asks for no admin token. Mockey 2.x had none, the scripts that the shim is for send none, and the
 specification puts the shim on the mock listener, which has none either. So whoever reaches the mock
-listener of a server with the shim can read and change its definitions, as with Mockey 2.x.
+listener of a server with the shim can read and change its definitions, as with Mockey 2.x. With `/home`,
+that includes deleting all of them, replacing them with a document of the definitions location, and
+switching the server to writable mode, in which it stores what it holds.
 
 That's why the shim is off by default. A server that has the shim says what that means in its log:
 
@@ -229,4 +315,5 @@ the answers of `/definitions` with the ones that the recordings state. `ShimServ
 `ShimPlansTest` do the same for `/config/service` and `/plan/setup`: each sends the requests of the
 recordings, compares the answers, and compares the definitions after a request with the ones that the
 request asks for. Where a recording names a service by a number of Mockey 2.x, a test also sends the request
-with the identifier of this server, to see what the request does when it finds its service.
+with the identifier of this server, to see what the request does when it finds its service. `ShimHomeTest`
+gives each test a definitions location of its own with the document of the recordings, `suite-a.xml`.

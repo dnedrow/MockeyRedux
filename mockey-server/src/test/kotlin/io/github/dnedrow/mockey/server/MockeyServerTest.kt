@@ -224,6 +224,63 @@ class MockeyServerTest {
         assertEquals(TestLog.messages(ofShim, "WARN"), TestLog.messages(ofShim))
     }
 
+    /**
+     * The legacy shim of a server reads a document of Mockey 2.x in the definitions location of that server,
+     * next to the files in which the server stores its definitions. In read-only mode, the server takes the
+     * definitions of the document into memory, and the definitions location stays as it is.
+     */
+    @Test
+    fun theLegacyShimLoadsADocumentOfTheDefinitionsLocationOfTheServer() {
+        val location = definitionsLocation()
+        Files.writeString(location.resolve("suite.xml"), SUITE)
+        val before = filesOf(location)
+        val server = start(settings().copy(definitions = location, legacyShim = true))
+        val mock = server.listeners.mock.address
+
+        val stored = RawHttp.get(mock, "/service/customer/7")
+        val init = RawHttp.get(mock, "/home?action=init&type=json&transientState=true&file=suite.xml")
+        val loaded = RawHttp.get(mock, "/service/suite")
+        val gone = RawHttp.get(mock, "/service/customer/7")
+
+        assertEquals(200 to StoredDefinitions.CUSTOMER, stored.status to stored.body)
+        assertEquals("""{"result":{"success":"Loaded definitions from suite.xml"}}""", init.body)
+        assertEquals(200 to "suite answer", loaded.status to loaded.body)
+        assertEquals(404, gone.status)
+        assertEquals(before, filesOf(location))
+        assertTrue("suite.xml" in before.keys && before.size > 1, "$before")
+    }
+
+    /**
+     * In writable mode, the definitions of the document take the place of the stored ones, so a server that
+     * starts on the definitions location afterwards has them. The document itself stays where it is.
+     */
+    @Test
+    fun theLegacyShimOfAServerInWritableModeStoresTheDefinitionsOfTheDocument() {
+        val location = definitionsLocation()
+        Files.writeString(location.resolve("suite.xml"), SUITE)
+        val first = start(settings().copy(definitions = location, legacyShim = true, readOnly = false))
+
+        val init = RawHttp.get(first.listeners.mock.address, "/home?action=init&file=suite.xml")
+        first.close()
+        val second = start(settings().copy(definitions = location))
+        val loaded = RawHttp.get(second.listeners.mock.address, "/service/suite")
+        val gone = RawHttp.get(second.listeners.mock.address, "/service/customer/7")
+
+        assertEquals("""{"result":{"success":"Loaded definitions from suite.xml"}}""", init.body)
+        assertEquals(200 to "suite answer", loaded.status to loaded.body)
+        assertEquals(404, gone.status)
+        assertEquals(SUITE, Files.readString(location.resolve("suite.xml")))
+    }
+
+    /** Returns the files below [directory] by their paths from it, each with its text. */
+    private fun filesOf(directory: Path): Map<String, String> =
+        Files.walk(directory).use { paths ->
+            paths
+                .filter { Files.isRegularFile(it) }
+                .toList()
+                .associate { directory.relativize(it).toString() to Files.readString(it) }
+        }
+
     /** The legacy shim takes a body that is as long as the mock endpoint takes it. */
     @Test
     fun theLegacyShimTakesBodiesAsLongAsTheSettingsOfTheServerSay() {
@@ -341,5 +398,21 @@ class MockeyServerTest {
 
         /** The longest time that something takes which happens at once. The engine takes twice as long to give up a port. */
         const val AT_ONCE_MILLIS = 2_000L
+
+        /** An export document of Mockey 2.x with one service, which answers `suite answer` at `suite`. */
+        val SUITE =
+            """
+            <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+            <mockservice version="1.0" xml:lang="en-US">
+            <service default_real_url_index="0" default_scenario_id="1" description="" error_scenario_id="0" hang_time="0"
+                name="Suite" request_inspector_name="null" service_response_type="1" tag="" url="suite">
+            <scenario hang_time="0" http_method_type="" http_resp_status_code="200" id="1" name="answer" tag="">
+            <scenario_match scenario_match_evaluation_rules_flag="false"><![CDATA[]]></scenario_match>
+            <scenario_response><![CDATA[suite answer]]></scenario_response>
+            <scenario_response_header/>
+            </scenario>
+            </service>
+            </mockservice>
+            """.trimIndent()
     }
 }

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.nio.file.Path
 import java.time.Instant
 
 /**
@@ -75,17 +76,21 @@ internal class ShimUnderTest private constructor(
         /** The header with which a request declares its body as a URL-encoded form. */
         val FORM = listOf("Content-Type: application/x-www-form-urlencoded")
 
+        /** A definitions location that doesn't exist, for a test that has nothing to do with it. */
+        val NO_LOCATION: Path = Path.of("no-definitions-location-of-a-shim-test")
+
         /**
          * Starts a mock listener for [engine], with the legacy shim unless [withShim] says otherwise. The
-         * listener takes a body of [maxRequestBody] bytes at most. Closing what this returns stops the
-         * listener and closes the engine.
+         * listener takes a body of [maxRequestBody] bytes at most, and the shim takes [location] as the
+         * definitions location. Closing what this returns stops the listener and closes the engine.
          */
         fun start(
             engine: MockeyEngine = runBlocking { MockeyEngine.create() },
             withShim: Boolean = true,
             maxRequestBody: Long = MEBIBYTE,
+            location: Path = NO_LOCATION,
         ): ShimUnderTest {
-            val shim = if (withShim) LegacyShim(engine, maxRequestBody) else null
+            val shim = if (withShim) LegacyShim(engine, maxRequestBody, location) else null
             return start(engine, shim, maxRequestBody)
         }
 

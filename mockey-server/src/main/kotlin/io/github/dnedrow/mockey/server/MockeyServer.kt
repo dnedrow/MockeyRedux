@@ -88,7 +88,7 @@ internal class MockeyServer private constructor(
             val mark = ForwardMark(addresses.admin.port.takeUnless { it == 0 })
             val engine = ServerEngine.start(settings, mark)
             val since = clock.instant()
-            val shim = if (settings.legacyShim) LegacyShim(engine, settings.maxRequestBody) else null
+            val shim = if (settings.legacyShim) LegacyShim(engine, settings.maxRequestBody, settings.definitions) else null
             val mockModule = mockListenerModule(MockEndpoint(engine, settings.maxRequestBody, clock), StatusEndpoint(since), shim)
             val listeners =
                 try {

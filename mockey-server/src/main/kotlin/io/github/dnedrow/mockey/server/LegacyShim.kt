@@ -11,6 +11,7 @@ import io.github.dnedrow.mockey.core.storage.StorageException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.content.TextContent
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 
 /**
  * The legacy shim: the automation endpoints of Mockey 2.x on the mock listener, for the scripts that were
@@ -47,20 +49,20 @@ internal class LegacyShim(
     private val maxRequestBody: Long,
     private val endpoints: Map<String, ShimEndpoint>,
 ) {
-    /** Creates the shim of a server with [engine], which takes a body of [maxRequestBody] bytes at most. */
-    constructor(engine: MockeyEngine, maxRequestBody: Long) : this(maxRequestBody, endpointsOf(engine))
+    /**
+     * Creates the shim of a server with [engine], which takes a body of [maxRequestBody] bytes at most and
+     * has its definitions location at [definitions].
+     */
+    constructor(engine: MockeyEngine, maxRequestBody: Long, definitions: Path) : this(maxRequestBody, endpointsOf(engine, definitions))
 
-    /** Answers the request of [call] when it's for an endpoint of the shim, and returns whether it is. */
+    /**
+     * Answers the request of [call] when it's one that the shim answers, and returns whether it is. A request
+     * for the path of an endpoint is none when the endpoint has no answer to it.
+     */
     suspend fun handle(call: ApplicationCall): Boolean {
         val target = RequestTarget.parse(call.request.local.uri)
         val endpoint = endpoints[target.path] ?: return false
-        // The answer of a moment ago says nothing about now.
-        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
-        val body = bodyOf(call, maxRequestBody)
-        if (body == null) {
-            call.respond(Refusal.content(HttpStatusCode.PayloadTooLarge, tooLarge()))
-            return true
-        }
+        val body = bodyOf(call, maxRequestBody) ?: return answered(call, Refusal.content(HttpStatusCode.PayloadTooLarge, tooLarge()))
         val document =
             try {
                 endpoint.answer(parametersOf(call, target, body))
@@ -73,10 +75,20 @@ internal class LegacyShim(
             } catch (failure: Exception) {
                 // The query string is left out, because it can hold a secret.
                 log.error("The request for {} of the legacy shim failed.", target.path, failure)
-                call.respond(Refusal.content(HttpStatusCode.InternalServerError, FAILED))
-                return true
+                return answered(call, Refusal.content(HttpStatusCode.InternalServerError, FAILED))
             }
-        call.respond(TextContent(document.toString(), ContentType.Application.Json, HttpStatusCode.OK))
+        if (document == null) return false
+        return answered(call, TextContent(document.toString(), ContentType.Application.Json, HttpStatusCode.OK))
+    }
+
+    /** Answers the request of [call] with [content], which no cache is to store, and returns that the request is answered. */
+    private suspend fun answered(
+        call: ApplicationCall,
+        content: OutgoingContent,
+    ): Boolean {
+        // The answer of a moment ago says nothing about now.
+        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+        call.respond(content)
         return true
     }
 
@@ -99,12 +111,16 @@ internal class LegacyShim(
         "The body of the request is longer than $maxRequestBody bytes, which is the most that this server takes."
 
     internal companion object {
-        /** Returns the endpoints of the shim for [engine], by their paths. */
-        fun endpointsOf(engine: MockeyEngine): Map<String, ShimEndpoint> =
+        /** Returns the endpoints of the shim for [engine], whose definitions location is at [definitions], by their paths. */
+        fun endpointsOf(
+            engine: MockeyEngine,
+            definitions: Path,
+        ): Map<String, ShimEndpoint> =
             mapOf(
                 ShimDefinitions.PATH to ShimDefinitions(engine),
                 ShimServices.PATH to ShimServices(engine),
                 ShimPlans.PATH to ShimPlans(engine),
+                ShimHome.PATH to ShimHome(engine, definitions),
             )
 
         private val log = LoggerFactory.getLogger(LegacyShim::class.java)
@@ -120,8 +136,12 @@ internal class LegacyShim(
 
 /** An endpoint of the legacy shim. */
 internal fun interface ShimEndpoint {
-    /** Returns the document that answers a request with [parameters]. */
-    suspend fun answer(parameters: ShimParameters): JsonObject
+    /**
+     * Returns the document that answers a request with [parameters], or `null` when the request is none that
+     * the endpoint answers. Such a request gets the status 404, like every request for a path that the mock
+     * listener doesn't serve.
+     */
+    suspend fun answer(parameters: ShimParameters): JsonObject?
 }
 
 /**
