@@ -1149,8 +1149,8 @@ The help says how this server behaves, which differs from Mockey 2.x in places:
 - Merging. The other services are deleted only when no scenario was skipped (DEV-29).
 - Status. The address `/status` says that the server runs and since when, and no longer where the
   definitions are (DEV-28).
-- Robots. The help names the admin API. The automation endpoints of Mockey 2.x come with group 14 of the
-  tasks, and the help says nothing about them yet.
+- Robots. The help names the admin API. Since task 14.5, it also says that a server answers the automation
+  endpoints of Mockey 2.x only with the legacy shim, and that those endpoints ask for no admin token.
 - The help of Mockey 2.x has no topic for the Image Depot, the debug console, or the page for mobile
   devices, and this version has none of the three. So this help doesn't mention them.
 

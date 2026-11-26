@@ -15,7 +15,8 @@ import kotlin.test.assertTrue
 
 /**
  * Task 11.10: the commands of `docs/server.md` and of `docs/migrating-from-2x.md` run as they are written.
- * Task 12.9: so do the examples of `docs/admin-api.md`.
+ * Task 12.9: so do the examples of `docs/admin-api.md`. Task 14.5: so do the requests to the legacy shim
+ * in the migration document.
  *
  * A reader runs the commands of a document in their order, in one directory, with the start script of the
  * distribution on the path of the shell. So does this test. Every block of a document that is marked
@@ -67,12 +68,17 @@ class ServerDocumentsTest {
 
         val commands = runCommandsOf(serverDocument)
 
-        assertEquals(Commands(blocks = 18, servers = 12, compared = 5), commands)
+        assertEquals(Commands(blocks = 19, servers = 13, compared = 5), commands)
     }
 
+    /**
+     * The migration document imports the definitions of a Mockey 2.x, and then it sends the requests of a
+     * script for Mockey 2.x to a server with the legacy shim. It reads the answers of the shim with `jq`.
+     */
     @Test
     fun everyCommandOfTheMigrationDocumentRunsAsItIsWritten() {
         needsTheDefaultPorts()
+        needsJq()
         TestEnvironment.needs(
             TestEnvironment.isFree("127.0.0.1", LEGACY_PORT),
             "the port $LEGACY_PORT free, for what stands in for Mockey 2.x",
@@ -82,7 +88,7 @@ class ServerDocumentsTest {
 
         val commands = runningMockey2(Files.readAllBytes(export)) { runCommandsOf(migrationDocument) }
 
-        assertEquals(Commands(blocks = 6, servers = 2, compared = 2), commands)
+        assertEquals(Commands(blocks = 13, servers = 3, compared = 8), commands)
     }
 
     /**
@@ -92,8 +98,7 @@ class ServerDocumentsTest {
     @Test
     fun everyCommandOfTheAdminApiDocumentRunsAsItIsWritten() {
         needsTheDefaultPorts()
-        val jq = runCatching { ProcessBuilder("jq", "--version").start().waitFor() }.getOrNull() == 0
-        TestEnvironment.needs(jq, "jq, which the document reads the answers with")
+        needsJq()
 
         val commands = runCommandsOf(adminApiDocument)
 
@@ -296,6 +301,11 @@ class ServerDocumentsTest {
         )
         val curl = runCatching { ProcessBuilder("curl", "--version").start().waitFor() }.getOrNull() == 0
         TestEnvironment.needs(curl, "curl, which the documents send requests with")
+    }
+
+    private fun needsJq() {
+        val jq = runCatching { ProcessBuilder("jq", "--version").start().waitFor() }.getOrNull() == 0
+        TestEnvironment.needs(jq, "jq, which a document reads the answers with")
     }
 
     private companion object {

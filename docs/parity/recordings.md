@@ -629,4 +629,4 @@ Not recorded:
 
 - `/home` without an action. Legacy answers with the HTML home page of about 33 KB.
 - `init` without `transientState=true`. It switches legacy to writable mode, in which legacy rewrites its
-  definitions directory (DEV-30).
+  definitions directory (DEV-30). The shim leaves the mode as it is for such a request (DEV-70).

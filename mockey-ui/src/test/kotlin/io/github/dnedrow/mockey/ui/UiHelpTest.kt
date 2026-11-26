@@ -107,6 +107,28 @@ class UiHelpTest {
     }
 
     /**
+     * Task 14.5: the help says what became of the automation endpoints of Mockey 2.x. Its topic about
+     * automation names the four endpoints and the setting that makes a server answer them, and it says that
+     * they ask for no admin token. The page of the server, which the topic leads to, says whether the server
+     * has the setting.
+     */
+    @Test
+    fun theHelpSaysWhatBecameOfTheAutomationEndpointsOfMockey2() {
+        val (browser, _) = browser()
+
+        val topic = browser.get("/help/automation")
+        val server = browser.get(SystemPages.PAGE)
+
+        val said = saidBy(topic)
+        val named = listOf("/definitions", "/config/service", "/plan/setup", "/home", "--legacy-shim", "no admin token")
+        assertEquals(emptyList(), named.filterNot { it in said })
+        val headings = topic.page.select("main .help > h2").map { it.text() }
+        assertTrue("The automation endpoints of Mockey 2.x" in headings, "The headings of the topic: $headings")
+        val facts = server.page.select("main dt").map { it.text() }
+        assertTrue("Legacy shim" in facts, "What the page of the server states: $facts")
+    }
+
+    /**
      * A topic names the pages of the UI that it's about and the topics that continue from it. Each of these
      * links leads to a page that the UI has, and the last one leads back to the list of the topics.
      */

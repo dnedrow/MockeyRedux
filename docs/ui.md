@@ -247,7 +247,7 @@ storage and import. The help is part of the UI, so it works without a connection
 | JSON Schema Validation | The page of a service, then "Check the scenarios against the schema" |
 | Search | The search field of the overview |
 | Help | Help |
-| Configuration API | The admin API, see [admin-api.md](admin-api.md) |
+| Configuration API | The admin API, see [admin-api.md](admin-api.md). A server with the legacy shim still answers the endpoints that the page described, see [migrating-from-2x.md](migrating-from-2x.md). |
 
 The Image Depot, the debug console, and the page for mobile devices are gone, see "What is gone" in
 [migrating-from-2x.md](migrating-from-2x.md).

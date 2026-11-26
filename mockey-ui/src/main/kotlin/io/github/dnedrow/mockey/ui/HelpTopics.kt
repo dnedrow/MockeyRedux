@@ -864,7 +864,7 @@ internal object HelpTopics {
         HelpTopic(
             name = "automation",
             title = "Automation and startup",
-            summary = "The admin API for programs, the status address, and the settings that a server starts with.",
+            summary = "The admin API for programs, scripts for Mockey 2.x, the status address, and the settings that a server starts with.",
             places = listOf("Server" to SystemPages.PAGE),
             related = listOf("storage", "plans"),
         ) {
@@ -879,6 +879,20 @@ internal object HelpTopics {
                   the machine of the server reach it.
                 - The API describes itself at `/api/v1/openapi.json`.
                 - A server with an admin token takes only the requests that present the token.
+                """,
+            )
+            h2 { +"The automation endpoints of Mockey 2.x" }
+            prose(
+                """
+                Mockey 2.x had four addresses for scripts on the port of the mock traffic, its automation
+                endpoints: `/definitions`, `/config/service`, `/plan/setup`, and `/home`. A server answers
+                them only when it is started with the setting `--legacy-shim`. The page of the server says
+                whether the legacy shim is enabled. The endpoints take the parameters of Mockey 2.x, so a
+                script that was written for Mockey 2.x keeps working.
+
+                The endpoints ask for no admin token. Whoever reaches the mock listener of a server with the
+                legacy shim can change its definitions and delete them. A script that is written today uses
+                the admin API.
                 """,
             )
             h2 { +"Whether the server runs" }

@@ -1,6 +1,6 @@
 # The legacy shim
 
-Decided in tasks 14.1 to 14.4 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 14.1 to 14.5 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The legacy shim answers the automation endpoints of Mockey 2.x, so that the scripts that were written for
 them keep working. It's a handler on the mock listener, and a server has it only when it's started with
@@ -58,8 +58,8 @@ section "Server".
 A request names a service by `serviceId` or by `serviceName`. The shim tries the identifier first. When the
 request has none, or when the identifier identifies no service, the shim tries the name.
 
-Mockey 2.x looked at the name only when the request had no `serviceId`. The difference shows for a script
-that sends both. Its number identifies nothing on this server (DEV-20). With the rule of Mockey 2.x, the
+Mockey 2.x looked at the name only when the request had no `serviceId` (DEV-71). The difference shows for a
+script that sends both. Its number identifies nothing on this server (DEV-20). With the rule of Mockey 2.x, the
 script would find no service. With the rule of the shim, it finds the service that it names. A script that
 sends an identifier of this server gets that service either way.
 
@@ -128,21 +128,23 @@ says one thing about the service. What a request doesn't mention stays as it is.
 delay or a place that is no whole number, and for a scenario that the service doesn't have. The result still
 says `updated`. Mockey 2.x tried each parameter on its own and went on when one failed, and the recording
 `automation-config-unknown-scenario` states `updated` for a scenario name that the service doesn't have. The
-result states the service after the change, so a script can see what came of its request.
+result states the service after the change, so a script can see what came of its request. One value was
+usable in Mockey 2.x and isn't here: it stored every number of `scenarioId`, also one that no scenario of
+the service had (DEV-71).
 
 **A place that the list of real URLs doesn't have gives the first URL.** Mockey 2.x stored such a place and
 forwarded to the first URL when it came to it. The core does the same when it stores the service.
 
 **Request rules that aren't a well-formed rule set fail the request.** Mockey 2.x stored every text as rules.
-The core takes a well-formed rule set only, for the admin API as well, so the result has `fail` with what is
-wrong with the rules. The change to a service is one change, so nothing else of the request is applied
-either. An answer is `updated` with everything usable applied, or `fail` with nothing changed.
+The core takes a well-formed rule set only (DEV-54), for the admin API as well, so the result has `fail` with
+what is wrong with the rules. The change to a service is one change, so nothing else of the request is
+applied either. An answer is `updated` with everything usable applied, or `fail` with nothing changed.
 
 **The result states ten members.** They are `success`, `serviceId`, `serviceName`, `scenarioId`,
 `scenarioName`, `serviceResponseType`, `hangTime`, `requestInspectorName`, `serviceSchemaEnableFlag`, and
 `requestInspectorJsonRulesEnableFlag`. The mode, the delay, the inspector, and the scenario are stated as
 `/definitions` states them. A service without scenarios has JSON `null` for the scenario, where Mockey 2.x
-left `scenarioName` out.
+left `scenarioName` out (DEV-47).
 
 **A request that names no service gets a `fail`.** Mockey 2.x answered it with the status 500 and a stack
 trace (DEV-46). Its servlet has a branch for that case which nothing reached. The text of the shim starts as
@@ -182,9 +184,9 @@ its home page as well. An action is named as it's written, in lower case.
 `fail`, and its text names the value, such as `Service plan not saved. No service has the identifier 3.`
 The specification doesn't say what such a request answers, and the three recordings of `save_plan` state
 the envelope only: they name their services by the numbers of Mockey 2.x, which name nothing here (DEV-20).
-Mockey 2.x has no answer for an unknown number: its servlet fails on it. A plan for the services that are
-there would be a plan that the script didn't ask for, so nothing is saved. The core refuses such a save, for
-the admin API as well, and the shim passes on what the core says.
+Mockey 2.x has no answer for an unknown number: its servlet fails on it (DEV-72). A plan for the services
+that are there would be a plan that the script didn't ask for, so nothing is saved. The core refuses such a
+save, for the admin API as well, and the shim passes on what the core says.
 
 **A save keeps what the request doesn't mention.** A plan that exists keeps its name without
 `service_plan_name` and its tags without `service_plan_tag`. An empty `service_plan_tag` removes the tags.
@@ -226,6 +228,9 @@ to them.
 
 **`url` is refused, whatever else the request names.** No request is made to the URL.
 
+**An init that names no file gets a `fail`.** Mockey 2.x loaded nothing for it and answered with a result
+that had neither `success` nor `fail` (DEV-73). The specification asks for one of the two in every result.
+
 **A file that is no definitions document changes nothing.** Mockey 2.x deleted its definitions before it
 found out. The server reads the document first, and it touches its definitions only when the document
 holds some, or when the document is a definitions document that holds none. A file that doesn't exist gets
@@ -250,7 +255,8 @@ An init changes nothing until it has read its document. Then it takes these step
    (DEV-49).
 4. It switches the server to the mode that the request asks for. With `transientState=true` that's read-only
    mode, with every other `transientState` it's writable mode, and without the parameter it's the mode that
-   the server was in. The switch to writable mode stores the new definitions.
+   the server was in. The switch to writable mode stores the new definitions. Mockey 2.x set the mode before
+   it read the document, and it took a request without the parameter as one for writable mode (DEV-70).
 
 **In writable mode, the definitions of the document take the place of the stored ones.** That's what the
 specification asks of an init, and it's what a reset and an import through the admin API do as well. At
@@ -260,7 +266,7 @@ definitions location holds none (DEV-30). An init is a request to replace what t
 **The definitions location holds the old definitions or the new ones.** Steps 1 and 4 see to that: nothing
 is stored between the reset and the import. When step 4 can't store the definitions, the server holds them
 in memory, in read-only mode, and the stored ones are the old ones. The result then has `fail` with a text
-that says so, and the log says why.
+that says so, and the log says why. Mockey 2.x answered as if all were stored (DEV-74).
 
 **Two requests take turns.** An init takes several changes of the engine, and two inits that took them
 alternately would leave the definitions of both documents. So one request at a time replaces or clears the
@@ -294,7 +300,7 @@ no admin token. Whoever reaches it can read and change the definitions.
 ```
 
 A web page counts as "whoever" too. A page of any site can make the browser that shows it send a request to
-a server that the browser reaches, and the other endpoints of the shim change the definitions on a `GET`
+a server that the browser reaches, and three of the four endpoints change the definitions on a `GET`
 request. The page can't read the answer, because the shim sends no `Access-Control-Allow-Origin`.
 
 The shim could refuse the requests of a browser, which say where they come from in the headers `Origin` and
@@ -303,11 +309,59 @@ use that Mockey 2.x invited: a link on a team's page that sets a server up with 
 doesn't want the exposure leaves the shim off and uses the admin API, which is on a listener of its own and
 takes a token.
 
+## What the documents say
+
+Task 14.5 puts the shim into the documents for a person who moves from Mockey 2.x:
+
+- [migrating-from-2x.md](../migrating-from-2x.md) has the section "The automation endpoints". It says how
+  to switch the shim on, shows a request to each endpoint with its answer, lists what differs from
+  Mockey 2.x, and names the operation of the admin API for each request of a script.
+- [server.md](../server.md) names the endpoints among the things that the mock listener serves. Its section
+  "Security" says what the shim opens and how to limit that.
+- The help of the UI says what became of the endpoints, in its topic about automation.
+- [deviations.md](../deviations.md) has five more entries, DEV-70 to DEV-74, and DEV-47 now covers the
+  result of `/config/service` as well.
+
+**The requests of the migration document run in a test.** `ServerDocumentsTest` runs every command of the
+document as it's written, in its order, with the server of the built distribution. Where the document shows
+the answer to a request, the test compares it with what the request prints. So the document can't show an
+answer that the shim doesn't give. The identifiers differ from run to run, so the test accepts any
+identifier in the place of another.
+
+**The document shows the answers as `jq` formats them.** An answer of the shim is one line, and the answer
+of `/definitions` for one service has more than 300 characters. A reader sees the members of an answer when
+each has a line of its own. So the test needs `jq`, as the test of the admin API document does.
+
+**The migration document lists the parameters.** Mockey 2.x described its endpoints on a page of its UI,
+and that page is gone. A person who keeps a script running finds the parameters in the document, next to
+what differs.
+
+**The register gets the differences that no recording shows.** The recordings of task 2.8 cover the
+requests that a script usually sends. Writing the shim brought up five differences beyond them, and each is
+taken from the source of Mockey 2.x:
+
+| ID | What differs |
+|---|---|
+| DEV-70 | An init without `transientState` keeps the mode, and an init that loads nothing changes neither the mode nor the tag filter. |
+| DEV-71 | A name counts when the identifier beside it identifies nothing, and a `scenarioId` that the service doesn't have is ignored. |
+| DEV-72 | `save_plan` for a service that isn't there gets a `fail`. |
+| DEV-73 | An init that names no file gets a `fail`. |
+| DEV-74 | In writable mode, a change that can't be stored isn't made. |
+
+DEV-74 isn't about the shim alone. The specification asks it of every change in writable mode
+(`definition-storage`: Changes are saved before they are acknowledged), and the admin API answers a change
+that can't be stored with the status 500. The register had no entry for it. A script for Mockey 2.x meets
+the difference in the answers of the shim, so the entry comes with this task.
+
 ## Repeating the tests
 
 ```shell
 ./gradlew :mockey-server:test --tests '*Shim*Test' --tests '*MockeyServerTest' --tests '*ServerProgramTest'
+./gradlew :mockey-server:test --tests '*ServerDocumentsTest'
 ```
+
+The second command runs the commands of the documents. It needs `curl` and `jq`, and the ports 8080, 8081,
+and 8090 free.
 
 `LegacyShimTest` sends requests to a listener that runs the module of the mock listener, with the shim and
 without it. `ShimFixture` defines the services of the parity fixture `automation.xml`, and the test compares

@@ -4,8 +4,9 @@
 server, at a path under `/service/`, and the server answers with a scenario of the service that it has
 defined for that URL, or it forwards the request to the real service and passes the answer on.
 
-The server has two listeners. The mock listener serves the mock traffic and `/status`. The admin listener
-serves the admin API, which states what the server holds and is to change what the server does.
+The server has two listeners. The mock listener serves the mock traffic and `/status`, and with the legacy
+shim also the automation endpoints of Mockey 2.x. The admin listener serves the admin API, which states and
+changes what the server holds.
 
 The server has no web pages. The web UI is a program of its own, `mockey-ui`, which manages a server through
 the admin API. [ui.md](ui.md) describes it. The admin API states and changes what the server holds: the
@@ -125,6 +126,11 @@ The mock listener serves two things: the mock endpoint, which is every path that
 all addresses of the machine, because mock traffic often comes from other machines and from devices. The
 address `0.0.0.0` stands for all addresses of IPv4. On a machine that has IPv6 as well, the Java runtime
 makes the listener accept connections on the addresses of both.
+
+A server that is started with `--legacy-shim` answers four more paths on the mock listener: the automation
+endpoints `/definitions`, `/config/service`, `/plan/setup`, and `/home` of Mockey 2.x, for the scripts that
+were written for them. [migrating-from-2x.md](migrating-from-2x.md) describes the endpoints, and "The legacy
+shim" under "Security" says who can use them.
 
 The admin listener serves the admin API, which is the path `/api/v1` with every path below it. It answers
 every other path with the status 404, and the mock listener serves nothing of the admin API. By default the
@@ -445,3 +451,38 @@ mockey-server --admin-host 0.0.0.0
   who reaches it then has the power of the admin API. The server logs a warning when it starts that way.
 - Responses of the admin listener carry no `Access-Control-Allow-Origin` header, so a web page of another
   origin cannot read them. Mock responses carry `Access-Control-Allow-Origin: *`, as a mock has to.
+
+### The legacy shim
+
+A server that's started with `--legacy-shim` answers the automation endpoints of Mockey 2.x on its mock
+listener. The endpoints ask for no admin token, because the scripts that they're for send none. So whoever
+reaches the mock listener of such a server can do these things without the admin API:
+
+- Read the names and the identifiers of the services and their scenarios.
+- Change how a service answers, including its request rules and its inspector.
+- Save, apply, and delete plans, and designate the default plan.
+- Delete all definitions and the history.
+- Put the definitions of a Mockey 2.x document in the place of all definitions, and switch the server to
+  writable mode with the same request, so that it stores them. The document has to be a file inside the
+  definitions location. The server reads nothing outside that location for such a request, and it fetches no
+  URL.
+
+A web page can do all of that but the reading. A page of any site can make the browser that shows it send a
+`GET` request to a server that the browser reaches, and the endpoints change the definitions on a `GET`
+request, as they did in Mockey 2.x. The page can't read the answers, because they carry no
+`Access-Control-Allow-Origin` header.
+
+That's why the shim is off by default, and why the server logs a warning when it starts with the shim. To
+limit what the shim opens:
+
+- Leave the shim off once the scripts have moved to the admin API, which has a listener of its own and
+  takes a token. [migrating-from-2x.md](migrating-from-2x.md) names the operation of the admin API for each
+  request of a script.
+- Where the scripts and the clients of the mocks run on the machine of the server, let the mock listener
+  accept connections on the loopback address only:
+
+  ```shell
+  mockey-server --legacy-shim --mock-host 127.0.0.1
+  ```
+
+  A web page still reaches such a listener, through a browser on that machine.
