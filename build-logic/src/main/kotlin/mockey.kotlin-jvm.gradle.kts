@@ -14,6 +14,7 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    addTestListener(TestSummary(project.name, logger))
 }
 
 ktlint {
