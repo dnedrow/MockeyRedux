@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
  * The server of the document is a stand-in here, because this module has no server program. It listens
  * where the admin listener of a server with its defaults does. While the UI of the document runs with the
  * admin token of the document, the stand-in asks for that token, as a server does that was started with it.
- * Task 15.1 runs the two programs together.
+ * The end-to-end check of the build runs the two programs together, see `scripts/end-to-end-check.sh`.
  *
  * The document uses the ports of the defaults, so the test needs them free.
  */

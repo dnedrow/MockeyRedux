@@ -29,8 +29,8 @@ import kotlin.test.assertTrue
  * Java 21 runtime. It gets nothing from its environment that tells a runtime which classes or options to
  * take, so it runs as it does on a machine that has a Java 21 runtime and nothing else.
  *
- * The server that the UI manages is a stand-in here, because this module has no server program. Task 15.1
- * runs the two programs together.
+ * The server that the UI manages is a stand-in here, because this module has no server program. The
+ * end-to-end check of the build runs the two programs together, see `scripts/end-to-end-check.sh`.
  */
 class UiDistributionTest {
     private val distribution = Path(System.getProperty("mockey.distribution"))

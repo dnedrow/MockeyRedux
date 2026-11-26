@@ -1078,8 +1078,8 @@ and it compares the answers with what the page of a service and the page for tag
 
 ### What the test doesn't cover
 
-- The server of the test is a stand-in. The smoke runs of each task used the real server, and task 15.1
-  adds an end-to-end check.
+- The server of the test is a stand-in. The smoke runs of each task used the real server, and the
+  end-to-end check of task 15.1 runs the two programs together, see [release-checks.md](release-checks.md).
 - The walk submits each form once, with input that the server accepts. Rejected forms are covered by the
   tests of each page.
 

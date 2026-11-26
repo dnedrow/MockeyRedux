@@ -331,8 +331,8 @@ program.
 In both tests, the server is a stand-in, because `mockey-ui` must not depend on the server module, not even
 for its tests. For the task, the two programs ran together once by hand: the UI from its built distribution
 against the server from its built distribution. A script loaded the overview, the first page of the help,
-the 18 topics, every page that a topic links to, and the three files. All 79 checks passed. Task 15.1 turns
-such a run into a check of the build.
+the 18 topics, every page that a topic links to, and the three files. All 79 checks passed. Task 15.1
+turned a run of the two programs into a check of the build, see [release-checks.md](release-checks.md).
 
 One thing came up that the task doesn't cover. An idle UI takes 5 seconds to stop, because Netty waits for
 the grace period even when no request is in progress. `docs/ui.md` says so.
