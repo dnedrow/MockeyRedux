@@ -2,10 +2,12 @@ package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.server.routing.get
+import kotlinx.html.a
 import kotlinx.html.code
 import kotlinx.html.dd
 import kotlinx.html.dl
 import kotlinx.html.dt
+import kotlinx.html.p
 
 /** The area of the pages about the server itself. */
 internal val SystemArea =
@@ -34,6 +36,7 @@ internal object SystemPages {
                 dt { +"Enabled twist configuration" }
                 dd { +(system.enabledTwist?.name ?: NONE) }
             }
+            p(classes = "actions") { a(href = ProxyPages.PAGE) { +"Outbound proxy and upstream session" } }
         }
 
     private const val NONE = "none"

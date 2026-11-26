@@ -19,6 +19,7 @@ import kotlinx.html.label
 import kotlinx.html.legend
 import kotlinx.html.option
 import kotlinx.html.p
+import kotlinx.html.passwordInput
 import kotlinx.html.role
 import kotlinx.html.select
 import kotlinx.html.textArea
@@ -94,7 +95,8 @@ internal fun FlowContent.otherProblemsOf(state: FormState) {
 /**
  * A field for a line of text. The field has the name [name] in the form and shows the value that [state]
  * has for it, under [label] and with [hint]. It shows what the server has against [api], which is the member
- * of a request to the admin API that the field is for.
+ * of a request to the admin API that the field is for. [autocomplete] tells the browser whether it may fill
+ * in the field on its own. Set it to `off` for a field that a browser could mistake for a login name.
  */
 internal fun FlowContent.textField(
     state: FormState,
@@ -102,11 +104,34 @@ internal fun FlowContent.textField(
     label: String,
     api: String = name,
     hint: String? = null,
+    autocomplete: String? = null,
 ) {
     field(state, name, label, api, hint) { describe ->
         textInput(name = name) {
             id = idOf(name)
             value = state.value(name)
+            if (autocomplete != null) attributes["autocomplete"] = autocomplete
+            describe()
+        }
+    }
+}
+
+/**
+ * A field for a password (see [textField]). The field never shows a value: the browser doesn't get a stored
+ * password, and a password that someone typed isn't sent back when the form is displayed again. The field
+ * also asks the browser not to fill in a saved password, because the form would take that for an edit.
+ */
+internal fun FlowContent.passwordField(
+    state: FormState,
+    name: String,
+    label: String,
+    api: String = name,
+    hint: String? = null,
+) {
+    field(state, name, label, api, hint) { describe ->
+        passwordInput(name = name) {
+            id = idOf(name)
+            attributes["autocomplete"] = "new-password"
             describe()
         }
     }

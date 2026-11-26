@@ -4,11 +4,16 @@ import io.github.dnedrow.mockey.api.DiagnosticDto
 import io.github.dnedrow.mockey.api.HeaderDto
 import io.github.dnedrow.mockey.api.InspectorDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
+import io.github.dnedrow.mockey.api.OutboundProxyDto
+import io.github.dnedrow.mockey.api.PlanDto
+import io.github.dnedrow.mockey.api.PlanItemDto
+import io.github.dnedrow.mockey.api.ResponseModeDto
 import io.github.dnedrow.mockey.api.ScenarioDto
 import io.github.dnedrow.mockey.api.ScenarioReferenceDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
+import io.github.dnedrow.mockey.api.TwistPairDto
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,7 +43,7 @@ class UiCrawlTest {
     @Test
     fun everyLinkOfAPageLeadsToAPageOfTheUiAndToAPlaceThatThePageHas() {
         val api = FakeAdminApi().also { fakes += it }
-        api.hold(diagnostics = listOf(Samples.diagnostic))
+        holdSamples(api)
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(api.url), logLevel = LogLevel.WARN)
         val browser = Browser(MockeyUi.start(settings).also { uis += it })
 
@@ -51,8 +56,14 @@ class UiCrawlTest {
         val ofScenario = listOf("/scenario", "/scenario/delete")
         val ofScenarios = listOf("sc-found", "sc-missing").flatMap { id -> ofScenario.map { "$it?service=svc-customers&id=$id" } }
         val ofNewScenarios = listOf("svc-customers", "svc-orders").map { "/scenario/new?service=$it" }
-        val general = setOf("/", "/services", "/services?tag=team-a", "/service/new", "/diagnostics", "/system")
-        assertEquals(general + ofServices + ofScenarios + ofNewScenarios, found.pages.keys)
+        val ofPlan = listOf("/plan", "/plan/edit", "/plan/save", "/plan/delete")
+        val ofPlans = listOf("/plans", "/plan/new") + ofPlan.map { "$it?id=plan-night" }
+        val ofTwists = listOf("/twists", "/twist/new", "/twist?id=twist-german", "/twist/delete?id=twist-german")
+        val tags = listOf("happy", "nightly", "team-a")
+        val ofTags = listOf("/tags") + tags.map { "/tag/remove?tag=$it" } + tags.map { "/services?tag=$it" }
+        val general = setOf("/", "/services", "/service/new", "/diagnostics", "/system", "/proxy")
+        val reached = general + ofServices + ofScenarios + ofNewScenarios + ofPlans + ofTwists + ofTags
+        assertEquals(reached, found.pages.keys)
         assertEquals(emptyMap(), (found.pages - "/").mapValues { it.value.status }.filterValues { it != OK })
         val toPlaces = found.links.filter { it.place != null }
         val astray = toPlaces.filter { link -> found.pages.getValue(link.address).let { it.page.getElementById(link.place!!) } == null }
@@ -69,7 +80,7 @@ class UiCrawlTest {
     @Test
     fun followingTheLinksChangesNothingAndEveryFormThatChangesSomethingHoldsTheToken() {
         val api = FakeAdminApi().also { fakes += it }
-        api.hold(diagnostics = listOf(Samples.diagnostic))
+        holdSamples(api)
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(api.url), logLevel = LogLevel.WARN)
         val browser = Browser(MockeyUi.start(settings).also { uis += it })
 
@@ -120,9 +131,14 @@ class UiCrawlTest {
             val diagnostic = DiagnosticDto(text, text, text, text, text, listOf(text))
             val paths = mapOf(text to Hostile.written(text))
             val inspectors = listOf(InspectorDto(text, global = true))
-            api.hold(listOf(service), listOf(diagnostic), paths, inspectors, ScenarioReferenceDto(text, text))
-            val twist = TwistConfigurationDto(text, text, emptyList())
+            val held = api.hold(listOf(service), listOf(diagnostic), paths, inspectors, ScenarioReferenceDto(text, text))
+            val twist = TwistConfigurationDto(text, text, listOf(TwistPairDto(text, text)))
             api.system = SystemStatusDto(text, text, text, readOnly = false, listOf(text), twist, text, legacyShimEnabled = true)
+            val plan = PlanDto(text, text, text, listOf(text), listOf(PlanItemDto(text, text, ResponseModeDto.STATIC, 5)), text)
+            val plans = api.holdPlans(held, listOf(plan), default = text, paths = paths)
+            api.holdTwists(listOf(twist), enabled = text, paths = paths)
+            api.holdTags(held, plans, paths)
+            api.holdProxy(OutboundProxyDto(text, enabled = true, username = text, passwordSet = true))
 
             val found = Crawl.from(browser)
 
@@ -130,13 +146,25 @@ class UiCrawlTest {
             val reached = addresses.map { it.substringBefore('?') }.toSet()
             val ofService = setOf("/service", "/service/new", "/service/edit", "/service/delete")
             val ofScenario = setOf("/scenario", "/scenario/new", "/scenario/delete")
-            assertEquals(setOf("/", "/services", "/diagnostics", "/system") + ofService + ofScenario, reached, text)
+            val ofPlan = setOf("/plans", "/plan", "/plan/new", "/plan/edit", "/plan/save", "/plan/delete")
+            val ofRouting = setOf("/twists", "/twist", "/twist/new", "/twist/delete", "/tags", "/tag/remove")
+            val general = setOf("/", "/services", "/diagnostics", "/system", "/proxy")
+            assertEquals(general + ofService + ofScenario + ofPlan + ofRouting, reached, text)
             for ((address, answer) in found.pages - "/") {
                 assertEquals(OK, answer.status, "$text at $address")
                 assertEquals(emptyList(), Hostile.moreThanText(answer), "$text at $address")
             }
         }
         assertEquals(emptyList(), api.violations)
+    }
+
+    /** Makes [api] hold the samples: services, a plan, a twist configuration, and proxy settings. */
+    private fun holdSamples(api: FakeAdminApi) {
+        val services = api.hold(diagnostics = listOf(Samples.diagnostic))
+        val plans = api.holdPlans(services)
+        api.holdTwists()
+        api.holdTags(services, plans)
+        api.holdProxy()
     }
 
     private companion object {

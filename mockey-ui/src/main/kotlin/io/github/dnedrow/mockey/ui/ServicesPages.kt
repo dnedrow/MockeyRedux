@@ -167,6 +167,14 @@ internal object ServicesPages {
                 }
             }
             p(classes = "actions") { a(href = ServicePages.NEW) { +"New service" } }
+            if (system.tagFilter.isNotEmpty()) {
+                p(classes = "note") {
+                    +"$TAG_FILTER_IS_ON "
+                    tagsOf(system.tagFilter)
+                    +". "
+                    a(href = TagPages.PAGE) { +"Change the tag filter" }
+                }
+            }
             if (services.isEmpty()) return@Page
             div(classes = "scroll") {
                 table(classes = "services") {
@@ -327,6 +335,10 @@ internal object ServicesPages {
     private val COLUMNS = listOf("Service", "Mock URL", "Response mode", "Default scenario", "Delay", "Tags", "Last used")
 
     private const val FILTER_HINT = "The overview lists the services that carry one of these tags. Tags have spaces between them."
+
+    private const val TAG_FILTER_IS_ON =
+        "The tag filter of the server is on. A service answers requests only if the service or one of its scenarios " +
+            "carries one of these tags:"
 
     private const val LAST_USED_HINT =
         "A service was last used when it last answered a request. " +

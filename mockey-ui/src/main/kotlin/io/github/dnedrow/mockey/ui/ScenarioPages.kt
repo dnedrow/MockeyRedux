@@ -11,11 +11,8 @@ import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import kotlinx.html.ButtonType
 import kotlinx.html.FlowContent
 import kotlinx.html.a
-import kotlinx.html.button
-import kotlinx.html.div
 import kotlinx.html.h2
 import kotlinx.html.hiddenInput
 import kotlinx.html.p
@@ -86,13 +83,14 @@ internal val ScenarioArea =
                     val (service, scenario) = ui.client.scenarioWithService(serviceId, id)
                     ui.client.updateService(serviceId, buildJsonObject { put("defaultScenarioId", id) })
                     val role = "the default scenario of the service ${briefly(service.name)}"
-                    Outcome.Done(ScenarioPages.addressOf(serviceId, id), "The scenario ${briefly(scenario.name)} is now $role.")
+                    val notice = Designation.notice(ScenarioPages.subjectOf(scenario), role, assigned = true, wasHeld = false)
+                    Outcome.Done(ScenarioPages.addressOf(serviceId, id), notice)
                 }
             }
             post(ScenarioPages.ERROR) {
                 val (serviceId, id) = call.scenarioOfAddress()
                 ui.submit(call) { input ->
-                    val designate = ScenarioPages.designates(input)
+                    val designate = Designation.isAssigned(input)
                     val (service, scenario) = ui.client.scenarioWithService(serviceId, id)
                     val wasDesignated = service.errorScenarioId == id
                     // A page only removes the designation from its own scenario, never from another one.
@@ -100,14 +98,14 @@ internal val ScenarioArea =
                         ui.client.updateService(serviceId, buildJsonObject { put("errorScenarioId", id.takeIf { designate }) })
                     }
                     val role = "the error scenario of the service ${briefly(service.name)}"
-                    val notice = ScenarioPages.designationNotice(scenario, role, designate, wasDesignated)
+                    val notice = Designation.notice(ScenarioPages.subjectOf(scenario), role, designate, wasDesignated)
                     Outcome.Done(ScenarioPages.addressOf(serviceId, id), notice)
                 }
             }
             post(ScenarioPages.UNIVERSAL_ERROR) {
                 val (serviceId, id) = call.scenarioOfAddress()
                 ui.submit(call) { input ->
-                    val designate = ScenarioPages.designates(input)
+                    val designate = Designation.isAssigned(input)
                     val scenario = ui.client.getScenario(serviceId, id)
                     val wasDesignated = ui.client.getUniversalErrorScenario() == ScenarioReferenceDto(serviceId, id)
                     // A page only removes the designation from its own scenario, never from another one.
@@ -115,7 +113,8 @@ internal val ScenarioArea =
                         designate -> ui.client.setUniversalErrorScenario(serviceId, id)
                         wasDesignated -> ui.client.clearUniversalErrorScenario()
                     }
-                    val notice = ScenarioPages.designationNotice(scenario, "the universal error scenario", designate, wasDesignated)
+                    val subject = ScenarioPages.subjectOf(scenario)
+                    val notice = Designation.notice(subject, "the universal error scenario", designate, wasDesignated)
                     Outcome.Done(ScenarioPages.addressOf(serviceId, id), notice)
                 }
             }
@@ -164,11 +163,6 @@ internal object ScenarioPages {
     /** The address parameter that holds the identifier of the scenario. */
     const val ID = "id"
 
-    /** The field that a designation button sends: [YES] to designate the scenario, or [NO] to undo the designation. */
-    const val DESIGNATE = "designate"
-    const val YES = "yes"
-    const val NO = "no"
-
     /** Returns the address of the page for the scenario [id] of the service [serviceId]. */
     fun addressOf(
         serviceId: String,
@@ -184,36 +178,8 @@ internal object ScenarioPages {
         scenario: ScenarioDto,
     ): String = Address.of(path, SERVICE to service.id, ID to scenario.id)
 
-    /**
-     * Returns whether a designation button asked to designate its scenario.
-     *
-     * @throws InvalidInput if the form doesn't say whether to designate the scenario or to undo that.
-     */
-    fun designates(input: FormInput): Boolean =
-        when (input.text(DESIGNATE)) {
-            YES -> true
-            NO -> false
-            else -> throw InvalidInput(DESIGNATE, "The form does not say whether to designate the scenario.")
-        }
-
-    /**
-     * Returns the notice to show after a designation action on [scenario]. [role] names the designation, for
-     * example "the universal error scenario". [designate] says whether the action asked to designate the
-     * scenario or to undo that, and [wasDesignated] says whether the scenario held the designation before.
-     */
-    fun designationNotice(
-        scenario: ScenarioDto,
-        role: String,
-        designate: Boolean,
-        wasDesignated: Boolean,
-    ): String {
-        val name = briefly(scenario.name)
-        return when {
-            designate -> "The scenario $name is now $role."
-            wasDesignated -> "The scenario $name is no longer $role."
-            else -> "The scenario $name was not $role. Nothing was changed."
-        }
-    }
+    /** Returns how a notice refers to [scenario], for example "The scenario gold". */
+    fun subjectOf(scenario: ScenarioDto): String = "The scenario ${briefly(scenario.name)}"
 
     /**
      * Returns the page of [scenario], which belongs to [service]. The page contains the form that edits the
@@ -288,30 +254,6 @@ internal object ScenarioPages {
     }
 
     /**
-     * Shows whether the scenario holds [designation], along with the button that changes it. [isHeld] says
-     * whether the scenario holds the designation right now. The button submits its form to [action].
-     */
-    private fun FlowContent.designationOf(
-        view: View,
-        designation: Designation,
-        isHeld: Boolean,
-        action: String,
-    ) {
-        div(classes = "designation") {
-            p { +(if (isHeld) designation.held else designation.notHeld) }
-            val label = if (isHeld) designation.remove else designation.assign
-            if (label != null) {
-                postForm(view, action, classes = "inline") {
-                    button(type = ButtonType.submit, name = DESIGNATE) {
-                        value = if (isHeld) NO else YES
-                        +label
-                    }
-                }
-            }
-        }
-    }
-
-    /**
      * Renders the scenario form. The browser submits it to [action], and it's displayed with [state]. The form
      * of an existing scenario is [marked], which means it tracks the initial values of its fields (see
      * [Shown]). The button is labeled [save], and the link next to it leads to [back].
@@ -356,18 +298,6 @@ internal object ScenarioPages {
         val known = listOf("" to "Any method") + METHODS.map { it to it }
         return if (named.isEmpty() || named in METHODS) known else known + (named to named)
     }
-
-    /**
-     * A designation that a scenario can hold: the texts that describe it on the scenario page, and the labels
-     * of the buttons that assign and remove it. A designation without a [remove] label can't be removed. It
-     * only goes away when another scenario takes it over.
-     */
-    private class Designation(
-        val held: String,
-        val notHeld: String,
-        val assign: String,
-        val remove: String?,
-    )
 
     private val AS_DEFAULT =
         Designation(

@@ -694,7 +694,7 @@ class UiScenarioTest {
 
         assertEquals(answers.map { 422 }, answers.map { it.status })
         val said = answers.map { it.page.select("main .problem").text() }.toSet()
-        assertEquals(setOf("The form does not say whether to designate the scenario."), said)
+        assertEquals(setOf("The form does not say whether to assign the designation or to remove it."), said)
         assertEquals(emptyList(), changing(api))
     }
 

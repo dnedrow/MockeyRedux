@@ -61,6 +61,7 @@ internal object Hostile {
     val ATTRIBUTES =
         setOf("class", "id", "href", "action", "method", "enctype", "type", "name", "value", "for", "scope", "role", "rows")
             .plus(setOf("selected", "checked", "disabled", "datetime", "aria-label", "aria-pressed", "aria-describedby", "aria-invalid"))
+            .plus("autocomplete")
 
     /** Returns how a client of the admin API writes [identifier] as a segment of a path, which is how an address of the UI writes it. */
     fun written(identifier: String): String = Address.of("/x", "id" to identifier).substringAfter("id=")

@@ -62,7 +62,10 @@ internal object Html {
     val sections: List<Section> =
         listOf(
             Section(ServicesPages.OVERVIEW, "Services", setOf(ServicePages.PAGE, ScenarioPages.PAGE, DiagnosticsPages.PATH)),
-            Section("/system", "Server"),
+            Section(PlanPages.LIST, "Plans", setOf(PlanPages.PAGE)),
+            Section(TwistPages.LIST, "Twisting", setOf(TwistPages.PAGE)),
+            Section(TagPages.PAGE, "Tags", setOf("/tag")),
+            Section("/system", "Server", setOf(ProxyPages.PAGE)),
         )
 
     /**

@@ -45,7 +45,7 @@ internal fun FakeAdminApi.hold(
     paths: Map<String, String> = emptyMap(),
     inspectors: List<InspectorDto> = listOf(Samples.inspector),
     universal: ScenarioReferenceDto? = null,
-): Map<String, ServiceDto> {
+): MutableMap<String, ServiceDto> {
     val held = Collections.synchronizedMap(LinkedHashMap<String, ServiceDto>())
     val universalError = AtomicReference(universal)
     val created = AtomicInteger()

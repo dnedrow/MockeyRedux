@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5, 13.6, and 13.7 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5 to 13.8 of the change `kotlin-rewrite-modular`, on 2026-11-25.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -87,8 +87,8 @@ effective mode, and says that the service has no scenario to answer with where t
   which looks at the tags of a service and not at those of its scenarios.
 - The UI takes the tags in lower case and each once, as a server holds tags, so that two addresses that mean
   the same list show the same page.
-- This filter is no setting of the server. The tag filter of a server decides which services answer requests,
-  and task 13.8 gives it a page.
+- This filter isn't a setting of the server. The server's tag filter decides which services answer requests,
+  and it has a page of its own (see [The page for tags](#the-page-for-tags)).
 
 ### After a switch
 
@@ -112,7 +112,8 @@ effective mode, and says that the service has no scenario to answer with where t
 - Legacy can set the response mode of every service at once. The specification does not ask for it, and the
   admin API has no operation for it.
 - The list has no pages and no other order. The specification asks for paging of the history only.
-- The overview does not say which services the tag filter of the server leaves out.
+- The overview says when the server's tag filter is on, but it doesn't mark the services that the filter
+  leaves out.
 
 ## The pages of a service
 
@@ -303,6 +304,193 @@ of every body that someone edits.
 - The scenario page doesn't show the last-used time. The list on the page of the service does.
 - Saving a history entry as a scenario belongs to task 13.9.
 
+## The pages for plans
+
+A plan is a snapshot of the response mode, the delay, and the default scenario of several services. The UI
+lists the plans, shows a single plan, and offers everything the admin API can do with one: create it from the
+current settings of services, edit its name, description, and tags, save the current settings into it again,
+apply it, make it the default plan, and delete it.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for plans (`admin-ui`: Coverage of management
+  operations).
+- After a plan is applied, the UI says so and names the items that were skipped (`admin-ui`: Result feedback,
+  with the scenario "Plan apply report").
+- The UI asks for confirmation before it deletes a plan (`admin-ui`: Confirmation of destructive actions).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/plans` | The list of all plans. |
+| `/plan?id=` | The page of a plan. |
+| `/plan/new` | The form that creates a plan. |
+| `/plan/edit?id=` | The form that edits the name, the description, and the tags. |
+| `/plan/save?id=` | The form that saves the current settings of services into the plan. |
+| `/plan/apply?id=` | Applies the plan (`POST`) and leads to the report. |
+| `/plan/default?id=` | Makes the plan the default plan, or undoes that (`POST`). |
+| `/plan/delete?id=` | The confirmation step for a deletion. |
+
+### Creating a plan
+
+- The admin API creates a plan from the current settings of services, so the form asks which services to
+  include. It shows one check box per service, and all of them start checked, so a snapshot of everything
+  takes one click. Legacy needs two steps instead: it creates an empty plan first, and the check boxes in its
+  service list fill the plan afterward.
+- A plan needs at least one service. The UI rejects a form without a checked box, because a plan without
+  settings does nothing when it's applied. The admin API accepts such a plan.
+- The server updates an existing plan if the new plan uses its name. The hint below the name field says so,
+  and the browser ends up on the page of that plan either way.
+- A field that's left empty isn't sent. That way, an existing plan with the same name keeps its description
+  and its tags.
+
+### Editing a plan
+
+- The edit form covers the name, the description, and the tags. Like every edit form, it only sends the
+  attributes whose fields were changed (see [ui-forms.md](ui-forms.md)).
+- The form doesn't edit the settings of a single service. To change what a plan holds, set up the services the
+  way the plan should have them, and then use "Save current settings". That's also how legacy works. The admin
+  API can replace the items of a plan directly, but the UI doesn't offer that.
+- "Save current settings" shows the same check boxes as the form for a new plan. The services that the plan
+  already names start checked. The UI matches them by name and ignores letter case and surrounding
+  whitespace, which is how the server matches them when it applies a plan.
+
+### Applying a plan
+
+- "Apply" is a button on the page of the plan. The server answers with a report, so the browser is sent to a
+  report page with an address of its own (see [ui-forms.md](ui-forms.md)). Loading that page again doesn't
+  apply the plan again.
+- The report says how many services got their settings. It lists the services that the plan names but that
+  don't exist, and the scenarios that the server couldn't find. A section without entries is left out.
+
+### The default plan
+
+- The page of a plan says whether it's the default plan, and it has a button that assigns or removes that
+  designation. The list marks the default plan.
+- As with the designations of a scenario, the button that removes the designation doesn't change anything if
+  another plan has become the default plan in the meantime.
+
+### What the plan pages don't have
+
+- The page of a plan doesn't check whether the services and scenarios it names still exist. The report of
+  applying the plan does.
+- The list has no pages and no filter.
+
+## The pages for twist configurations
+
+A twist configuration rewrites the target of a request before the server looks for a service. The UI lists
+the configurations, and each one has a page that doubles as its edit form, like a scenario.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for twist configurations (`admin-ui`: Coverage of
+  management operations).
+- The UI asks for confirmation before it deletes a twist configuration (`admin-ui`: Confirmation of
+  destructive actions).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/twists` | The list of all twist configurations. |
+| `/twist?id=` | The page of a twist configuration. `GET` displays the form, and `POST` saves it. |
+| `/twist/new` | The form for a new twist configuration. |
+| `/twist/enabled?id=` | Enables or disables the configuration (`POST`). |
+| `/twist/delete?id=` | The confirmation step for a deletion. |
+
+### The form
+
+- Each replacement is a row with two fields: the text to replace, and the text that takes its place. The form
+  shows the stored replacements followed by three empty rows. A form can't add rows without scripting, so a
+  configuration that needs more rows has to be saved and opened again.
+- The order of the rows matters, because the server only uses the first row whose text occurs in the target.
+  The form sends the rows in their order. To move a replacement, retype it in another row.
+- A row without a text to replace is left out, which is what the server does as well. A row that has a
+  replacement but no text to replace is probably a mistake, so the UI rejects it and names the row.
+- Both texts are sent exactly as typed, including spaces, because the server takes them literally.
+
+### Enabling and disabling
+
+- The list has a button for each configuration that enables or disables it, so switching takes one click.
+  The page of a configuration has the same button. The browser goes back to wherever the button was pressed.
+- The server reports the enabled configuration in its status, which the UI requests for every page anyway. So
+  the list doesn't need an extra request to mark the enabled configuration.
+- Enabling a configuration disables the one that was enabled before. Disabling a configuration that isn't
+  enabled doesn't change anything, so a stale page can't disable another configuration.
+
+## The page for tags
+
+One page covers both things the server does with tags: the tag filter, which decides which services answer
+requests, and the list of the tags in use, from which a tag can be removed everywhere.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for the tag filter and for tags (`admin-ui`:
+  Coverage of management operations).
+- The UI asks for confirmation before it removes a tag from all definitions (`admin-ui`: Confirmation of
+  destructive actions).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/tags` | The page with the tag filter and the tags in use. |
+| `/tags/filter` | Sets the tag filter (`POST`). |
+| `/tags/filter-off` | Turns the tag filter off (`POST`). |
+| `/tag/remove?tag=` | The confirmation step for removing a tag from all definitions. |
+
+### The tag filter
+
+- The form has one field, with the tags separated by spaces. An empty field turns the filter off. So does
+  the button below the form, which only appears while the filter is on.
+- The server reports the tag filter in its status, so the page doesn't need an extra request for it.
+- While the filter is on, the services overview says so above its list and links to this page. An active
+  filter is easy to forget, and it's a common reason why a service doesn't answer.
+
+### Removing a tag
+
+- Each tag in use has a "Remove" link that leads to a confirmation page. The page says how many services,
+  scenarios, and plans carry the tag. The admin API only lists the tags, so the UI requests the services and
+  the plans and counts them itself.
+- If the tag filter uses the tag, the page warns that removing the tag doesn't change the filter. Afterward,
+  no service matches that tag anymore.
+- The tag is passed as an address parameter, so it can contain any character.
+- For a tag that nothing carries, the page says so and offers nothing to confirm.
+
+## The page for the outbound proxy
+
+The page has the form with the settings of the outbound proxy and the button that clears the upstream
+session. Both are about how the server reaches real services, so they share a page in the "Server" section.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for the outbound proxy settings and the shared
+  upstream session (`admin-ui`: Coverage of management operations).
+- The server never returns the password of the proxy (`upstream-proxying`: Outbound proxy settings and
+  credentials).
+
+### The form
+
+- The form covers the proxy URL, the enabled flag, the user name, and the password. Like every edit form, it
+  only sends the attributes whose fields were changed (see [ui-forms.md](ui-forms.md)).
+- The server only says whether a password is set. So the password field always starts empty, and the hint
+  below it says whether the server has a password. Leaving the field empty keeps the stored password.
+- A check box removes the stored password. It only appears while a password is set, and it wins over a
+  password that's typed in at the same time. An empty user name means there is none.
+- When the server rejects the form, the form is displayed again without the typed password. The UI never
+  sends a password back to the browser.
+- Browsers like to fill in saved logins. The user name field and the password field ask the browser not to do
+  that (`autocomplete`), because the form would take a filled-in value for an edit and overwrite the stored
+  credentials.
+- The server validates the URL and the user name, and its messages appear next to the fields.
+
+### The upstream session
+
+- The button clears the cookies that real services have set. It doesn't ask for confirmation. The
+  specification lists the actions that need one, and clearing the session isn't among them. The session only
+  holds cookies, and real services set them again.
+
 ## A look in a browser
 
 The tests read the pages without a browser. The overview was looked at once in a browser, which is no test and
@@ -314,6 +502,9 @@ is not repeated by one:
   asks before a service is deleted.
 - Chrome displayed the scenario list on the page of a service, the scenario page with its designations at
   widths of 1,280 and 520 pixels, a rejected form with its messages, and the confirmation page for a deletion.
+- Chrome displayed the plan list, the page of a plan, the form for a new plan, the report of applying a plan,
+  the twist list, the page of a twist configuration, the tags page with an active filter, the confirmation
+  page for removing a tag, the proxy page, and the overview with its note about the tag filter.
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
   was sent to the row of a service: the line of the page stayed at the top of the window, and the row began
   below it.
@@ -323,5 +514,6 @@ is not repeated by one:
 Run `./gradlew :mockey-ui:test`. `UiServicesTest` reads the overview and the page of the diagnostics and sends
 the forms of the switches. `UiServiceTest` sends the forms of a service and reads what the admin API was
 asked for. `UiScenarioTest` submits the scenario forms, presses the designation buttons, and checks
-which requests reached the admin API. `UiCrawlTest` follows every link from the first page on, also with a
-server that states content that is written to be read as markup.
+which requests reached the admin API. `UiPlansTest`, `UiTwistsTest`, `UiTagsTest`, and `UiProxyTest` do the
+same for plans, twist configurations, tags, and the outbound proxy. `UiCrawlTest` follows every link from the
+first page on, also with a server that states content that is written to be read as markup.
