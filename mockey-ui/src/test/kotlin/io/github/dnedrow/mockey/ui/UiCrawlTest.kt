@@ -1,7 +1,11 @@
 package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.DiagnosticDto
+import io.github.dnedrow.mockey.api.HeaderDto
 import io.github.dnedrow.mockey.api.InspectorDto
+import io.github.dnedrow.mockey.api.MatchCriterionDto
+import io.github.dnedrow.mockey.api.ScenarioDto
+import io.github.dnedrow.mockey.api.ScenarioReferenceDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.github.dnedrow.mockey.api.TwistConfigurationDto
@@ -44,8 +48,11 @@ class UiCrawlTest {
         assertEquals(302 to "/services", first.status to first.header("location"))
         val ofService = listOf("/service", "/service/edit", "/service/delete")
         val ofServices = listOf("svc-customers", "svc-orders").flatMap { id -> ofService.map { "$it?id=$id" } }
-        val reached = setOf("/", "/services", "/services?tag=team-a", "/service/new", "/diagnostics", "/system") + ofServices
-        assertEquals(reached, found.pages.keys)
+        val ofScenario = listOf("/scenario", "/scenario/delete")
+        val ofScenarios = listOf("sc-found", "sc-missing").flatMap { id -> ofScenario.map { "$it?service=svc-customers&id=$id" } }
+        val ofNewScenarios = listOf("svc-customers", "svc-orders").map { "/scenario/new?service=$it" }
+        val general = setOf("/", "/services", "/services?tag=team-a", "/service/new", "/diagnostics", "/system")
+        assertEquals(general + ofServices + ofScenarios + ofNewScenarios, found.pages.keys)
         assertEquals(emptyMap(), (found.pages - "/").mapValues { it.value.status }.filterValues { it != OK })
         val toPlaces = found.links.filter { it.place != null }
         val astray = toPlaces.filter { link -> found.pages.getValue(link.address).let { it.page.getElementById(link.place!!) } == null }
@@ -90,7 +97,10 @@ class UiCrawlTest {
         val browser = Browser(MockeyUi.start(settings).also { uis += it })
 
         for (text in Hostile.MARKUP + Hostile.ADDRESSES) {
-            val scenarios = listOf(Samples.found.copy(id = text, name = text, tags = listOf(text)), Samples.missing.copy(name = text))
+            val headers = listOf(HeaderDto(text, text))
+            val asText = ScenarioDto(text, text, text, OK, headers, MatchCriterionDto.Text(text), text, 5, listOf(text), text)
+            val asRules = Samples.missing.copy(name = text, matchCriterion = MatchCriterionDto.Rules(text))
+            val scenarios = listOf(asText, asRules)
             val service =
                 ServiceDto(
                     id = text,
@@ -108,7 +118,9 @@ class UiCrawlTest {
                     lastUsedTime = text,
                 )
             val diagnostic = DiagnosticDto(text, text, text, text, text, listOf(text))
-            api.hold(listOf(service), listOf(diagnostic), mapOf(text to Hostile.written(text)), listOf(InspectorDto(text, global = true)))
+            val paths = mapOf(text to Hostile.written(text))
+            val inspectors = listOf(InspectorDto(text, global = true))
+            api.hold(listOf(service), listOf(diagnostic), paths, inspectors, ScenarioReferenceDto(text, text))
             val twist = TwistConfigurationDto(text, text, emptyList())
             api.system = SystemStatusDto(text, text, text, readOnly = false, listOf(text), twist, text, legacyShimEnabled = true)
 
@@ -117,7 +129,8 @@ class UiCrawlTest {
             val addresses = found.pages.keys
             val reached = addresses.map { it.substringBefore('?') }.toSet()
             val ofService = setOf("/service", "/service/new", "/service/edit", "/service/delete")
-            assertEquals(setOf("/", "/services", "/diagnostics", "/system") + ofService, reached, text)
+            val ofScenario = setOf("/scenario", "/scenario/new", "/scenario/delete")
+            assertEquals(setOf("/", "/services", "/diagnostics", "/system") + ofService + ofScenario, reached, text)
             for ((address, answer) in found.pages - "/") {
                 assertEquals(OK, answer.status, "$text at $address")
                 assertEquals(emptyList(), Hostile.moreThanText(answer), "$text at $address")

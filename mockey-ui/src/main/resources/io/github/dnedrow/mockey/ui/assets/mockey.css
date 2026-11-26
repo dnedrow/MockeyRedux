@@ -389,6 +389,37 @@ table.services td p {
   margin: 0.25rem 0 0;
 }
 
+/* A cell of the scenario list is as wide as its words. The match criterion and the tags wrap first. */
+table.scenarios th[scope="col"],
+table.scenarios td {
+  white-space: nowrap;
+}
+
+table.scenarios th[scope="row"] {
+  min-width: 10rem;
+  color: var(--ink);
+}
+
+table.scenarios td:nth-child(3),
+table.scenarios td:nth-child(6) {
+  white-space: normal;
+}
+
+/* A designation of a scenario: its description, and the button that changes it. */
+.designation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.designation p {
+  flex: 1 1 24rem;
+  max-width: 48rem;
+  margin: 0;
+}
+
 form.switch {
   margin: 0;
   white-space: nowrap;

@@ -2,13 +2,16 @@ package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.FieldErrorDto
 import io.github.dnedrow.mockey.api.InspectorDto
+import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
 import io.github.dnedrow.mockey.api.ScenarioDto
+import io.github.dnedrow.mockey.api.ScenarioReferenceDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.html.FlowContent
+import kotlinx.html.ThScope
 import kotlinx.html.a
 import kotlinx.html.dd
 import kotlinx.html.div
@@ -21,7 +24,13 @@ import kotlinx.html.li
 import kotlinx.html.p
 import kotlinx.html.radioInput
 import kotlinx.html.span
+import kotlinx.html.table
+import kotlinx.html.tbody
+import kotlinx.html.td
 import kotlinx.html.textInput
+import kotlinx.html.th
+import kotlinx.html.thead
+import kotlinx.html.tr
 import kotlinx.html.ul
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -43,7 +52,7 @@ internal val ServiceArea =
                 ui.show(call) { view, system ->
                     val service = ui.client.getService(id)
                     val concerning = ui.client.listDiagnostics().count { it.serviceId == service.id }
-                    ServicePages.service(view, system, service, concerning)
+                    ServicePages.service(view, system, service, concerning, ui.client.getUniversalErrorScenario())
                 }
             }
             get(ServicePages.NEW) {
@@ -111,6 +120,10 @@ internal object ServicePages {
     const val DUPLICATE = "/service/duplicate"
 
     private const val NONE = "none"
+    private const val ANY_METHOD = "any"
+    private const val SERVICE_DELAY = "service delay"
+
+    private val SCENARIO_COLUMNS = listOf("Scenario", "Status", "Match criterion", "Method", "Delay", "Tags", "Last used")
 
     private val SCENARIOS_BY_NAME = compareBy<ScenarioDto, String>(String.CASE_INSENSITIVE_ORDER) { it.name }.thenBy { it.id }
 
@@ -125,13 +138,15 @@ internal object ServicePages {
     /**
      * The page of [service]: what the service is set to, with the URL at which a client calls it at the
      * server that states [system], its scenarios, and what leads to the forms that change it. The service
-     * has [diagnostics] diagnostics, which a marker leads to.
+     * has [diagnostics] diagnostics, which a marker leads to. [universal] is the universal error scenario of
+     * the server, or `null` if the server has none.
      */
     fun service(
         view: View,
         system: SystemStatusDto,
         service: ServiceDto,
         diagnostics: Int,
+        universal: ScenarioReferenceDto?,
     ): Page =
         Page(service.name) {
             if (diagnostics > 0) {
@@ -176,7 +191,8 @@ internal object ServicePages {
                 }
             }
             h2 { +"Scenarios" }
-            scenariosOf(service)
+            scenariosOf(service, universal)
+            p(classes = "actions") { a(href = ScenarioPages.addressOfNew(service.id)) { +"New scenario" } }
         }
 
     /** The page with the form that creates a service, which is shown with [state]. A service can name one of [inspectors]. */
@@ -256,25 +272,73 @@ internal object ServicePages {
         }
     }
 
-    /** Shows the scenarios of [service] by their names, and says which one is the default one and which one the error scenario. */
-    private fun FlowContent.scenariosOf(service: ServiceDto) {
+    /**
+     * Shows the scenarios of [service] in a table, sorted by name. Each row links to the page of its scenario
+     * and shows the status code, the match criterion, the method restriction, the delay, the tags, and the
+     * last-used time of the scenario. A row also marks the default scenario and the error scenario of the
+     * service, and the universal error scenario of the server, which is [universal].
+     */
+    private fun FlowContent.scenariosOf(
+        service: ServiceDto,
+        universal: ScenarioReferenceDto?,
+    ) {
         if (service.scenarios.isEmpty()) {
             p { +"The service has no scenario. It forwards every request while it has none." }
             return
         }
-        ul(classes = "scenarios") {
-            for (scenario in service.scenarios.sortedWith(SCENARIOS_BY_NAME)) {
-                li {
-                    +scenario.name
-                    val asDefault = "default".takeIf { scenario.id == service.defaultScenarioId }
-                    for (mark in listOfNotNull(asDefault, "error scenario".takeIf { scenario.id == service.errorScenarioId })) {
-                        +" "
-                        span(classes = "mark") { +mark }
+        div(classes = "scroll") {
+            table(classes = "scenarios") {
+                thead {
+                    tr { SCENARIO_COLUMNS.forEach { th(scope = ThScope.col) { +it } } }
+                }
+                tbody {
+                    for (scenario in service.scenarios.sortedWith(SCENARIOS_BY_NAME)) {
+                        tr {
+                            th(scope = ThScope.row) {
+                                a(href = ScenarioPages.addressOf(service.id, scenario.id)) { +scenario.name }
+                                for (mark in marksOf(service, scenario, universal)) {
+                                    +" "
+                                    span(classes = "mark") { +mark }
+                                }
+                            }
+                            td { +"${scenario.statusCode}" }
+                            td { +criterionOf(scenario.matchCriterion) }
+                            td { +(scenario.methodRestriction ?: ANY_METHOD) }
+                            td { +(if (scenario.delayMillis > 0) "${scenario.delayMillis} ms" else SERVICE_DELAY) }
+                            td { tagsOf(scenario.tags) }
+                            td {
+                                val used = scenario.lastUsedTime
+                                if (used == null) span(classes = "none") { +"never" } else timeOf(used)
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    /**
+     * Returns the marks for the designations that [scenario] of [service] holds. [universal] is the universal
+     * error scenario of the server, or `null` if the server has none.
+     */
+    private fun marksOf(
+        service: ServiceDto,
+        scenario: ScenarioDto,
+        universal: ScenarioReferenceDto?,
+    ): List<String> =
+        listOfNotNull(
+            "default".takeIf { scenario.id == service.defaultScenarioId },
+            "error scenario".takeIf { scenario.id == service.errorScenarioId },
+            "universal error scenario".takeIf { universal == ScenarioReferenceDto(service.id, scenario.id) },
+        )
+
+    /** Returns the text that the table shows for [criterion]: its kind, and for a text criterion also the beginning of the text. */
+    private fun criterionOf(criterion: MatchCriterionDto): String =
+        when (criterion) {
+            is MatchCriterionDto.None -> NONE
+            is MatchCriterionDto.Text -> "Text: ${briefly(criterion.text)}"
+            is MatchCriterionDto.Rules -> "Rule set"
+        }
 
     /**
      * The form of a service, which a browser sends to [action] and which is shown with [state]. It is the

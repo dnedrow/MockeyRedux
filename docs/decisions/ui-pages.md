@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5 and 13.6 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5, 13.6, and 13.7 of the change `kotlin-rewrite-modular`, on 2026-11-25.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -142,8 +142,8 @@ long.
 
 ### The form
 
-- The form has a field for every attribute of a service but the error scenario, which task 13.7 adds with the
-  scenarios. The form of a new service states each of these attributes in its request. The form of a service
+- The form has a field for every attribute of a service except the error scenario, which is set on the page of
+  a scenario. The form of a new service states each of these attributes in its request. The form of a service
   that is there states the ones that were changed in it, see [ui-forms.md](ui-forms.md), so a form that is
   sent as it is shown asks for nothing.
 - A real URL has a row of its own, with a button that makes it the default one. The form has two rows more
@@ -170,10 +170,136 @@ long.
 
 ### What the pages of a service do not have
 
-- The scenarios of the service are listed by their names, with the default one and the error scenario
-  marked. Task 13.7 adds their pages and the forms that change them.
 - The report of the response schema, the merge of services, and the derivation of real URLs are pages of
   task 13.10.
+
+## The pages of a scenario
+
+A scenario has one page, which is the form that edits it. A form of the same kind creates a scenario. Buttons
+on the page designate the scenario as the default scenario or the error scenario of its service, or as the
+universal error scenario, and a link leads to the confirmation step for a deletion. The page of a service
+lists its scenarios in a table that links to these pages.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for scenarios (`admin-ui`: Coverage of management
+  operations). Task 13.7 names the editor with the status, the headers, the criterion, the method, the delay,
+  the tags, and the error designations.
+- A form that the admin API rejects is displayed again with the entered values, and each message appears next
+  to the field that it concerns (`admin-ui`: Validation feedback).
+- The UI asks for confirmation before it deletes a scenario (`admin-ui`: Confirmation of destructive actions).
+- The server sends the body of a scenario exactly as it is stored (`scenario-responses`: Body fidelity).
+
+### One page
+
+| Option | Advantages | Disadvantages |
+|---|---|---|
+| 1. A page that shows the scenario, and a separate page with the form, as for a service. | The pattern is the same as for a service. | A scenario has little to show beyond its form. The read-only page would repeat the status code, the headers, and the body, and every edit would take one more click. |
+| 2. One page, which is the form. | Opening a scenario from the list of its service leads directly to the editable values. | A rejected form is displayed above the designations, so the designations are out of view. |
+
+The UI uses option 2. Legacy also opens a scenario directly in an editor dialog.
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/scenario?service=&id=` | The page of a scenario. `GET` displays the form, and `POST` saves it. |
+| `/scenario/new?service=` | The form for a new scenario. |
+| `/scenario/delete?service=&id=` | The confirmation step for a deletion. |
+| `/scenario/default?service=&id=` | Makes the scenario the default scenario of its service (`POST`). |
+| `/scenario/error?service=&id=` | Designates the scenario as the error scenario of its service, or removes that designation (`POST`). |
+| `/scenario/universal-error?service=&id=` | Designates the scenario as the universal error scenario, or removes that designation (`POST`). |
+
+An address names the service and the scenario. The admin API addresses a scenario below its service, and two
+services can have scenarios with the same identifier.
+
+### The form
+
+- The status code is a text field. A status code in HTTP has three digits, so the UI accepts a whole number
+  from 100 to 999. The server does not validate the status code.
+- The headers are one text area with one header per line, in the form `Name: value`. The name ends at the
+  first colon, so a value can contain colons. The order of the lines is the order of the headers, and a name
+  can appear more than once, which headers such as `Set-Cookie` need. The UI rejects a line without a name
+  and reports its line number.
+- Rows of name and value fields, as for the real URLs of a service, would validate each header separately.
+  Without scripting, however, a form cannot add rows, and a response often has more headers than a fixed
+  number of rows.
+- The match criterion is one text area and a check box. An empty field means no criterion. Otherwise, the
+  text is a rule set if the check box is checked, and a text criterion if it is not. Legacy has the same two
+  controls.
+- The method restriction is a choice of "Any method" and seven common methods. If the scenario has another
+  restriction, such as `*` or a method in lower case, the form offers it as an additional choice. The form
+  therefore never changes the restriction on its own.
+- The delay follows the rule of the form of a service: a whole number of milliseconds that is 0 or greater.
+  An empty field means 0.
+- The tags are separated by whitespace, as in the form of a service.
+- The form for an existing scenario states only the attributes whose fields were changed, see
+  [ui-forms.md](ui-forms.md). The UI validates only the changed fields, so a stored status code that the form
+  would reject does not prevent saving another field. The form for a new scenario states every attribute.
+
+### The line endings of the body
+
+The server sends a body exactly as it is stored, but a browser submits every line break of a text area as a
+carriage return and a line feed. A form that stored the submitted text would rewrite the line endings of every
+body that a person edits.
+
+- The form has a hidden field that holds the line endings of the stored body: `crlf` if every line break of
+  the body is a carriage return and a line feed, and `lf` otherwise. When the body field is changed, the UI
+  applies this style to the submitted text.
+- A body that mixes line endings therefore receives line feeds when it is edited. A body that is not edited
+  is not sent at all, so it keeps its mixed line endings.
+- A body that is entered in the form for a new scenario receives line feeds.
+- The match criterion is handled in the same way. A text criterion that spans several lines matches a request
+  body only if the line endings are equal.
+
+### The designations
+
+- A section below the form says whether the scenario is the default scenario of its service, the error
+  scenario of its service, and the universal error scenario. Each statement explains the designation in one
+  sentence.
+- Each designation has one button, which assigns the designation or removes it. The default designation has
+  no button that removes it, because a service with scenarios always has a default scenario. The designation
+  ends only when another scenario becomes the default scenario.
+- The default scenario and the error scenario are attributes of the service, so their buttons send
+  `PATCH services/{id}`. The universal error scenario is a resource of its own, so its button sends
+  `PUT universal-error-scenario` or `DELETE universal-error-scenario`.
+- A button that removes a designation changes nothing if the scenario no longer holds the designation. The
+  page may be stale: another scenario may have received the designation after the page was rendered. Without
+  this check, the button would remove the designation from that other scenario.
+- The check and the change are two requests, so a change by someone else between them can still be
+  overwritten. The admin API has no conditional request that would close this gap.
+- Legacy sets the two error designations with check boxes in the scenario editor. The buttons are separate
+  forms instead, so a designation does not depend on the other fields, and a rejected form does not block a
+  designation. Pressing a button does not save unsaved edits in the form of the scenario.
+
+### The list on the page of a service
+
+- The page of a service lists its scenarios in a table, sorted by name without regard to letter case. Each
+  row links to the page of its scenario and shows the status code, the match criterion, the method
+  restriction, the delay, the tags, and the last-used time.
+- The table shows the kind of the criterion. For a text criterion, it also shows the first 80 characters of
+  the text. It does not show a rule set, which is long.
+- A row marks the default scenario, the error scenario, and the universal error scenario. The page of a
+  service therefore requests the universal error scenario from the server.
+- A scenario with a delay of 0 shows `service delay`, because the delay of the service applies to it.
+
+### Deleting a scenario
+
+- The link leads to a page that asks for confirmation. The page lists the consequences of the deletion: the
+  oldest remaining scenario becomes the default scenario, the service loses its error scenario, or the server
+  loses its universal error scenario. For the only scenario of a service, the page says that a service
+  without a scenario forwards every request.
+- After the deletion, the browser goes to the page of the service, which reports the deletion.
+
+### Limits
+
+- A header whose stored value contains a line break appears as two lines in the form. The form does not
+  change such a header unless a person edits the headers. In that case, the UI rejects the second line or
+  reads it as a separate header.
+- An edited body loses its NUL characters, and an edited name loses its line breaks, see
+  [ui-forms.md](ui-forms.md).
+- The page of a scenario does not show the last-used time. The list on the page of the service shows it.
+- Saving a history entry as a scenario belongs to task 13.9.
 
 ## A look in a browser
 
@@ -184,6 +310,9 @@ is not repeated by one:
   one of 560 pixels. In the narrow window the list scrolls sideways within the page.
 - Chrome showed the page of a service, its form, the form with the messages of a refusal, and the page that
   asks before a service is deleted.
+- Chrome showed the list of scenarios on the page of a service, the page of a scenario with its designations
+  in a window of 1,280 pixels and in one of 520 pixels, a rejected form with its messages, and the
+  confirmation page for a deletion.
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
   was sent to the row of a service: the line of the page stayed at the top of the window, and the row began
   below it.
@@ -192,5 +321,6 @@ is not repeated by one:
 
 Run `./gradlew :mockey-ui:test`. `UiServicesTest` reads the overview and the page of the diagnostics and sends
 the forms of the switches. `UiServiceTest` sends the forms of a service and reads what the admin API was
-asked for. `UiCrawlTest` follows every link from the first page on, also with a server that states content
-that is written to be read as markup.
+asked for. `UiScenarioTest` submits the forms and presses the buttons of a scenario, and it checks the
+requests that the admin API received. `UiCrawlTest` follows every link from the first page on, also with a
+server that states content that is written to be read as markup.

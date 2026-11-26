@@ -61,7 +61,7 @@ internal object Html {
     /** The sections of the UI, in the order of the navigation. */
     val sections: List<Section> =
         listOf(
-            Section(ServicesPages.OVERVIEW, "Services", setOf(ServicePages.PAGE, DiagnosticsPages.PATH)),
+            Section(ServicesPages.OVERVIEW, "Services", setOf(ServicePages.PAGE, ScenarioPages.PAGE, DiagnosticsPages.PATH)),
             Section("/system", "Server"),
         )
 

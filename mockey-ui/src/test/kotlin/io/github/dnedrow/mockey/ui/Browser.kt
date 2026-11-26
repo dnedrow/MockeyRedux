@@ -30,8 +30,11 @@ internal class Browser(
         val body: String,
         private val address: String,
     ) {
-        /** The body as the page that a browser makes of it. */
-        val page: Document by lazy { Jsoup.parse(body, address) }
+        /**
+         * The body as the page that a browser makes of it. A browser reads every carriage return, with or
+         * without a line feed after it, as one line feed, before it parses the page.
+         */
+        val page: Document by lazy { Jsoup.parse(body.replace("\r\n", "\n").replace('\r', '\n'), address) }
 
         /** Returns the one value of the header [name], or `null` when the answer has no such header, or several. */
         fun header(name: String): String? = headers[name.lowercase()]?.singleOrNull()
@@ -186,7 +189,7 @@ internal class Browser(
 
     private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
 
-    private fun asSent(value: String): String = value.replace("\r\n", "\n").replace("\n", "\r\n")
+    private fun asSent(value: String): String = value.replace("\r\n", "\n").replace('\r', '\n').replace("\n", "\r\n")
 
     private fun encoded(fields: List<Pair<String, String>>): String =
         fields.joinToString("&") { (name, value) -> "${escaped(name)}=${escaped(value)}" }

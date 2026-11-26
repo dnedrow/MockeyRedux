@@ -7,6 +7,7 @@ import io.github.dnedrow.mockey.api.InspectorDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
 import io.github.dnedrow.mockey.api.ScenarioDto
+import io.github.dnedrow.mockey.api.ScenarioReferenceDto
 import io.github.dnedrow.mockey.api.ServiceAttributesDto
 import io.github.dnedrow.mockey.api.ServiceDto
 import io.github.dnedrow.mockey.ui.FakeAdminApi.Companion.problem
@@ -89,7 +90,8 @@ class UiServiceTest {
         services: List<ServiceDto> = listOf(billing, Samples.orders),
         diagnostics: List<DiagnosticDto> = emptyList(),
         paths: Map<String, String> = emptyMap(),
-    ): FakeAdminApi = FakeAdminApi().also { fakes += it }.also { it.hold(services, diagnostics, paths, inspectors) }
+        universal: ScenarioReferenceDto? = null,
+    ): FakeAdminApi = FakeAdminApi().also { fakes += it }.also { it.hold(services, diagnostics, paths, inspectors, universal) }
 
     private fun browserFor(api: FakeAdminApi): Browser {
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(api.url), logLevel = LogLevel.WARN)
@@ -123,7 +125,10 @@ class UiServiceTest {
     @Test
     fun thePageOfAServiceShowsWhatTheServiceIsSetTo() {
         val concerning = DiagnosticDto("unknownInspector", billing.id, billing.name, "The inspector 'Audit' is not installed.")
-        val api = holding(diagnostics = listOf(concerning))
+        val late = due.copy(methodRestriction = "POST", delayMillis = 40, tags = listOf("slow"), lastUsedTime = "2026-01-02T03:04:05Z")
+        val ruled = paid.copy(matchCriterion = MatchCriterionDto.Rules("{}"))
+        val held = billing.copy(scenarios = listOf(ruled, late))
+        val api = holding(listOf(held), listOf(concerning), universal = ScenarioReferenceDto(billing.id, paid.id))
         val browser = browserFor(api)
 
         val answer = browser.get("/service?id=svc-billing")
@@ -147,9 +152,25 @@ class UiServiceTest {
         assertEquals("Billing - Mockey" to "Billing", page.title() to page.select("main h1").text())
         assertEquals(facts, described(page))
         assertEquals("What a customer owes.\nKept by the billing team.", page.select("main dd.lines").first()!!.wholeText())
-        assertEquals(listOf("due default", "paid error scenario"), page.select("main ul.scenarios li").map { it.text() })
+        val table = page.select("main table.scenarios").single()
+        val scenarios =
+            listOf(
+                listOf("due default", "402", "Text: due", "POST", "40 ms", "slow", "2026-01-02 03:04:05 UTC"),
+                listOf("paid error scenario universal error scenario", "200", "Rule set", "any", "service delay", "", "never"),
+            )
+        val columns = listOf("Scenario", "Status", "Match criterion", "Method", "Delay", "Tags", "Last used")
+        assertEquals(columns, table.select("thead th").map { it.text() })
+        assertEquals(scenarios, table.select("tbody tr").map { row -> row.select("th, td").map { it.text() } })
+        val ofScenarios = listOf("/scenario?service=svc-billing&id=sc-due", "/scenario?service=svc-billing&id=sc-paid")
+        assertEquals(ofScenarios, table.select("tbody th a").map { it.attr("href") })
         val links = page.select("main .actions a").associate { it.text() to it.attr("href") }
-        assertEquals(mapOf("Edit" to "/service/edit?id=svc-billing", "Delete" to "/service/delete?id=svc-billing"), links)
+        val leading =
+            mapOf(
+                "Edit" to "/service/edit?id=svc-billing",
+                "Delete" to "/service/delete?id=svc-billing",
+                "New scenario" to "/scenario/new?service=svc-billing",
+            )
+        assertEquals(leading, links)
         val duplicate = page.select("main .actions form").single()
         val ofDuplicate = Triple(duplicate.attr("method"), duplicate.attr("action"), duplicate.text())
         assertEquals(Triple("post", "/service/duplicate?id=svc-billing", "Duplicate"), ofDuplicate)
@@ -158,8 +179,20 @@ class UiServiceTest {
         assertEquals(listOf("/services?tag=nightly", "/services?tag=team-b"), page.select("main dd a.tag").map { it.attr("href") })
         assertEquals(0, page.select("main dd code.url a").size)
         assertEquals(listOf("/services"), page.select("nav a[aria-current=page]").map { it.attr("href") })
-        assertEquals(listOf("GET system", "GET services/svc-billing", "GET diagnostics"), api.requests.map { it.line })
+        val requests = listOf("GET system", "GET services/svc-billing", "GET diagnostics", "GET universal-error-scenario")
+        assertEquals(requests, api.requests.map { it.line })
         assertEquals(emptyList(), api.violations)
+    }
+
+    /** The list of the scenarios shows only the beginning of a long text criterion. */
+    @Test
+    fun theScenarioListShortensALongTextCriterion() {
+        val long = due.copy(matchCriterion = MatchCriterionDto.Text("x".repeat(200)))
+        val browser = browserFor(holding(listOf(billing.copy(scenarios = listOf(long)))))
+
+        val page = browser.get("/service?id=svc-billing").page
+
+        assertEquals("Text: " + "x".repeat(79) + "\u2026", page.select("main table.scenarios tbody td").eq(1).text())
     }
 
     /** A service that is set to little says so, and a service that answers in another mode than it is set to says in which. */
@@ -185,8 +218,9 @@ class UiServiceTest {
                 "Last used" to "never",
             )
         assertEquals(facts, described(page))
-        assertEquals(0, page.select("main a.marker, main ul.scenarios").size)
+        assertEquals(0, page.select("main a.marker, main table.scenarios").size)
         assertEquals("The service has no scenario. It forwards every request while it has none.", page.select("main h2 + p").text())
+        assertEquals(listOf("/scenario/new?service=svc-orders"), page.select("main p.actions a").map { it.attr("href") })
         val without = browserFor(holding(listOf(Samples.customers))).get("/service?id=svc-customers").page
         val unset = listOf("Real URLs", "Request rules", "Response schema")
         assertEquals(listOf("none", "none", "none"), unset.map(described(without)::getValue))
@@ -718,7 +752,7 @@ class UiServiceTest {
 
         for ((id, written) in ids) {
             val page = browser.get(Address.of("/service", "id" to id))
-            val actions = page.page.select("main .actions a")
+            val actions = page.page.select("main div.actions a")
             val edit = browser.get(actions.first()!!.attr("href"))
             val saved = browser.submit(edit.form(), mapOf("delay" to "1"))
             val asked = browser.get(actions.last()!!.attr("href"))
@@ -773,8 +807,8 @@ class UiServiceTest {
             val stated = listOf("Description", "Default scenario", "Tags", "Real URLs", "Inspector", "Last used")
             assertEquals(stated.associateWith { text }, facts.filterKeys { it in stated }, text)
             assertEquals(callableUrlOf(api.system, text), facts["Mock URL"], text)
-            val scenarioNames = page.select("main ul.scenarios li").map { it.textNodes().first().wholeText }
-            assertEquals(text to setOf("$text ", "due"), page.select("main h1").first()!!.wholeText() to scenarioNames.toSet(), text)
+            val scenarioNames = page.select("main table.scenarios tbody th a").map { it.wholeText() }
+            assertEquals(text to setOf(text, "due"), page.select("main h1").first()!!.wholeText() to scenarioNames.toSet(), text)
             val fields = shown(edit.form())
             val ofLines = listOf("description", "defaultScenario", "rules", "inspector", "schema")
             assertEquals(ofLines.associateWith { listOf(text) }, fields.filterKeys { it in ofLines }, text)

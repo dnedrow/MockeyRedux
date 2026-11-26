@@ -31,6 +31,35 @@ internal fun tagsIn(text: String): List<String> = text.split(BETWEEN_TAGS).filte
 internal fun inOneLine(text: String): String = text.filterNot { it == '\r' || it == '\n' }
 
 /**
+ * The line endings of a multi-line text whose exact characters matter, such as a response body. A browser
+ * submits every line break as a carriage return and a line feed, so a form cannot tell from a submitted text
+ * which line endings the stored text has. A form therefore keeps the style of the stored text in a hidden
+ * field and applies that style to the submitted text.
+ */
+internal object LineEndings {
+    private const val CRLF = "crlf"
+    private const val LF = "lf"
+
+    /** The style of a text that is entered in the form for a new object: every line ends with a line feed. */
+    const val DEFAULT = LF
+
+    /**
+     * Returns the style of [text]. The style is a carriage return and a line feed if every line break of the
+     * text has this form. Otherwise, it is a line feed.
+     */
+    fun styleOf(text: String): String {
+        val rest = text.replace("\r\n", "")
+        return if ("\r\n" in text && '\r' !in rest && '\n' !in rest) CRLF else LF
+    }
+
+    /** Returns [text], whose lines end with a line feed, with the line endings of [style]. */
+    fun apply(
+        style: String,
+        text: String,
+    ): String = if (style == CRLF) text.replace("\n", "\r\n") else text
+}
+
+/**
  * Marks of the initial values of form fields. They let the UI detect which fields a person changed, so that
  * it asks the server to set only the attributes of those fields. A form that changes a few attributes of an
  * object leaves the other attributes as the server holds them, even if they changed after the page was

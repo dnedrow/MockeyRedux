@@ -353,7 +353,7 @@ internal class UiApplication(
 
     internal companion object {
         /** The areas of the UI. */
-        val AREAS: List<Area> = listOf(ServicesArea, ServiceArea, DiagnosticsArea, SystemArea)
+        val AREAS: List<Area> = listOf(ServicesArea, ServiceArea, ScenarioArea, DiagnosticsArea, SystemArea)
 
         private val log = LoggerFactory.getLogger(UiApplication::class.java)
 
