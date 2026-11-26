@@ -277,7 +277,7 @@ internal object PlanPages {
                 p(classes = "actions") { a(href = ServicePages.NEW) { +"New service" } }
                 return@Page
             }
-            postForm(view, NEW) {
+            postForm(view, NEW, inPlace = true) {
                 rejectionOf(state)
                 textField(state, PlanForm.NAME, "Name", hint = NAME_OF_NEW_HINT)
                 textAreaField(state, PlanForm.DESCRIPTION, "Description", rows = DESCRIPTION_ROWS)
@@ -299,7 +299,7 @@ internal object PlanPages {
         state: FormState,
     ): Page =
         Page("Edit the plan ${plan.name}") {
-            postForm(view, addressOf(EDIT, plan)) {
+            postForm(view, addressOf(EDIT, plan), inPlace = true) {
                 shownOf(state, PlanForm.FIELDS)
                 rejectionOf(state)
                 textField(state, PlanForm.NAME, "Name", hint = NAME_HINT)
@@ -330,7 +330,7 @@ internal object PlanPages {
                 p { +NO_SERVICES }
                 return@Page
             }
-            postForm(view, addressOf(SAVE, plan)) {
+            postForm(view, addressOf(SAVE, plan), inPlace = true) {
                 rejectionOf(state)
                 servicesOf(state, services, null)
                 otherProblemsOf(state)

@@ -273,10 +273,32 @@ internal class UiApplication(
                 return showAgain(call, again, FormState(form.values, invalid.errors))
             }
         when (outcome) {
-            is Outcome.Done -> seeOther(call, outcome.to, outcome.notice)
+            is Outcome.Done -> done(call, outcome)
             is Outcome.Report -> seeOther(call, "$REPORTS/${reports.keep(outcome.page, outcome.entries)}")
             is Outcome.Shown -> respond(call, outcome.page)
         }
+    }
+
+    /**
+     * Answers a form that the server did. The script of a page gets the part of the page that the form
+     * changed, where the form has one, and puts it into the page. Every other request is sent on.
+     */
+    private suspend fun done(
+        call: ApplicationCall,
+        outcome: Outcome.Done,
+    ) {
+        val inPlace = outcome.inPlace
+        if (inPlace == null || !Enhancement.isRequested(call)) return seeOther(call, outcome.to, outcome.notice)
+        val part =
+            try {
+                inPlace(View(tokens.tokenFor(call)), client.getSystem())
+            } catch (_: ApiFailure) {
+                // The server did what the form asked for, and now it fails to say what it holds. The page of
+                // a failure would say that nothing was changed. So the browser is sent on, as without the
+                // script, and the page that it loads says what is the matter with the server.
+                return seeOther(call, outcome.to, outcome.notice)
+            }
+        respondPart(call, part, notice = outcome.notice)
     }
 
     override suspend fun confirm(
@@ -309,7 +331,9 @@ internal class UiApplication(
         val system = client.getSystem()
         call.attributes.put(SYSTEM, system)
         val page = again(View(tokens.tokenFor(call)), system, state)
-        respond(call, Page(page.title, HttpStatusCode.UnprocessableEntity, content = page.content))
+        val notTaken = Page(page.title, HttpStatusCode.UnprocessableEntity, content = page.content)
+        // The script of a page puts the form with its messages in the place of the form that it sent.
+        if (Enhancement.isRequested(call)) respondPart(call, Html.mainPartOf(notTaken), notTaken.status) else respond(call, notTaken)
     }
 
     /**
@@ -324,9 +348,18 @@ internal class UiApplication(
     ) {
         require(path.startsWith("/") && !path.startsWith("//") && '\\' !in path) { "A form leads to a path of the UI, and not to $path." }
         if (notice != null) notices.leave(call, notice)
-        call.response.header(HttpHeaders.Location, path)
         call.response.header(HttpHeaders.CacheControl, "no-store")
-        call.respond(HttpStatusCode.SeeOther)
+        if (Enhancement.isRequested(call)) {
+            // A script follows a redirect without a word and would put the page that it leads to into a part
+            // of the page. So the script is told to load that page, which a browser does for the status 303.
+            // The address names no place in the page: a browser that is sent to a place in the page that it
+            // shows goes there and loads nothing.
+            call.response.header(Enhancement.REDIRECT, path.substringBefore('#'))
+            call.respond(HttpStatusCode.OK)
+        } else {
+            call.response.header(HttpHeaders.Location, path)
+            call.respond(HttpStatusCode.SeeOther)
+        }
     }
 
     /**
@@ -356,10 +389,30 @@ internal class UiApplication(
         page: Page,
         trouble: String? = null,
     ) {
+        val live = page.live
+        // The script asks for a page again to bring the part of it up to date that changes by itself.
+        if (live != null && Enhancement.isRequested(call)) return respondPart(call, live.part)
         val notice = if (call.request.httpMethod == HttpMethod.Get) notices.take(call) else null
         call.response.header(HttpHeaders.CacheControl, "no-store")
         val document = Html.document(page, call.request.path(), adminUrl, call.attributes.getOrNull(SYSTEM), notice, trouble)
         call.respondText(document, HTML, page.status)
+    }
+
+    /**
+     * Answers the request of [call], which the script of a page sent, with [part] alone. The answer says
+     * where the part goes in the page that the browser shows. The script puts it there, and with it
+     * [notice], when there is one.
+     */
+    private suspend fun respondPart(
+        call: ApplicationCall,
+        part: Part,
+        status: HttpStatusCode = HttpStatusCode.OK,
+        notice: String? = null,
+    ) {
+        call.response.header(HttpHeaders.CacheControl, "no-store")
+        call.response.header(Enhancement.RETARGET, part.place.target)
+        call.response.header(Enhancement.RESWAP, part.place.swap)
+        call.respondText(Html.partial(part, notice), HTML, status)
     }
 
     /** Returns the page for the request of [call], which failed with [cause]. */

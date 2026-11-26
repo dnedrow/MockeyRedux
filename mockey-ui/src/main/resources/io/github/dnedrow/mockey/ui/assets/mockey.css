@@ -170,6 +170,18 @@ th[scope="row"] {
   border-left-color: var(--good);
 }
 
+/* The element is there before it says something, so that a screen reader announces what a script puts into it. */
+.notice:empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* A form that the script has sent, until its answer is in the page. */
+form.htmx-request {
+  opacity: 0.6;
+}
+
 :target {
   scroll-margin-top: 5rem;
 }

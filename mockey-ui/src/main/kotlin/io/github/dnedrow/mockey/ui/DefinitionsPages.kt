@@ -78,7 +78,7 @@ internal object DefinitionsPages {
             h2 { +"Import" }
             p { +ABOUT_IMPORT }
             ul { IMPORT_RULES.forEach { li { +it } } }
-            postForm(view, IMPORT, withFiles = true) {
+            postForm(view, IMPORT, withFiles = true, inPlace = true) {
                 rejectionOf(state)
                 fileField(state, ImportForm.DOCUMENT, "Document", hint = DOCUMENT_HINT)
                 textField(state, ImportForm.TAGS, "Tags", hint = TAGS_HINT)

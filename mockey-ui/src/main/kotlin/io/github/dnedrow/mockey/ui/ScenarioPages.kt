@@ -266,7 +266,7 @@ internal object ScenarioPages {
         save: String,
         back: String,
     ) {
-        postForm(view, action) {
+        postForm(view, action, inPlace = true) {
             if (marked) shownOf(state, ScenarioForm.FIELDS)
             for (name in ScenarioForm.LINE_ENDING_FIELDS) hiddenInput(name = name) { value = state.value(name) }
             rejectionOf(state)

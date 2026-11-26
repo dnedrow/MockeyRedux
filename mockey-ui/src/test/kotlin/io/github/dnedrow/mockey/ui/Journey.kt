@@ -11,10 +11,14 @@ import org.jsoup.nodes.FormElement
  * The walk is made of steps (see [step]). For each step, it remembers which operations of the admin API
  * the stand-in server [api] was asked for. It also remembers every form that its pages showed and every
  * form that it submitted, so a test can tell whether a form was left out.
+ *
+ * With [withScript], the walk is the one of a browser that runs the script of the UI: the script sends
+ * every form that is marked for it, and the walk goes on from the page that the script makes of the answer.
  */
 internal class Journey(
     private val browser: Browser,
     private val api: FakeAdminApi,
+    private val withScript: Boolean = false,
 ) {
     /** The addresses that the walk may open: the first page, and every address that a page of the walk refers to. */
     private val linked = mutableSetOf("/")
@@ -27,6 +31,12 @@ internal class Journey(
 
     /** The forms that the walk submitted, named the same way. */
     val submitted: MutableSet<String> = sortedSetOf()
+
+    /** The forms that the script of the UI sent on the walk, named the same way. */
+    val sentByScript: MutableSet<String> = sortedSetOf()
+
+    /** Every page that the browser of the walk showed, in the order of the walk. */
+    val pages: MutableList<Browser.Response> = mutableListOf()
 
     /** The operations of the admin API that each step reached, by the name of the step, in the order of the steps. */
     val reached: MutableMap<String, Set<String>> = LinkedHashMap()
@@ -61,15 +71,15 @@ internal class Journey(
 
     /**
      * Opens the address that the element which [selector] finds on the page of [answer] refers to, and
-     * returns the answer. The element is a link, or it names the stylesheet of the page. If [selector]
-     * finds several elements, the first one is taken.
+     * returns the answer. The element is a link, or it names the stylesheet or the script of the page. If
+     * [selector] finds several elements, the first one is taken.
      */
     fun follow(
         answer: Browser.Response,
         selector: String,
     ): Browser.Response {
         val found = answer.page.select(selector).firstOrNull() ?: error("The page has nothing for $selector: ${answer.page.title()}")
-        return open(found.attr("href"))
+        return open(found.attr("href").ifEmpty { found.attr("src") })
     }
 
     /**
@@ -90,6 +100,10 @@ internal class Journey(
         // A browser sends a form with the method GET as a request for a page.
         if (name.startsWith("GET ")) opened += name.substringAfter(' ')
         val button = pressed ?: form.select("button").firstOrNull()
+        if (withScript && form.hasAttr("hx-post")) {
+            sentByScript += name
+            return arrivedByScript(form, browser.submitWithScript(form, edits, files, button, rows), "The form $name")
+        }
         return arrived(browser.submit(form, edits, files, button, rows), "The form $name")
     }
 
@@ -106,10 +120,36 @@ internal class Journey(
             current = browser.get(target)
             hops++
         }
+        return noted(current, what)
+    }
+
+    /**
+     * Does what the script of the UI does with [answer], which is the answer to [form], and returns the
+     * page that the browser shows then. The script loads the page that the answer names, as a browser
+     * does. Otherwise, it puts the answer into the page that showed the form (see [Swap]).
+     */
+    private fun arrivedByScript(
+        form: FormElement,
+        answer: Browser.Response,
+        what: String,
+    ): Browser.Response {
+        val target = answer.header(Swap.REDIRECT)?.substringBefore('#')
+        if (target == null) return noted(Swap.shown(form.ownerDocument()!!, form, answer), what)
+        opened += target.substringBefore('?')
+        return arrived(browser.get(target), what)
+    }
+
+    /** Takes note of [current], which is what the browser shows after [what], and returns it. */
+    private fun noted(
+        current: Browser.Response,
+        what: String,
+    ): Browser.Response {
         if (current.status != OK) failures += "$what led to the status ${current.status}: ${current.page.select("main").text().take(BRIEF)}"
         // Only a page has links and forms. A browser saves a file, or uses it for a page, whatever the file holds.
         if (!current.header("content-type").orEmpty().startsWith("text/html")) return current
-        linked += current.page.select("[href]").map { it.attr("href").substringBefore('#') }
+        pages += current
+        val referred = current.page.select("[href]").map { it.attr("href") } + current.page.select("[src]").map { it.attr("src") }
+        linked += referred.map { it.substringBefore('#') }
         shown += current.page.select("form").map { nameOf(it as FormElement) }
         return current
     }

@@ -1,10 +1,11 @@
 # The stack of the web UI
 
-Decided in task 13.1 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in task 13.1 of the change `kotlin-rewrite-modular`, on 2026-11-25. The section "The script" was
+added in task 13.12, on 2026-11-26.
 
 `mockey-ui` is a Ktor application on Netty, as the server is, and it uses the routing of Ktor, which the
 server does not. It writes its pages with kotlinx.html, and it talks to the admin API with the HTTP client
-of the JDK, `java.net.http.HttpClient`.
+of the JDK, `java.net.http.HttpClient`. Its pages load one script, htmx, which nothing depends on.
 
 ## What was needed
 
@@ -105,9 +106,184 @@ refuses every other token when it starts, and says why.
   asks for anything else. That is the one place at which the UI finds that a server cannot be reached, does
   not take the token, or is no server that the UI can manage. It costs one request more for every page, on
   a connection that the client keeps.
-- The files that a page refers to are resources of the program: a stylesheet and an icon. The UI serves them
-  by their names from a list, so no other resource of the program is served. A file has a tag of its bytes,
-  and a browser that has the file asks whether it still holds.
+- The files that a page refers to are resources of the program: a stylesheet, an icon, and a script. The UI
+  serves them by their names from a list, so no other resource of the program is served. A file has a tag of
+  its bytes, and a browser that has the file asks whether it still holds.
+
+## The script
+
+Every page loads one script from the UI itself: htmx 2.0.11, as a file in the source tree (see
+[third-party.md](../third-party.md)). Where a page marks an element for it, the script sends the request of
+that element and puts the answer into the page, so the browser doesn't load a whole page.
+
+Nothing depends on the script. A browser without scripting gets the same pages with the same forms, and it
+uses them with links, forms, and full page loads.
+
+### What was needed
+
+- With scripting, the UI can update a part of a page in place. Such an interaction uses the same address as
+  its full-page equivalent, and it leaves the server in the same state (`admin-ui`: Optional scripting
+  enhancement, with the scenario "Mode switch updates in place").
+- With scripting, new history entries appear in place (`admin-ui`: Live history view).
+- A browser gets every script from the UI and from nowhere else (`admin-ui`: Self-hosted assets).
+- Design decision 12 says that htmx is a vendored static file, and that a handler returns a fragment instead
+  of a full page when a request carries the marker header of htmx.
+- Task 13.12 names three uses: the switches of the overview, the refresh of the history, and validation
+  feedback.
+
+### What the script does
+
+| Where | Without the script | With the script |
+|---|---|---|
+| A switch of the overview | The browser is sent to the overview, at the row of the service. | The row of the service is replaced, and the page says what was switched. |
+| A form with fields that isn't taken | The page comes back with the form and its messages. | The form with its messages replaces what the page shows below the navigation. |
+| A form with fields that is done | The browser is sent to the page of the result. | The script loads the page of the result. |
+| The history list with automatic refresh | The browser loads the page again every 5 seconds. | The script asks for the page every 5 seconds and replaces the part that depends on the history. |
+
+Everything else is the same either way: links, forms that are only a button, and the confirmation steps.
+[ui-pages.md](ui-pages.md) has the details for the overview and for the history.
+
+### How a page marks an element
+
+- A form has the attribute `hx-post` with the address of the form, which is also its `action`. A form with
+  files has `hx-encoding="multipart/form-data"` as well. The script then sends the form the way a browser
+  would: to the same address, with the same fields.
+- The part of the history page that is refreshed has `hx-get` with the address of the page and
+  `hx-trigger="every 5s"`.
+- A page has no other attribute for the script, and the tests hold the pages to these four.
+
+### How the UI answers the script
+
+The script adds the header `HX-Request: true` to every request. That header is the only difference to the
+request of a browser. With it, the UI answers in one of three ways:
+
+- **A part of a page.** The answer is one element, and its headers say where it goes: `HX-Retarget` names
+  the element that it replaces, and `HX-Reswap` says how. The UI has three such parts: the row of a service
+  (`closest tr`), the content of a page below the navigation (`main`), and the refreshed part of the history
+  page (`#entries`). After a form is shown again, the window shows the start of the page, as it does after
+  a page load (`show:window:top`).
+- **The address of a page**, in the header `HX-Redirect`, with the status 200 and no content. The script
+  loads that page, as a browser does after the status 303. A script that got the status 303 would follow it
+  on its own and put the page that it leads to into a part of the page. The address never names a place in
+  the page, after a `#`: a browser that is sent to a place in the page that it already shows goes there and
+  loads nothing.
+- **A whole page**, exactly as for any other request. The script shows it in the place of the page that the
+  browser shows, and it takes the title from it. That's how every failure reaches the person: a refusal, a
+  server that can't be reached, and a page that something between the browser and the UI sent.
+
+What the page says of a form that is done goes along with a part as a second element. It's marked with
+`hx-swap-oob="innerHTML"`, so the script puts its content into the notice element of the page. Every page
+has that element, also when it says nothing. So the element stays where it is, and a screen reader that
+watches it announces the new content.
+
+There were two ways to say where an answer goes:
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. The form names the element, with `hx-target` and `hx-swap`. | It's how htmx is mostly used, and the markup shows where an answer goes. | The page writes the form, and the handler writes the answer. A part that doesn't fit the element that the form names would break the page. A whole page needs a header anyway. |
+| 2. The answer names the element, with `HX-Retarget` and `HX-Reswap`. | A part goes where it belongs, whatever the form says. The settings can send every other answer to the place of the whole page. | The markup doesn't show where an answer goes. |
+
+Way 2. An answer without these headers is no part, so it replaces the page.
+
+One case needs care. To make the row of a service, the UI asks the server again, after the server has made
+the change. If that fails, the page of a failure would be wrong, because it says that nothing was changed.
+So the UI falls back to the address of the overview, as without the script. The overview then says what is
+the matter with the server, and it says what was switched.
+
+### The settings of the script
+
+Every page states the settings of the script in a `meta` element with the name `htmx-config`:
+
+| Setting | Value | Why |
+|---|---|---|
+| `includeIndicatorStyles` | `false` | The script would add a `style` element to the page, which the content security policy forbids. The stylesheet of the UI has the one rule that's needed: a form is dimmed until its answer is there. |
+| `allowEval` | `false` | The script evaluates no text as code. The policy forbids that too, and the UI uses nothing that needs it. |
+| `allowScriptTags` | `false` | The script runs no script that an answer holds. |
+| `historyCacheSize` | `0` | The script keeps no copy of a page in the storage of the browser. It only does that for pages that change the address, which the UI doesn't use, so the setting is a second line. |
+| `responseHandling` | See below. | By default, the script drops every answer with a status from 400 on. Someone would press a button and see nothing. |
+
+`responseHandling` has two rules. An answer with the status 204 changes nothing. Every other answer replaces
+what the body of the page holds, unless its headers say otherwise.
+
+The script writes one entry into the session storage of the tab: the path and the query string of the page,
+under `htmx-current-path-for-history`. It holds nothing of what a page shows.
+
+The content security policy of the UI didn't have to change. It already let a page load a script from the UI
+itself, and it lets a script of a page ask the UI and nothing else.
+
+### What the UI relies on
+
+The UI relies on this behavior of htmx. It was read in the source of version 2.0.11 and seen in a browser:
+
+- The script sends a marked form when the form is submitted, by a button or by the Enter key. It sends the
+  fields that the form holds and the button that was pressed.
+- A field of several lines is sent with line feeds alone, where a browser sends a carriage return before
+  every line feed. A form with files is written by the browser, with carriage returns. The UI takes both
+  (see [ui-forms.md](ui-forms.md)).
+- A file field without a chosen file is left out, where a browser sends a file without a name and without
+  content.
+- `HX-Retarget` and `HX-Reswap` count for more than the settings. `closest tr` is looked for from the form.
+- An answer that is a whole document gives the content of its body and its title. Anything else is read as
+  the content of a `template` element, so a table row can stand for itself.
+- After the script has put an answer into the page, it gives the focus to the element with the identifier
+  of the one that had it before. That's why the controls of a switch and the links and buttons of the
+  history list have identifiers.
+- A part that is refreshed stops asking when it's no longer in the page, and the part that took its place
+  asks on.
+- The script only sends requests to the origin of the page.
+
+### A check in a browser
+
+The tests run no browser. So the script was run once in headless Chrome 158, which a small program drove
+through the DevTools protocol. The UI and the server were the runnable jars. This is what Chrome did, and
+it's the list to go through again after htmx is updated:
+
+1. **A page load.** The console is empty, so nothing violates the content security policy. `htmx.version`
+   is `2.0.11`, `htmx.config` has the settings of the page, the page has no `style` element, and the session
+   storage has the one entry.
+2. **A switch of the overview.** Pressing a mode button sends one request with `HX-Request: true`, and no
+   page is loaded. Only the row of that service is a new element. The notice element is the same element as
+   before, and it says what was switched. The pressed button has the focus. What the page shows then equals
+   the page that is loaded again, apart from the notice. The same holds for the default scenario, for a
+   second switch in the row that was replaced, and for a button that is pressed with the space bar.
+3. **A form that isn't taken.** A new service with a delay that's no number gets the status 422. No page is
+   loaded, the fields keep what was entered, the message is at its field, and the window shows the start of
+   the page, as after a page load. The request has line feeds alone in a field of several lines. The Enter
+   key sends the form through the script as well. The corrected form leads to the page of the new service
+   with its notice.
+4. **Every form with fields.** For each of the 15 forms, the script sent exactly the fields that the form
+   holds, and Chrome showed the answer: the page of the result, or the form with its messages.
+5. **A form with a file.** The import with a chosen file led to the report, and the server held what the
+   file held. Without a file, the form came back with its message.
+6. **The history.** With automatic refresh, a request to the mock endpoint appeared in the list within 5
+   seconds, and no page was loaded. A text that was typed into the filter stayed, and so did the focus on a
+   link of the list. After the history was emptied, the list said so and no longer offered to delete
+   entries. A list without automatic refresh asked for nothing. With scripting switched off, Chrome loaded
+   the page again every 5 seconds.
+7. **Failures.** With the server stopped, a switch, a form, and the refresh of the list each showed the page
+   "The server cannot be reached" in the place of the page, with its title. The list asked no more.
+8. **Where requests go.** Every request of the browser went to the UI.
+9. **An address of the page that is shown.** Sent to a place in the page that it showed, Chrome loaded
+   nothing. Sent to the same address without a place, it loaded the page again. After a switch in place and
+   a visit to another page, the back button showed the overview as the server held it.
+
+### What the script doesn't cover
+
+- **No answer at all.** When the UI is down or the connection breaks, the script changes nothing, and the
+  page says nothing. A browser without scripting shows its own error page.
+- **A browser that runs scripts and doesn't get the script.** Its forms work as without scripting. The
+  history list doesn't refresh: such a browser ignores the `noscript` element, and nothing asks for the
+  page.
+- **The console of the browser.** A browser notes every answer to a script with a status from 400 on as a
+  failed request, also the status 422 of a form that isn't taken.
+- **Other browsers.** Only Chrome was run. Safari on macOS doesn't give the focus to a button that is
+  clicked, so there's no focus to keep after a click.
+- **The names of fields.** In a browser, a field shadows the property of its form that has the same name.
+  The fields `name` and `method` do that, and the script doesn't depend on those properties. A field that
+  is named like something the script does depend on, such as `attributes`, `matches`, or `closest`, would
+  break its form for the script. Check 4 above would show it.
+- **The tests.** `Browser.submitWithScript` sends what the script sends, and `Swap` does what the script does
+  with an answer. Both follow the behavior that's listed above, and neither is the script.
 
 ## The settings
 
@@ -149,7 +325,8 @@ the pages themselves.
 - The settings of a proxy for the requests to the admin API. The JDK client goes by the system properties of
   the runtime, such as `http.proxyHost`, and by nothing of the UI.
 - The tests run no browser. What a browser does with the headers above is what the standards say. Where a
-  page was looked at in a browser, [ui-pages.md](ui-pages.md) says so.
+  page was looked at in a browser, [ui-pages.md](ui-pages.md) says so, and "A check in a browser" above says
+  what the script was seen to do in one.
 
 ## Repeating the tests
 

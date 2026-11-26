@@ -11,7 +11,7 @@ import io.ktor.server.routing.post
 import kotlinx.html.ButtonType
 import kotlinx.html.FlowContent
 import kotlinx.html.FlowOrPhrasingContent
-import kotlinx.html.TBODY
+import kotlinx.html.TagConsumer
 import kotlinx.html.ThScope
 import kotlinx.html.a
 import kotlinx.html.button
@@ -36,7 +36,9 @@ import kotlinx.serialization.json.put
  * give a service another response mode and another default scenario.
  *
  * A switch is a form of the overview. The UI asks the server to change the one attribute of the service that
- * the form is about, and sends the browser back to the overview as the form showed it, at the service.
+ * the form is about, and sends the browser back to the overview as the form showed it, at the service. For
+ * a browser that runs the script of the UI, the answer is the row of the service alone, which the script
+ * puts in the place of the row that the page shows, see [Enhancement].
  *
  * See `docs/decisions/ui-pages.md`.
  */
@@ -52,21 +54,25 @@ internal val ServicesArea =
             }
             post(ServicesPages.MODE) {
                 val id = call.partOfAddress(ServicesPages.ID)
-                val back = ServicesPages.addressOf(call.tagsOfAddress(), id)
+                val tags = call.tagsOfAddress()
                 ui.submit(call) { input ->
                     val mode = Modes.named(input.text(ServicesPages.MODE_FIELD)) ?: throw InvalidInput("responseMode", NO_MODE)
                     val service = ui.client.updateService(id, buildJsonObject { put("responseMode", Modes.nameOf(mode)) })
-                    Outcome.Done(back, ServicesPages.noticeOfMode(service))
+                    Outcome.Done(ServicesPages.addressOf(tags, id), ServicesPages.noticeOfMode(service)) { view, system ->
+                        ServicesPages.rowOf(view, system, service, ui.client.listDiagnostics(), tags)
+                    }
                 }
             }
             post(ServicesPages.DEFAULT_SCENARIO) {
                 val id = call.partOfAddress(ServicesPages.ID)
-                val back = ServicesPages.addressOf(call.tagsOfAddress(), id)
+                val tags = call.tagsOfAddress()
                 ui.submit(call) { input ->
                     val scenario = input.text(ServicesPages.SCENARIO_FIELD)
                     if (scenario.isEmpty()) throw InvalidInput("defaultScenarioId", NO_SCENARIO)
                     val service = ui.client.updateService(id, buildJsonObject { put("defaultScenarioId", scenario) })
-                    Outcome.Done(back, ServicesPages.noticeOfDefaultScenario(service))
+                    Outcome.Done(ServicesPages.addressOf(tags, id), ServicesPages.noticeOfDefaultScenario(service)) { view, system ->
+                        ServicesPages.rowOf(view, system, service, ui.client.listDiagnostics(), tags)
+                    }
                 }
             }
         }
@@ -190,7 +196,7 @@ internal object ServicesPages {
                     }
                     tbody {
                         val concerning = diagnostics.groupingBy { it.serviceId }.eachCount()
-                        for (service in services.sortedWith(BY_NAME)) row(view, system, service, concerning[service.id] ?: 0, tags)
+                        for (service in services.sortedWith(BY_NAME)) consumer.row(view, system, service, concerning[service.id] ?: 0, tags)
                     }
                 }
             }
@@ -199,6 +205,19 @@ internal object ServicesPages {
                 a(href = "${SystemPages.PAGE}#${SystemPages.LAST_USED_ANCHOR}") { +"Clear the last-used times" }
             }
         }
+
+    /**
+     * Returns the row of [service] in the overview as a part of its own, as the overview of the services
+     * that carry one of [tags] shows it. [diagnostics] are the diagnostics of the server, of which the row
+     * counts the ones that concern the service.
+     */
+    fun rowOf(
+        view: View,
+        system: SystemStatusDto,
+        service: ServiceDto,
+        diagnostics: List<DiagnosticDto>,
+        tags: List<String>,
+    ): Part = Part(Place.ROW) { row(view, system, service, diagnostics.count { it.serviceId == service.id }, tags) }
 
     /** Returns what the form says that gave [service] another response mode, where [service] is the service as it is now. */
     fun noticeOfMode(service: ServiceDto): String {
@@ -238,7 +257,7 @@ internal object ServicesPages {
     }
 
     /** The row of [service] in the overview. The service has [diagnostics] diagnostics. */
-    private fun TBODY.row(
+    private fun TagConsumer<*>.row(
         view: View,
         system: SystemStatusDto,
         service: ServiceDto,
@@ -278,12 +297,14 @@ internal object ServicesPages {
         service: ServiceDto,
         tags: List<String>,
     ) {
-        postForm(view, Address.of(MODE, ID to service.id, *filterOf(tags)), classes = "switch") {
+        postForm(view, Address.of(MODE, ID to service.id, *filterOf(tags)), classes = "switch", inPlace = true) {
             div {
                 role = "group"
                 attributes["aria-label"] = "Response mode of ${service.name}"
                 for (mode in ResponseModeDto.entries) {
                     button(type = ButtonType.submit, name = MODE_FIELD) {
+                        // With an identifier, the button that was pressed has the focus again in the row that takes the place of this one.
+                        id = Address.anchorOf("mode-${Modes.nameOf(mode)}", service.id)
                         value = Modes.nameOf(mode)
                         attributes["aria-pressed"] = "${mode == service.responseMode}"
                         +Modes.labelOf(mode)
@@ -312,8 +333,10 @@ internal object ServicesPages {
         } else if (scenarios.size == 1 && default != null) {
             +default.name
         } else {
-            postForm(view, Address.of(DEFAULT_SCENARIO, ID to service.id, *filterOf(tags)), classes = "switch") {
+            val action = Address.of(DEFAULT_SCENARIO, ID to service.id, *filterOf(tags))
+            postForm(view, action, classes = "switch", inPlace = true) {
                 select {
+                    id = Address.anchorOf("default-scenario", service.id)
                     attributes["name"] = SCENARIO_FIELD
                     attributes["aria-label"] = "Default scenario of ${service.name}"
                     // A browser shows the first choice as the chosen one where none is, so a choice says that none is.
@@ -335,6 +358,7 @@ internal object ServicesPages {
                 }
                 +" "
                 button(type = ButtonType.submit) {
+                    id = Address.anchorOf("set-default-scenario", service.id)
                     attributes["aria-label"] = "Set the default scenario of ${service.name}"
                     +"Set"
                 }

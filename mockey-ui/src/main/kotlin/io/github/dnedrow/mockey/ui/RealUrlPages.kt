@@ -53,7 +53,7 @@ internal object RealUrlPages {
         Page("Derive real URLs") {
             p { +ABOUT }
             p { +EXAMPLE }
-            postForm(view, PAGE) {
+            postForm(view, PAGE, inPlace = true) {
                 rejectionOf(state)
                 textField(state, RealUrlForm.EXPRESSION, "Regular expression", hint = EXPRESSION_HINT)
                 textAreaField(state, RealUrlForm.REPLACEMENTS, "Replacements", hint = REPLACEMENTS_HINT, rows = REPLACEMENT_ROWS)

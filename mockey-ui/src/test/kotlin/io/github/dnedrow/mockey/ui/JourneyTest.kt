@@ -50,7 +50,10 @@ class JourneyTest {
         assertEquals(ofService, journey.reached["a service"])
     }
 
-    /** The walk begins at the first page. Any other address has to be one that a page of the walk refers to. */
+    /**
+     * The walk begins at the first page. Any other address has to be one that a page of the walk refers to,
+     * as a link does, and as the head of a page does for its stylesheet and its script.
+     */
     @Test
     fun anAddressThatNoPageRefersToIsAFailure() {
         val journey = journey()
@@ -59,9 +62,16 @@ class JourneyTest {
         val overview = journey.open("/")
         journey.open("/service?id=svc-customers")
         journey.follow(overview, "link[rel=stylesheet]")
+        val script = journey.follow(overview, "script[src]")
+        journey.open("/assets/favicon.svg")
+        journey.open("/assets/other.js")
 
         assertEquals(200, typed.status)
-        assertEquals(listOf("No page of the walk refers to /service?id=svc-customers."), journey.failures)
+        assertEquals(200 to "text/javascript; charset=UTF-8", script.status to script.header("content-type"))
+        val typedByHand = "No page of the walk refers to /service?id=svc-customers."
+        val unknown = listOf("No page of the walk refers to /assets/other.js.", "The address /assets/other.js led to the status 404")
+        assertEquals(listOf(typedByHand) + unknown, journey.failures.map { it.substringBefore(':') })
+        assertEquals(true, "/assets/htmx.min.js" in journey.opened)
     }
 
     /** A file is no page: what a download holds doesn't count as a link, even if it reads like one. */
@@ -93,6 +103,38 @@ class JourneyTest {
         journey.submit(overview.formTo("/search"), mapOf("term" to "found"))
 
         assertEquals(listOf("No page of the walk showed the form GET /diagnostics."), journey.failures)
+    }
+
+    /**
+     * A walk with the script sends a form that is marked for the script through the script. It goes on
+     * from the page that the script makes of the answer: the page that the answer names, or the page that
+     * showed the form, with the answer in it. Every other form is sent as without the script.
+     */
+    @Test
+    fun aWalkWithTheScriptGoesOnFromThePageThatTheScriptMakes() {
+        val api = started.api()
+        api.holdSamples()
+        val journey = Journey(started.browserFor(api), api, withScript = true)
+
+        val overview = journey.open("/")
+        val switch = overview.formTo("/services/mode")
+        val switched = journey.submit(switch, pressed = switch.select("button[value=proxy]").first())
+        val form = journey.follow(switched, "a[href=/service/new]").formTo("/service/new")
+        val created = journey.submit(form, mapOf("name" to "Billing", "mockUrl" to "billing"))
+        val copied = journey.submit(created.formTo("/service/duplicate"))
+        val rejected = journey.submit(form, mapOf("name" to "Kept", "delay" to "later"))
+
+        assertEquals(setOf("POST /services/mode", "POST /service/new"), journey.sentByScript.toSet())
+        assertEquals(setOf("POST /services/mode", "POST /service/new", "POST /service/duplicate"), journey.submitted.toSet())
+        assertEquals("Services" to "The service Customers is in proxy mode now.", switched.page.select("main h1").text() to switched.notice)
+        assertEquals("Billing" to "The service Billing was created.", created.page.select("main h1").text() to created.notice)
+        assertEquals("Billing (copy)", copied.page.select("main h1").text())
+        assertEquals(setOf("/", "/services", "/service/new", "/service"), journey.opened.toSet())
+        assertEquals(listOf("The form POST /service/new led to the status 422"), journey.failures.map { it.substringBefore(':') })
+        assertEquals("New service" to setOf("delay"), rejected.page.select("main h1").text() to rejected.fieldProblems.keys)
+        val headings = journey.pages.map { it.page.select("main h1").text() }
+        assertEquals(listOf("Services", "Services", "New service", "Billing", "Billing (copy)", "New service"), headings)
+        assertEquals(listOf(overview, switched, created, copied, rejected), journey.pages.filterIndexed { index, _ -> index != 2 })
     }
 
     /** Every answer has to be a page or a file. A page that reports a failure is not, whether a link or a form led to it. */

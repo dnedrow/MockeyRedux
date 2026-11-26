@@ -350,7 +350,7 @@ class UiFormsTest {
             assertEquals("Delete the service" to "danger", button.text() to button.attr("class"))
             assertEquals(path to "yes", answer.form().attr("action") to answer.form().select("[name=confirmed]").attr("value"))
             assertEquals(listOf("Cancel -> /sample/services/new"), answer.form().select("a").map { "${it.text()} -> ${it.attr("href")}" })
-            assertEquals(0, answer.page.select("script, [onclick], [onsubmit]").size)
+            assertEquals(0, answer.page.select("body script, [onclick], [onsubmit]").size)
         }
         assertEquals(emptyList(), deletedBefore)
         assertEquals(303 to SampleArea.NEW, confirmed.status to confirmed.header("location"))

@@ -8,6 +8,7 @@ import io.github.dnedrow.mockey.api.RecordedResponseDto
 import io.github.dnedrow.mockey.api.RecordedScenarioDto
 import io.github.dnedrow.mockey.api.RecordedServiceDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
+import org.jsoup.nodes.Document
 
 /**
  * Content that is written to be read as more than the text that it is, for the tests that show that the pages
@@ -66,11 +67,27 @@ internal object Hostile {
             .plus(setOf("select", "option", "span", "time", "section", "ul", "li", "dl", "dt", "dd", "fieldset", "legend"))
             .plus(setOf("textarea", "pre", "h3", "meter"))
 
+    /**
+     * The attributes with which a page marks an element for the script of the UI, see [Enhancement], each
+     * with the values that the UI writes for it. The attributes that hold an address aren't among them:
+     * they are held to what an address of the UI looks like.
+     */
+    val FOR_THE_SCRIPT =
+        mapOf(
+            "hx-trigger" to setOf("every 5s"),
+            "hx-encoding" to setOf("multipart/form-data"),
+            "hx-swap-oob" to setOf("innerHTML"),
+        )
+
+    /** The attributes with which a page tells the script of the UI which address to ask. */
+    val ADDRESSES_FOR_THE_SCRIPT = setOf("hx-post", "hx-get")
+
     /** The attributes that the pages of the UI are written with. */
     val ATTRIBUTES =
         setOf("class", "id", "href", "action", "method", "enctype", "type", "name", "value", "for", "scope", "role", "rows")
             .plus(setOf("selected", "checked", "disabled", "datetime", "aria-label", "aria-pressed", "aria-describedby", "aria-invalid"))
             .plus(setOf("autocomplete", "step", "min", "max"))
+            .plus(FOR_THE_SCRIPT.keys + ADDRESSES_FOR_THE_SCRIPT)
 
     /** Returns the history entry [id] that states [text] wherever a history entry states a text. */
     fun entry(
@@ -115,19 +132,49 @@ internal object Hostile {
      * an attribute that the UI does not write, a bracket of content that is written as it is, and an address
      * or an identifier that is not written as the UI writes one. A page that shows content as text has none
      * of it.
+     *
+     * The same holds for what a page tells the script of the UI: the script is the file of the UI, its
+     * settings are the ones of the UI, and an element is marked for it with nothing but the fixed values
+     * and the addresses that the UI writes.
      */
     fun moreThanText(answer: Browser.Response): List<String> {
         val page = answer.page
         val within = page.select("main *")
         val elements = within.map { it.tagName() }.toSet() - ELEMENTS
         val attributes = within.flatMap { element -> element.attributes().map { it.key } }.toSet() - ATTRIBUTES
-        val links = page.select("[href], [action]").map { it.attr("href") + it.attr("action") }
+        val referring = listOf("href", "action") + ADDRESSES_FOR_THE_SCRIPT
+        val links = page.allElements.flatMap { element -> referring.filter(element::hasAttr).map(element::attr) }
         val ids = page.select("[id]").map { it.id() }
+        val marks = page.allElements.flatMap { element -> FOR_THE_SCRIPT.keys.filter(element::hasAttr).map { it to element.attr(it) } }
         return elements.map { "the element $it" } +
             attributes.map { "the attribute $it" } +
-            UNWRITTEN.filter { it in answer.body }.map { "the text $it" } +
+            unwrittenIn(answer.body).map { "the text $it" } +
             links.filterNot { it.isEmpty() || SAFE_LINK.matches(it) }.map { "the address $it" } +
             ids.filterNot(SAFE_ID::matches).map { "the identifier $it" } +
-            listOf("a script").filter { page.select("script, style, base, iframe, object, embed").isNotEmpty() }
+            marks.filterNot { (name, value) -> value in FOR_THE_SCRIPT.getValue(name) }.map { (name, value) -> "the mark $name=$value" } +
+            listOf("a script").filter { scriptsBeyondTheOneOfTheUi(page) || page.select("style, base, iframe, object, embed").isNotEmpty() }
+    }
+
+    /** The element with which every page loads the script of the UI, as the UI writes it. */
+    const val SCRIPT_ELEMENT = """<script src="/assets/htmx.min.js" defer="defer"></script>"""
+
+    /**
+     * Returns the brackets of [UNWRITTEN] that [body] holds, which is what a page has when it writes content
+     * as it is. The element that loads the script of the UI doesn't count. Every page has it once.
+     */
+    fun unwrittenIn(body: String): List<String> = UNWRITTEN.filter { it in body.replaceFirst(SCRIPT_ELEMENT, "") }
+
+    /**
+     * Returns whether [page] has a script besides the one of the UI, or states other settings for that
+     * script than the ones of the UI. A part of a page has neither the script nor the settings.
+     */
+    private fun scriptsBeyondTheOneOfTheUi(page: Document): Boolean {
+        val scripts = page.select("script")
+        val settings = page.select("meta[name=htmx-config]")
+        val written = scripts.singleOrNull()?.let { script -> script.attributes().map { it.key to it.value } to script.data() }
+        val ofTheUi = written == (listOf("src" to "/assets/htmx.min.js", "defer" to "defer") to "") && page.select("head script").size == 1
+        val asTheUiStatesThem = settings.size == 1 && settings.attr("content") == Enhancement.SETTINGS
+        val isPart = page.select("title").isEmpty()
+        return if (isPart) scripts.isNotEmpty() || settings.isNotEmpty() else !(ofTheUi && asTheUiStatesThem)
     }
 }

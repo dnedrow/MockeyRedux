@@ -8,7 +8,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.html.ButtonType
 import kotlinx.html.FlowContent
+import kotlinx.html.FlowOrPhrasingContent
 import kotlinx.html.TBODY
+import kotlinx.html.TagConsumer
 import kotlinx.html.ThScope
 import kotlinx.html.a
 import kotlinx.html.button
@@ -86,8 +88,8 @@ internal fun ApplicationCall.entryId(): Long =
 
 /**
  * How the history list is displayed: the filter [tokens], the [service] whose entries are listed, the [page]
- * of the list, and whether the page reloads itself ([refresh]). All of it is in the address of the list, so
- * the same address shows the same list in any browser.
+ * of the list, and whether the list is brought up to date by itself ([refresh]). All of it is in the address
+ * of the list, so the same address shows the same list in any browser.
  */
 internal data class HistoryView(
     val tokens: List<String> = emptyList(),
@@ -190,8 +192,11 @@ internal object HistoryPages {
     /** The number of entries on a page of the list. */
     const val PAGE_SIZE = 50
 
-    /** The number of seconds between two reloads of a list with automatic refresh. */
+    /** The number of seconds after which a list with automatic refresh is brought up to date. */
     const val REFRESH_SECONDS = 5
+
+    /** The identifier of the part of the list page that depends on what the history holds, see [entriesOf]. */
+    const val ENTRIES_ID = "entries"
 
     /** How the identifier of a history entry is written: a whole number without a sign. */
     val ENTRY_ID = Regex("[0-9]{1,18}")
@@ -200,6 +205,12 @@ internal object HistoryPages {
 
     /** Returns the identifier of the row of the entry [id] in the list, which an address can refer to after a `#`. */
     fun anchorOf(id: Long): String = Address.anchorOf("entry", "$id")
+
+    /** Returns the identifier of the link or the button in the row of [entry] that is for [what], see [link]. */
+    fun controlOf(
+        what: String,
+        entry: HistoryEntryDto,
+    ): String = "$what-${anchorOf(entry.id)}"
 
     /** Returns the address of the list that only shows the entries of the service [serviceId]. */
     fun addressOfService(serviceId: String): String = HistoryView(service = serviceId).address()
@@ -227,26 +238,49 @@ internal object HistoryPages {
         shown: HistoryView,
         entries: List<HistoryEntryDto>,
     ): Page {
+        val listed = Part(Place.of(ENTRIES_ID)) { entriesOf(view, shown, entries) }
+        return Page("History", live = Live(REFRESH_SECONDS, listed).takeIf { shown.refresh }) {
+            p { +INTRO }
+            filterOf(shown)
+            listed.content(consumer)
+        }
+    }
+
+    /**
+     * Writes everything of the list page that depends on what the history holds: the line about the
+     * service of the view, the links of the page, the entries of [entries] that are on the page of the
+     * view, and the links to the pages before and after, or the line that says why the page lists nothing.
+     *
+     * With automatic refresh, this is the part of the page that the script brings up to date (see [Live]).
+     * The filter form isn't in it, so the script doesn't take away what someone types there.
+     */
+    private fun TagConsumer<*>.entriesOf(
+        view: View,
+        shown: HistoryView,
+        entries: List<HistoryEntryDto>,
+    ) {
         val onPage = entries.drop((shown.page - 1) * PAGE_SIZE).take(PAGE_SIZE)
         val hasOlder = entries.size > shown.page * PAGE_SIZE
-        return Page("History", refresh = REFRESH_SECONDS.takeIf { shown.refresh }) {
-            p { +INTRO }
-            filterOf(shown, entries)
+        div {
+            id = ENTRIES_ID
+            if (shown.refresh) Enhancement.refresh(this, shown.address(), REFRESH_SECONDS)
+            if (shown.service != null) serviceLineOf(shown, entries)
             p(classes = "actions") {
-                a(href = StatisticsPages.PAGE) { +"Statistics" }
-                if (!shown.refresh) a(href = shown.copy(refresh = true).address()) { +"Switch automatic refresh on" }
-                if (entries.isNotEmpty() || shown.isFiltered) a(href = DELETE) { +"Delete all entries" }
-                shown.service?.let { a(href = Address.of(DELETE, HistoryView.SERVICE to it)) { +"Delete the entries of this service" } }
+                link(StatisticsPages.PAGE, "statistics", "Statistics")
+                if (!shown.refresh) link(shown.copy(refresh = true).address(), "refresh-on", "Switch automatic refresh on")
+                if (entries.isNotEmpty() || shown.isFiltered) link(DELETE, "delete-all", "Delete all entries")
+                val ofService = shown.service?.let { Address.of(DELETE, HistoryView.SERVICE to it) }
+                if (ofService != null) link(ofService, "delete-of-service", "Delete the entries of this service")
             }
             if (shown.refresh) {
                 p(classes = "note") {
-                    +"Automatic refresh is on, so this page reloads every $REFRESH_SECONDS seconds. "
-                    a(href = shown.copy(refresh = false).address()) { +"Switch automatic refresh off" }
+                    +"Automatic refresh is on, so the list is brought up to date every $REFRESH_SECONDS seconds. "
+                    link(shown.copy(refresh = false).address(), "refresh-off", "Switch automatic refresh off")
                 }
             }
             if (onPage.isEmpty()) {
                 emptyLineOf(shown)
-                return@Page
+                return@div
             }
             div(classes = "scroll") {
                 table(classes = "history") {
@@ -259,13 +293,13 @@ internal object HistoryPages {
             if (shown.page > 1 || hasOlder) {
                 p(classes = "paging") {
                     if (shown.page > 1) {
-                        a(href = shown.copy(page = shown.page - 1).address()) { +"Newer entries" }
+                        link(shown.copy(page = shown.page - 1).address(), "newer-entries", "Newer entries")
                         +" "
                     }
                     span { +"Page ${shown.page}" }
                     if (hasOlder) {
                         +" "
-                        a(href = shown.copy(page = shown.page + 1).address()) { +"Older entries" }
+                        link(shown.copy(page = shown.page + 1).address(), "older-entries", "Older entries")
                     }
                 }
             }
@@ -297,13 +331,9 @@ internal object HistoryPages {
 
     /**
      * The form that sets the filter tokens. It leads to the first page of the filtered list and keeps the
-     * rest of the view. Below it, a line says when the tokens limit the list, and another one says when the
-     * list is limited to one service. [entries] are the listed entries, which may hold the name of that service.
+     * rest of the view. Below it, a line says when the tokens limit the list.
      */
-    private fun FlowContent.filterOf(
-        shown: HistoryView,
-        entries: List<HistoryEntryDto>,
-    ) {
+    private fun FlowContent.filterOf(shown: HistoryView) {
         val state = FormState.of(HistoryView.TOKENS to shown.tokens.joinToString(" "))
         getForm(LIST, classes = "filter") {
             textField(state, HistoryView.TOKENS, "Filter tokens", hint = TOKENS_HINT)
@@ -317,10 +347,12 @@ internal object HistoryPages {
                 a(href = shown.copy(tokens = emptyList(), page = 1).address()) { +"Clear the filter tokens" }
             }
         }
-        if (shown.service != null) serviceLineOf(shown, entries)
     }
 
-    /** Says that the list only shows the entries of one service, and names the service if an entry holds its name. */
+    /**
+     * Says that the list only shows the entries of one service, and names the service if one of [entries]
+     * holds its name.
+     */
     private fun FlowContent.serviceLineOf(
         shown: HistoryView,
         entries: List<HistoryEntryDto>,
@@ -328,7 +360,23 @@ internal object HistoryPages {
         val name = entries.firstNotNullOfOrNull { it.service?.name }
         p(classes = "count") {
             +(if (name == null) "Only the entries of one service are listed. " else "Only the entries of the service $name are listed. ")
-            a(href = shown.copy(service = null, page = 1).address()) { +"Show the entries of all services" }
+            link(shown.copy(service = null, page = 1).address(), "all-services", "Show the entries of all services")
+        }
+    }
+
+    /**
+     * A link of the part that the script brings up to date, to [address], which says [text]. Every link and
+     * every button of that part has an identifier, here [id]: by it, the script finds the one that had the
+     * focus before, and gives it the focus again.
+     */
+    private fun FlowOrPhrasingContent.link(
+        address: String,
+        id: String,
+        text: String,
+    ) {
+        a(href = address) {
+            this.id = id
+            +text
         }
     }
 
@@ -340,7 +388,7 @@ internal object HistoryPages {
         }
         p {
             +"There are no entries on this page. "
-            a(href = shown.copy(page = 1).address()) { +"Go to the first page" }
+            link(shown.copy(page = 1).address(), "first-page", "Go to the first page")
         }
     }
 
@@ -360,13 +408,14 @@ internal object HistoryPages {
                 if (service == null) {
                     span(classes = "none") { +"none" }
                 } else {
-                    a(href = ServicePages.addressOf(service.id)) { +service.name }
+                    link(ServicePages.addressOf(service.id), controlOf("service-of", entry), service.name)
                     entry.responseMode?.let { +" (${Modes.labelOf(it)})" }
                 }
             }
             td(classes = "answer") { +answerOf(entry) }
             td(classes = "entry-actions") {
                 a(href = HistoryEntryPages.addressOf(entry.id)) {
+                    id = controlOf("view", entry)
                     attributes["aria-label"] = "View the entry ${entry.id}"
                     +"View"
                 }
@@ -375,6 +424,7 @@ internal object HistoryPages {
                 }
                 postForm(view, shown.address(REMOVE, ID to "${entry.id}"), classes = "inline") {
                     button(type = ButtonType.submit, classes = "danger") {
+                        id = controlOf("delete", entry)
                         attributes["aria-label"] = "Delete the entry ${entry.id}"
                         +"Delete"
                     }
@@ -440,6 +490,7 @@ internal fun FlowContent.flagButtonOf(
     inList: Boolean,
 ) {
     button(type = ButtonType.submit, name = Designation.FIELD) {
+        id = HistoryPages.controlOf("flag", entry)
         value = if (entry.flagged) Designation.NO else Designation.YES
         val named = if (entry.flagged) "Remove the flag of the entry ${entry.id}" else "Flag the entry ${entry.id}"
         if (inList) attributes["aria-label"] = named

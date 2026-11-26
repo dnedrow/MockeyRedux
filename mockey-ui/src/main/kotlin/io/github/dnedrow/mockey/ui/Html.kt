@@ -4,21 +4,26 @@ import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.http.HttpStatusCode
 import kotlinx.html.FlowContent
 import kotlinx.html.MetaHttpEquiv
+import kotlinx.html.TagConsumer
 import kotlinx.html.a
 import kotlinx.html.body
+import kotlinx.html.div
 import kotlinx.html.footer
 import kotlinx.html.h1
 import kotlinx.html.head
 import kotlinx.html.header
 import kotlinx.html.html
+import kotlinx.html.id
 import kotlinx.html.lang
 import kotlinx.html.li
 import kotlinx.html.link
 import kotlinx.html.main
 import kotlinx.html.meta
 import kotlinx.html.nav
+import kotlinx.html.noScript
 import kotlinx.html.p
 import kotlinx.html.role
+import kotlinx.html.script
 import kotlinx.html.stream.appendHTML
 import kotlinx.html.title
 import kotlinx.html.ul
@@ -34,11 +39,8 @@ import kotlinx.html.ul
 internal class Page(
     val title: String,
     val status: HttpStatusCode = HttpStatusCode.OK,
-    /**
-     * The number of seconds after which the browser loads the page again, or `null` for a page that stays
-     * as it is. The reload doesn't need scripting.
-     */
-    val refresh: Int? = null,
+    /** The part of the page that is brought up to date by itself, or `null` for a page that stays as it is. */
+    val live: Live? = null,
     val content: FlowContent.() -> Unit,
 )
 
@@ -57,8 +59,8 @@ internal class Section(
 }
 
 /**
- * The frame of every page: the head, with the stylesheet and the icon of the UI, the navigation, and the
- * foot, which names the server that the UI manages.
+ * The frame of every page: the head, with the stylesheet, the icon, and the script of the UI, the
+ * navigation, and the foot, which names the server that the UI manages.
  *
  * Everything that a page refers to is a path of the UI itself, so a browser that shows a page asks no other
  * place for anything.
@@ -102,38 +104,27 @@ internal object Html {
                 head {
                     meta(charset = "utf-8")
                     meta(name = "viewport", content = "width=device-width, initial-scale=1")
-                    page.refresh?.let { seconds ->
-                        meta {
-                            httpEquiv = MetaHttpEquiv.refresh
-                            content = "$seconds"
+                    meta(name = "htmx-config", content = Enhancement.SETTINGS)
+                    page.live?.let { live ->
+                        // A browser that runs scripts skips this element. The script brings the page up to date there.
+                        noScript {
+                            meta {
+                                httpEquiv = MetaHttpEquiv.refresh
+                                content = "${live.seconds}"
+                            }
                         }
                     }
                     title("${page.title} - Mockey")
                     link(rel = "stylesheet", href = Assets.path("mockey.css"))
                     link(rel = "icon", href = Assets.path("favicon.svg"), type = "image/svg+xml")
+                    script(src = Assets.path(Enhancement.SCRIPT)) { defer = true }
                 }
                 body {
                     header {
                         a(href = "/", classes = "brand") { +"Mockey" }
                         navigation(path)
                     }
-                    main {
-                        if (notice != null) {
-                            p(classes = "notice") {
-                                role = "status"
-                                +notice
-                            }
-                        }
-                        if (trouble != null) {
-                            p(classes = "problem") {
-                                +"$trouble "
-                                a(href = SystemPages.PAGE) { +"More about it" }
-                                +"."
-                            }
-                        }
-                        h1 { +page.title }
-                        page.content(this)
-                    }
+                    consumer.mainOf(page, notice, trouble)
                     footer {
                         p { +serverLine(adminUrl, system) }
                         p { +"Mockey UI ${UiVersion.text}" }
@@ -141,6 +132,68 @@ internal object Html {
                 }
             }
         }
+
+    /**
+     * Returns the part of [page] between the navigation and the foot, which is what a page shows of its
+     * own. The script of a page puts it in the place of that part where a form is shown again.
+     */
+    fun mainPartOf(page: Page): Part = Part(Place.MAIN) { mainOf(page) }
+
+    /**
+     * Returns what [part] writes as HTML that stands for itself, without the frame of a page. With
+     * [notice], a notice element follows the part. It's marked so that what it says goes into the notice
+     * element of the page that the part goes into.
+     */
+    fun partial(
+        part: Part,
+        notice: String? = null,
+    ): String =
+        buildString {
+            val consumer = appendHTML(prettyPrint = false)
+            part.content(consumer)
+            if (notice != null) consumer.noticeOf(notice, outOfBand = true)
+        }
+
+    /**
+     * Writes what [page] shows between the navigation and the foot: what the UI says of a form that it has
+     * done, which is [notice], then [trouble], the heading, and the content of the page.
+     */
+    private fun TagConsumer<*>.mainOf(
+        page: Page,
+        notice: String? = null,
+        trouble: String? = null,
+    ) {
+        main {
+            consumer.noticeOf(notice)
+            if (trouble != null) {
+                p(classes = "problem") {
+                    +"$trouble "
+                    a(href = SystemPages.PAGE) { +"More about it" }
+                    +"."
+                }
+            }
+            h1 { +page.title }
+            page.content(this)
+        }
+    }
+
+    /**
+     * Writes the element that says [notice], which is what the UI says of a form that it has done. The
+     * element is there without a notice as well, and empty then, so that a script can put a notice into
+     * the page later and a screen reader announces it. [outOfBand] marks the element as one whose content
+     * goes into the notice element of a page, see [Enhancement.markOutOfBand].
+     */
+    private fun TagConsumer<*>.noticeOf(
+        notice: String?,
+        outOfBand: Boolean = false,
+    ) {
+        div(classes = "notice") {
+            id = Enhancement.NOTICE_ID
+            role = "status"
+            if (outOfBand) Enhancement.markOutOfBand(this)
+            if (notice != null) +notice
+        }
+    }
 
     /**
      * Returns a document that says [text] under [title] and nothing else: it has no navigation, names no

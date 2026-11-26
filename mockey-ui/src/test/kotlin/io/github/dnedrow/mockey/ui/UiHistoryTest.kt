@@ -52,8 +52,8 @@ class UiHistoryTest {
     /** Returns the identifiers of the entries that [page] lists, in the order of the list. */
     private fun idsOf(page: Document): List<Long> = page.select(ROWS).map { it.id().removePrefix("entry-").toLong() }
 
-    /** Returns the last paragraph of [page], which says why the page lists nothing. */
-    private fun lastLineOf(page: Document): String = page.select("main > p").last()!!.text()
+    /** Returns the paragraph of [page] that takes the place of the entries, which says why the page lists nothing. */
+    private fun lastLineOf(page: Document): String = page.select(LAST_LINE).single().text()
 
     /** Returns the requests to [api] that listed history entries, each as its request line. */
     private fun asked(api: FakeAdminApi): List<String> = api.requests.map { it.line }.filter { it.startsWith("GET history") }
@@ -111,7 +111,7 @@ class UiHistoryTest {
         val page = browser.get("/history").page
 
         assertEquals(0, page.select("main table").size)
-        assertEquals("The history is empty.", page.select("main > p").last()!!.text())
+        assertEquals("The history is empty.", lastLineOf(page))
         assertEquals(listOf("Statistics" to "/statistics", "Switch automatic refresh on" to "/history?refresh=on"), linksOf(page))
     }
 
@@ -175,7 +175,7 @@ class UiHistoryTest {
         assertTrue(all to "/history?tokens=customer%2F3" in linksOf(filtered.page))
         assertTrue("Clear the filter tokens" to "/history?service=svc-customers" in linksOf(filtered.page))
         assertEquals(listOf("Only the entries of one service are listed. $all"), unknown.select("main p.count").map { it.text() })
-        assertEquals("No entry matches.", unknown.select("main > p").last()!!.text())
+        assertEquals("No entry matches.", lastLineOf(unknown))
         assertTrue("History of this service" to "/history?service=svc-customers" in ofTheServicePage)
         val asked = asked(held.api)
         val expected =
@@ -209,7 +209,7 @@ class UiHistoryTest {
         assertEquals("Newer entries Page 2 Older entries" to listOf("/history", "/history?page=3"), paging(pages[1]))
         assertEquals("Newer entries Page 3" to listOf("/history?page=2"), paging(pages[2]))
         assertEquals(0, pages[3].select("main table").size)
-        val last = pages[3].select("main > p").last()!!
+        val last = pages[3].select(LAST_LINE).single()
         assertEquals("There are no entries on this page. Go to the first page", last.text())
         assertEquals(listOf("/history"), last.select("a").map { it.attr("href") })
         val kept = "tokens=customer&service=svc-customers"
@@ -248,8 +248,8 @@ class UiHistoryTest {
 
     /**
      * The requirement "Live history view" without scripting: the automatic refresh is switched on and off
-     * with a link, and while it's on, the page tells the browser to load it again every few seconds. A new
-     * entry is on the page after the next load.
+     * with a link, and while it's on, the page tells a browser without scripting to load it again every few
+     * seconds. A new entry is on the page after the next load.
      */
     @Test
     fun automaticRefreshReloadsThePageWithoutScripting() {
@@ -262,13 +262,15 @@ class UiHistoryTest {
         held.entries[4L] = Entries.of(4)
         val reloaded = browser.get("/history?tokens=customer&refresh=on")
 
-        val refresh = { page: Document -> page.select("head meta[http-equiv=refresh]").map { it.attr("content") } }
+        val refresh = { page: Document -> page.select("head > noscript > meta[http-equiv=refresh]").map { it.attr("content") } }
         assertEquals(emptyList(), refresh(off.page))
         assertEquals(listOf("5"), refresh(on.page))
+        assertEquals(1, on.page.select("meta[http-equiv=refresh]").size)
         assertEquals(listOf(3L, 2L, 1L), idsOf(on.page))
         assertEquals(listOf(4L, 3L, 2L, 1L), idsOf(reloaded.page))
         val note = on.page.select("main p.note")
-        assertEquals("Automatic refresh is on, so this page reloads every 5 seconds. Switch automatic refresh off", note.text())
+        val isOn = "Automatic refresh is on, so the list is brought up to date every 5 seconds."
+        assertEquals("$isOn Switch automatic refresh off", note.text())
         assertEquals(listOf("/history?tokens=customer"), note.select("a").map { it.attr("href") })
         assertTrue(linksOf(on.page).none { it.first == "Switch automatic refresh on" })
         val form = on.form("main form.filter")
@@ -464,5 +466,8 @@ class UiHistoryTest {
     private companion object {
         /** The selector of the rows of the history table. */
         const val ROWS = "main table.history tbody tr"
+
+        /** The selector of the paragraph that takes the place of the entries. It's the one paragraph of the part without a class. */
+        const val LAST_LINE = "main > #entries > p:not([class])"
     }
 }

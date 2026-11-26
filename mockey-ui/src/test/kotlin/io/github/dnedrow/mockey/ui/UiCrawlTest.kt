@@ -1,21 +1,5 @@
 package io.github.dnedrow.mockey.ui
 
-import io.github.dnedrow.mockey.api.DiagnosticDto
-import io.github.dnedrow.mockey.api.HeaderDto
-import io.github.dnedrow.mockey.api.InspectorDto
-import io.github.dnedrow.mockey.api.MatchCriterionDto
-import io.github.dnedrow.mockey.api.OutboundProxyDto
-import io.github.dnedrow.mockey.api.PlanDto
-import io.github.dnedrow.mockey.api.PlanItemDto
-import io.github.dnedrow.mockey.api.ResponseModeDto
-import io.github.dnedrow.mockey.api.ScenarioConformanceDto
-import io.github.dnedrow.mockey.api.ScenarioDto
-import io.github.dnedrow.mockey.api.ScenarioReferenceDto
-import io.github.dnedrow.mockey.api.SchemaReportDto
-import io.github.dnedrow.mockey.api.ServiceDto
-import io.github.dnedrow.mockey.api.SystemStatusDto
-import io.github.dnedrow.mockey.api.TwistConfigurationDto
-import io.github.dnedrow.mockey.api.TwistPairDto
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -121,42 +105,7 @@ class UiCrawlTest {
         val browser = Browser(MockeyUi.start(settings).also { uis += it })
 
         for (text in Hostile.MARKUP + Hostile.ADDRESSES) {
-            val headers = listOf(HeaderDto(text, text))
-            val asText = ScenarioDto(text, text, text, OK, headers, MatchCriterionDto.Text(text), text, 5, listOf(text), text)
-            val asRules = Samples.missing.copy(name = text, matchCriterion = MatchCriterionDto.Rules(text))
-            val scenarios = listOf(asText, asRules)
-            val service =
-                ServiceDto(
-                    id = text,
-                    name = text,
-                    mockUrl = text,
-                    description = text,
-                    realUrls = listOf(text, "$text-2"),
-                    tags = listOf(text),
-                    scenarios = scenarios,
-                    defaultScenarioId = text,
-                    errorScenarioId = text,
-                    requestRules = text,
-                    inspectorName = text,
-                    responseSchema = text,
-                    lastUsedTime = text,
-                )
-            val diagnostic = DiagnosticDto(text, text, text, text, text, listOf(text))
-            val paths = mapOf(text to Hostile.written(text))
-            val inspectors = listOf(InspectorDto(text, global = true))
-            val conformance = ScenarioConformanceDto(text, text, conforms = false, listOf(text))
-            val schemaReports = mapOf(text to SchemaReportDto.Checked(listOf(conformance)))
-            val held = api.hold(listOf(service), listOf(diagnostic), paths, inspectors, ScenarioReferenceDto(text, text), schemaReports)
-            val twist = TwistConfigurationDto(text, text, listOf(TwistPairDto(text, text)))
-            api.system = SystemStatusDto(text, text, text, readOnly = false, listOf(text), twist, text, legacyShimEnabled = true)
-            val plan = PlanDto(text, text, text, listOf(text), listOf(PlanItemDto(text, text, ResponseModeDto.STATIC, 5)), text)
-            val plans = api.holdPlans(held, listOf(plan), default = text, paths = paths)
-            api.holdTwists(listOf(twist), enabled = text, paths = paths)
-            api.holdTags(held, plans, paths)
-            api.holdProxy(OutboundProxyDto(text, enabled = true, username = text, passwordSet = true))
-            api.holdHistory(listOf(Hostile.entry(1, text)), held)
-            api.holdDefinitions(held, plans)
-            api.holdSystem(held, plans)
+            api.holdHostile(text)
 
             val found = Crawl.from(browser)
 

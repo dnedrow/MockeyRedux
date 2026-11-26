@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.FieldErrorDto
+import io.github.dnedrow.mockey.api.SystemStatusDto
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -231,10 +232,15 @@ internal sealed class Outcome {
     /**
      * The server did what the form asked for. The browser is sent to the page at [to], which is a path of
      * the UI, and that page says [notice].
+     *
+     * Where the script of a page sent the form, the answer can be [inPlace] instead: the part of the page
+     * that the form changed, as the page at [to] would show it. The script puts it into the page that the
+     * browser shows, with [notice]. Without [inPlace], the script loads the page at [to].
      */
     class Done(
         val to: String,
         val notice: String,
+        val inPlace: (suspend (View, SystemStatusDto) -> Part)? = null,
     ) : Outcome()
 
     /**

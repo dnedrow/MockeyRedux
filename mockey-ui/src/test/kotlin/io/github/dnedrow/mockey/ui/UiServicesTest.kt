@@ -649,7 +649,7 @@ class UiServicesTest {
                 assertEquals(emptySet(), elements.toSet() - ELEMENTS, text)
                 val attributes = page.page.select("main *").flatMap { it.attributes().map { attribute -> attribute.key } }
                 assertEquals(emptySet(), attributes.toSet() - ATTRIBUTES, text)
-                assertEquals(emptyList(), Hostile.UNWRITTEN.filter { it in page.body }, text)
+                assertEquals(emptyList(), Hostile.unwrittenIn(page.body), text)
                 assertEquals(1, page.page.select("main [id^=service-]").size, text)
                 assertTrue(ANCHOR.matches(page.page.select("main [id^=service-]").attr("id")), text)
             }
@@ -677,7 +677,7 @@ class UiServicesTest {
             assertEquals(leading, addresses, text)
             val elements = page.select("main *").map { it.tagName() }
             assertEquals(setOf("h1", "form", "div", "label", "input", "p", "button", "a"), elements.toSet(), text)
-            assertEquals(emptyList(), Hostile.UNWRITTEN.filter { it in answer.body }, text)
+            assertEquals(emptyList(), Hostile.unwrittenIn(answer.body), text)
         }
         assertEquals(emptyList(), api.violations)
     }
@@ -695,10 +695,10 @@ class UiServicesTest {
             setOf("h1", "h2", "p", "a", "form", "div", "label", "input", "button", "table", "thead", "tbody", "tr", "th", "td")
                 .plus(setOf("code", "select", "option", "span", "time", "section", "ul", "li"))
 
-        /** The attributes that the two pages are written with. */
+        /** The attributes that the two pages are written with. The switches are marked for the script of the UI. */
         val ATTRIBUTES =
             setOf("class", "id", "href", "action", "method", "type", "name", "value", "for", "scope", "role", "selected", "disabled")
-                .plus(setOf("aria-label", "aria-pressed", "aria-describedby", "datetime"))
+                .plus(setOf("aria-label", "aria-pressed", "aria-describedby", "datetime", "hx-post"))
 
         /** How an address of the two pages is written: an address of the UI, and after it a place of a page of the UI. */
         val ADDRESS = Regex("/[a-z/-]*(\\?[A-Za-z0-9._~%=&-]*)?(#(service-[A-Za-z0-9._~-]*|last-used-times))?")

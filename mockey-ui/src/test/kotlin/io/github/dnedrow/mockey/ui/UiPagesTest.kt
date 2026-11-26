@@ -2,6 +2,7 @@ package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.ui.FakeAdminApi.Companion.problem
 import org.jsoup.nodes.Document
+import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -148,7 +149,8 @@ class UiPagesTest {
         assertEquals(400 to "text/html; charset=UTF-8", answer.status to answer.header("content-type"))
         assertEquals("Not an address - Mockey" to said, answer.page.title() to answer.page.select("main p").text())
         assertEquals(POLICY to "no-store", answer.header("content-security-policy") to answer.header("cache-control"))
-        assertFalse("zz" in answer.body || "script" in answer.body || "<b>" in answer.body, answer.body)
+        assertFalse("zz" in answer.body || "alert" in answer.body || "<b>" in answer.body, answer.body)
+        assertEquals(emptyList(), Hostile.unwrittenIn(answer.body))
     }
 
     // What stays with the UI
@@ -217,12 +219,38 @@ class UiPagesTest {
             assertEquals("nosniff" to "no-referrer", answer.header("x-content-type-options") to answer.header("referrer-policy"))
             files += page.select("link[href], script[src], img[src]").map { it.attr("href") + it.attr("src") }
         }
-        assertEquals(setOf("/assets/mockey.css", "/assets/favicon.svg"), files)
+        assertEquals(setOf("/assets/mockey.css", "/assets/favicon.svg", SCRIPT), files)
         for (file in files) {
             val served = browser.get(file)
             assertEquals(200, served.status, file)
             assertEquals(POLICY, served.header("content-security-policy"))
-            assertEquals(emptyList(), ELSEWHERE.findAll(served.body.replace(SVG_NAMESPACE, "")).map { it.value }.toList(), file)
+            // The script is a file that others wrote. Another test holds it to the file that was vendored.
+            val ofTheUi = if (file == SCRIPT) "" else served.body.replace(SVG_NAMESPACE, "")
+            assertEquals(emptyList(), ELSEWHERE.findAll(ofTheUi).map { it.value }.toList(), file)
+        }
+    }
+
+    /**
+     * The script of the UI is htmx as its makers published it: the file has the checksum that
+     * `docs/third-party.md` states, so no byte of it was changed. Every page loads it from the UI itself,
+     * after the page is read, and states the settings of the UI for it.
+     */
+    @Test
+    fun theScriptIsTheFileThatWasVendoredAndEveryPageLoadsItFromTheUi() {
+        val browser = browserFor(fake().also { it.hold() })
+
+        val script = browser.get(SCRIPT)
+        val pages = listOf("/services", "/service/new", "/nothing").map { browser.get(it).page }
+
+        val digest = MessageDigest.getInstance("SHA-256").digest(script.body.toByteArray(Charsets.UTF_8))
+        assertEquals(SCRIPT_SHA_256, digest.joinToString("") { "%02x".format(it) })
+        assertEquals(200 to "text/javascript; charset=UTF-8", script.status to script.header("content-type"))
+        assertTrue("version:\"$SCRIPT_VERSION\"" in script.body, "The script states another version than $SCRIPT_VERSION.")
+        for (page in pages) {
+            val loaded = page.select("script").map { element -> element.attributes().map { it.key to it.value } to element.data() }
+            assertEquals(listOf(listOf("src" to SCRIPT, "defer" to "defer") to ""), loaded)
+            assertEquals(1, page.select("head > script").size)
+            assertEquals(listOf(SCRIPT_SETTINGS), page.select("head > meta[name=htmx-config]").map { it.attr("content") })
         }
     }
 
@@ -282,6 +310,21 @@ class UiPagesTest {
 
         /** What refers to another place in a stylesheet or in an image. */
         val ELSEWHERE = Regex("""https?:|//|url\(|@import|href""", RegexOption.IGNORE_CASE)
+
+        /** The path of the script of the UI, its version, and the checksum of the file as `docs/third-party.md` states it. */
+        const val SCRIPT = "/assets/htmx.min.js"
+        const val SCRIPT_VERSION = "2.0.11"
+        const val SCRIPT_SHA_256 = "d6fdc75f204e6bdefa99b69bf1e6d4ac69b8a364f77929f45c13476b4000f717"
+
+        /**
+         * The settings that every page states for the script, word for word: the script adds no style,
+         * evaluates nothing, runs no script of an answer, and keeps no copy of a page. It changes nothing
+         * for an answer without content, and it puts every other answer in the place of the page.
+         */
+        const val SCRIPT_SETTINGS =
+            """{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false,"historyCacheSize":0,""" +
+                """"responseHandling":[{"code":"204","swap":false},""" +
+                """{"code":"...","swap":true,"target":"body","swapOverride":"innerHTML"}]}"""
 
         /** The name of what an SVG image is written in. It is a name, and nothing that a browser loads. */
         const val SVG_NAMESPACE = "xmlns=\"http://www.w3.org/2000/svg\""

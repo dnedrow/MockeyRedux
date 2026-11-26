@@ -1,7 +1,7 @@
 # The forms of the web UI
 
 Decided in task 13.3 of the change `kotlin-rewrite-modular`, on 2026-11-25. The section "What a form asks the
-server for" was added before task 13.7.
+server for" was added before task 13.7, and the section "A form that the script sends" in task 13.12.
 
 A form of the UI holds a token that only this UI makes, for the browser that the page of the form was loaded
 in. The UI answers under an IP address, under `localhost`, and under the names that it is started with, and
@@ -182,6 +182,36 @@ The UI goes with option 3. Here's how that works:
 
 Headless Chrome 158 confirmed all three browser behaviors for a text field, a hidden field, a text area, and a
 select option.
+
+## A form that the script sends
+
+In a browser that runs scripts, the script of the UI sends every form that takes what someone enters, and
+the two switches of the overview. [ui-stack.md](ui-stack.md) says what the script is and how a page marks a
+form for it. For the form itself, little changes:
+
+- The request goes to the address of the form, with the same fields, the same token, and the same cookies.
+  So the UI checks it like any other form, and it asks the server for the same thing. The only difference is
+  the header `HX-Request: true`.
+- **A form that is done** gets the status 200 and the header `HX-Redirect` with the path that a browser
+  would be sent to, without a place in the page. The script loads that page. The notice travels in its
+  cookie as before, and a report is kept as before.
+- **A form that is not taken** gets the status 422 and the form with its messages, as before. The answer is
+  only the part of the page below the navigation, which the script puts in the place of the one that the
+  browser shows. Nobody loses what they entered, and the page doesn't flicker.
+- **A switch of the overview** gets the row of its service and the notice, see [ui-pages.md](ui-pages.md).
+- **Everything else** gets the page that every browser gets: a refusal of the token, a failure of the
+  server, and a form that names something that's gone. The script shows that page in the place of the one
+  that the browser shows.
+
+The script doesn't send a form exactly as a browser does. Two differences reach the UI, and neither changes
+what the UI asks the server for:
+
+- The script sends the lines of a field with line feeds alone. The UI takes the lines of a field with either
+  kind of line break, and the marks of the initial values ignore line breaks.
+- The script leaves out a file field without a chosen file. A browser sends a file without a name and
+  without content. The UI takes both to mean that no file was chosen.
+
+`UiEnhancementTest` sends every form of the UI both ways and compares what the server was asked for.
 
 ## What this does not cover
 

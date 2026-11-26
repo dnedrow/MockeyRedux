@@ -247,7 +247,7 @@ class UiFailurePagesTest {
         val page = said(answer)
         assertEquals(502 to "The server failed", page.status to page.title)
         assertEquals(listOf("The server could not read <b>its</b> definitions location & <script>alert(1)</script>."), page.problems)
-        assertEquals(0, answer.page.select("main b, script").size)
+        assertEquals(0, answer.page.select("main b, body script").size)
         assertEquals(listOf("Load this page again -> ''"), page.again)
     }
 

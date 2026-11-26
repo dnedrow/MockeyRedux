@@ -68,7 +68,7 @@ internal object ProxyPages {
     ): Page =
         Page("Outbound proxy") {
             p { +INTRO }
-            postForm(view, PAGE) {
+            postForm(view, PAGE, inPlace = true) {
                 shownOf(state, ProxyForm.FIELDS)
                 rejectionOf(state)
                 textField(state, ProxyForm.URL, "Proxy URL", hint = URL_HINT)

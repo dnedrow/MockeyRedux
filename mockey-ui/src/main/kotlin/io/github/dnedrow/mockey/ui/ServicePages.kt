@@ -365,7 +365,7 @@ internal object ServicePages {
         back: String,
     ) {
         val scenarios = service?.scenarios.orEmpty()
-        postForm(view, action) {
+        postForm(view, action, inPlace = true) {
             if (service != null) shownOf(state, ServiceForm.FIELDS)
             rejectionOf(state)
             textField(state, ServiceForm.NAME, "Name", hint = if (service == null) "$NAME_HINT $NAME_OF_NEW_HINT" else NAME_HINT)

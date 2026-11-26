@@ -216,7 +216,7 @@ internal object TwistPages {
         marked: Boolean,
         save: String,
     ) {
-        postForm(view, action) {
+        postForm(view, action, inPlace = true) {
             if (marked) shownOf(state, TwistForm.FIELDS)
             rejectionOf(state)
             textField(state, TwistForm.NAME, "Name", hint = NAME_HINT)

@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5 to 13.11 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5 to 13.12 of the change `kotlin-rewrite-modular`, on 2026-11-25 and 2026-11-26.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -111,6 +111,25 @@ effective mode, and says that the service has no scenario to answer with where t
   4,096 bytes, and the line travels in one.
 - A form that names no mode or no scenario gets a page that says so, with the status 422, and the server is
   not asked. A switch that the server refuses gets the page of the refusal, see [ui-forms.md](ui-forms.md).
+
+### A switch in a browser that runs scripts
+
+Task 13.12 added the script of the UI (see [ui-stack.md](ui-stack.md)). With it, a switch updates the page
+in place:
+
+- The script sends the form of the switch to the same address. The UI asks the server for the same change,
+  and it answers with the row of the service alone, made from the service as the server returns it.
+- The script puts the row in the place of the one that the page shows. Nothing else of the overview depends
+  on a single service, so the page shows what a full page load would show.
+- What the page says of the switch comes with the row and goes into the line at the top of the page. It
+  isn't left in a cookie, so the next page doesn't say it again.
+- The buttons and the choice of a switch have identifiers, such as `mode-static-<service>`. After the row is
+  replaced, the script gives the focus to the control with the identifier of the one that had it. So
+  someone who uses the keyboard stays at the switch.
+- A switch that isn't taken, or that the server refuses, gets the same page as without the script. The
+  script shows it in the place of the overview.
+- If the server makes the change and then fails to say what the row needs, the script loads the overview
+  again. That page says what is the matter with the server, and it says what was switched.
 
 ### What the overview does not have
 
@@ -511,8 +530,8 @@ as a scenario. Entries can also be flagged and deleted.
   management operations, with the scenario "Replay with edits").
 - The history filter tokens and the paging are in the page address (`admin-ui`: View state lives in the
   address, with the scenario "Shared link").
-- The history page offers an automatic refresh that can be switched on and off, and it works with scripting
-  disabled (`admin-ui`: Live history view).
+- The history page offers an automatic refresh that can be switched on and off. With scripting, new entries
+  appear in place, and with scripting disabled, the page reloads itself (`admin-ui`: Live history view).
 - The UI asks for confirmation before it deletes all history (`admin-ui`: Confirmation of destructive
   actions).
 
@@ -554,13 +573,32 @@ as a scenario. Entries can also be flagged and deleted.
 
 ### Automatic refresh
 
-- While the automatic refresh is on, the head of the page has a `meta http-equiv="refresh"` element, and the
-  browser loads the page again every 5 seconds. That works without scripting. Task 13.12 adds the update in
-  place for browsers with scripting.
+- While the automatic refresh is on, the head of the page has a `meta http-equiv="refresh"` element, and a
+  browser without scripting loads the page again every 5 seconds.
 - The refresh is switched on and off with links, because it's part of the view: `refresh=on` is in the
   address, like the filter tokens.
 - After an entry is flagged, the browser goes back to the row of that entry. A page that reloads itself is
   the exception: with a row in its address, it would jump back to that row on every reload.
+
+Since task 13.12, a browser that runs scripts updates the list in place (see [ui-stack.md](ui-stack.md)):
+
+- The `meta` element is inside a `noscript` element. A browser that runs scripts skips it, so it doesn't
+  load the page again.
+- Every 5 seconds, the script asks for the address of the page, and the UI answers with one part of the page
+  instead of the whole page. The script puts it in the place of the part that the page shows.
+- That part holds everything that depends on the history: the line about the service, the links of the
+  page, the entries, and the links to the other pages of the list. For example, the link that deletes all
+  entries is only there when the history has entries, so it has to appear along with the first entry.
+- The filter form isn't in that part. Whatever someone types into it stays, which a page that reloads
+  itself can't offer.
+- Every link and every button of the part has an identifier, such as `view-entry-7`. After an update, the
+  script gives the focus to the one with the identifier of the one that had it. Otherwise, someone who uses
+  the keyboard would be thrown out of the list every 5 seconds.
+- An update doesn't take the notice of a form with it. The notice waits for the next page that the browser
+  loads.
+- When the list can't be updated, for example because the server is down, the UI answers with the page of
+  the failure. The script shows it in the place of the history page, and nothing asks again. A browser
+  without scripting stops reloading at that point too, because the page of a failure doesn't reload itself.
 
 ### The list
 
@@ -626,7 +664,6 @@ as a scenario. Entries can also be flagged and deleted.
 
 ### What the history pages don't have
 
-- New entries don't appear in place yet. That's part of task 13.12.
 - The list can't be limited to the flagged entries, because the admin API has no such filter.
 - A filter token can't contain a space.
 
@@ -1071,6 +1108,8 @@ is not repeated by one:
   writable mode, the reload, and the reset.
 - With the automatic refresh on, Chrome loaded a copy of the history list three times in 13 seconds. The copy
   was served with the content security policy of the UI, so the policy doesn't get in the way of the reload.
+- For task 13.12, Chrome ran the script of the UI against the real pages. [ui-stack.md](ui-stack.md) lists
+  what was checked, under "A check in a browser".
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
   was sent to the row of a service: the line of the page stayed at the top of the window, and the row began
   below it.
@@ -1087,4 +1126,5 @@ and `UiStatisticsTest` cover the history and the statistics. `UiDefinitionsTest`
 `ImportFormTest` checks how the import form tells XML from JSON. `UiCrawlTest` follows every link from the first
 page on, also with a server that states content that is written to be read as markup. `UiCoverageTest` walks
 through the whole UI without scripting and holds the coverage list, and `JourneyTest` checks the rules of
-such a walk.
+such a walk. `UiEnhancementTest` sends the requests of the script, puts the answers into the pages, and takes
+the same walk a second time with the script.

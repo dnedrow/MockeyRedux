@@ -110,7 +110,7 @@ class StoredContentTest {
             assertEquals(ELEMENTS, page.select("main *").map { it.tagName() }.toSet() - ELEMENTS_OF_CONTENT, text)
             val attributes = page.allElements.flatMap { it.attributes().map { attribute -> attribute.key } }
             assertEquals(emptySet(), attributes.toSet() - ATTRIBUTES, text)
-            assertEquals(emptyList(), UNWRITTEN.filter { it in written }, text)
+            assertEquals(emptyList(), Hostile.unwrittenIn(written), text)
         }
     }
 
@@ -218,7 +218,7 @@ class StoredContentTest {
         assertTrue(foot.endsWith(", version $text, in read-only mode"), foot)
         assertEquals(listOf(text), failed.select("main .problem").map { it.wholeText() })
         assertEquals(listOf(text, "$text: $text"), refused.select("main .problem").map { it.wholeText() })
-        for (page in listOf(status, failed, refused)) assertEquals(0, page.select("script, b").size)
+        for (page in listOf(status, failed, refused)) assertEquals(0, page.select("body script, b").size)
     }
 
     /**
@@ -240,7 +240,6 @@ class StoredContentTest {
     private companion object {
         val MARKUP = Hostile.MARKUP
         val ADDRESSES = Hostile.ADDRESSES
-        val UNWRITTEN = Hostile.UNWRITTEN
         val SAFE_ADDRESS = Hostile.SAFE_ADDRESS
 
         /** The elements of the page of the test, and the ones that hold nothing of the content. */
@@ -249,10 +248,10 @@ class StoredContentTest {
                 .plus(setOf("div", "textarea", "select", "option", "button"))
         val ELEMENTS_OF_CONTENT = setOf("thead", "th")
 
-        /** The attributes that the UI writes. */
+        /** The attributes that the UI writes. The head loads the script of the UI. */
         val ATTRIBUTES =
             setOf("lang", "charset", "name", "content", "rel", "href", "type", "class", "aria-label", "aria-current", "role", "id")
-                .plus(setOf("action", "method", "value", "for", "rows", "selected", "aria-describedby", "aria-invalid"))
+                .plus(setOf("action", "method", "value", "for", "rows", "selected", "aria-describedby", "aria-invalid", "src", "defer"))
 
         val SAFE_ANCHOR = Regex("service-[A-Za-z0-9._~-]*")
 

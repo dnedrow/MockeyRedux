@@ -11,8 +11,8 @@ import io.ktor.server.response.respondBytes
 import java.security.MessageDigest
 
 /**
- * The files that the pages of the UI refer to: the stylesheet and the icon. The UI serves each of them
- * itself, from what the program holds, so that a browser asks no other place for anything.
+ * The files that the pages of the UI refer to: the stylesheet, the icon, and the script. The UI serves each
+ * of them itself, from what the program holds, so that a browser asks no other place for anything.
  *
  * A file is served under the path of [path]. A browser may keep it, and asks whether it still holds: every
  * file has a tag that is made of its bytes, and a request that names the tag gets the status 304.
@@ -37,6 +37,7 @@ internal object Assets {
         mapOf(
             "mockey.css" to asset("mockey.css", ContentType.Text.CSS.withCharset(Charsets.UTF_8)),
             "favicon.svg" to asset("favicon.svg", ContentType.Image.SVG),
+            Enhancement.SCRIPT to asset(Enhancement.SCRIPT, ContentType.Text.JavaScript.withCharset(Charsets.UTF_8)),
         )
 
     /** The names of the files. */

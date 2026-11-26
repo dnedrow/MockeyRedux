@@ -109,7 +109,7 @@ internal object TagPages {
                     tagsOf(filter)
                 }
             }
-            postForm(view, FILTER, classes = "filter") {
+            postForm(view, FILTER, classes = "filter", inPlace = true) {
                 rejectionOf(state)
                 textField(state, TAGS, "Tags of the filter", hint = FILTER_HINT)
                 otherProblemsOf(state)

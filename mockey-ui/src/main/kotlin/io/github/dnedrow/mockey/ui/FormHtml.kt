@@ -37,16 +37,21 @@ import kotlinx.html.textInput
  * A form of the page of [view] that changes something. A browser sends it to [action], which is a path of
  * the UI, and with the files that were chosen in it when it is [withFiles]. The form has the classes
  * [classes], which say how it looks.
+ *
+ * With [inPlace], a browser that runs the script of the UI sends the form through the script, which puts
+ * the answer into the page that the browser shows, see [Enhancement]. Every other browser loads a page.
  */
 internal fun FlowContent.postForm(
     view: View,
     action: String,
     withFiles: Boolean = false,
     classes: String? = null,
+    inPlace: Boolean = false,
     block: FORM.() -> Unit,
 ) {
     val encType = if (withFiles) FormEncType.multipartFormData else null
     form(action = action, method = FormMethod.post, encType = encType, classes = classes) {
+        if (inPlace) Enhancement.mark(this, action, withFiles)
         hiddenInput(name = FormTokens.FIELD) { value = view.formToken }
         block()
     }

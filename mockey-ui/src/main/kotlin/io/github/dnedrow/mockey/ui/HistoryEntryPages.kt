@@ -169,7 +169,7 @@ internal object HistoryEntryPages {
                 +"${entry.request.method} "
                 urlOf(entry.request.url)
             }
-            postForm(view, addressOf(REPLAY, entry.id)) {
+            postForm(view, addressOf(REPLAY, entry.id), inPlace = true) {
                 shownOf(state, ReplayForm.trackedFields(entry))
                 hiddenInput(name = ReplayForm.BODY_LINE_ENDINGS) { value = state.value(ReplayForm.BODY_LINE_ENDINGS) }
                 rejectionOf(state)
@@ -212,7 +212,7 @@ internal object HistoryEntryPages {
                 return@Page
             }
             p { +"$SCENARIO_INTRO It belongs to the service ${service.name}." }
-            postForm(view, addressOf(SCENARIO, entry.id)) {
+            postForm(view, addressOf(SCENARIO, entry.id), inPlace = true) {
                 rejectionOf(state)
                 textField(state, ScenarioOfEntryForm.NAME, "Name", hint = NAME_HINT)
                 otherProblemsOf(state)

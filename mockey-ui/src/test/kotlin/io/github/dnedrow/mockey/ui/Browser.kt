@@ -13,12 +13,15 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 /**
- * A browser without scripting, as far as the tests of the UI need one. It sends one request and returns the
- * answer: it follows no redirect by itself, so that a test sees each answer of the UI as it is.
+ * A browser, as far as the tests of the UI need one. It sends one request and returns the answer: it
+ * follows no redirect by itself, so that a test sees each answer of the UI as it is.
  *
  * It keeps the cookies that the UI gives it and sends them with its requests, as a browser does for the
  * requests of a site's own pages. It sends a form of a page as a browser sends it, see [submit]. Two
  * browsers know nothing of each other.
+ *
+ * It runs no script. A test that needs what the script of the UI does sends the request of the script
+ * itself, see [submitWithScript] and [getWithScript], and puts the answer into the page with [Swap].
  */
 internal class Browser(
     /** The UI that the browser talks to. A second browser for the same UI stands for another person's browser. */
@@ -30,12 +33,20 @@ internal class Browser(
         val headers: Map<String, List<String>>,
         val body: String,
         private val address: String,
+        /** The page that the browser shows after the script of the UI has put the answer into it, when it did. */
+        private val shown: Document? = null,
     ) {
         /**
          * The body, parsed into a page the way a browser would do it. Before a browser parses a page, it turns
          * every carriage return into a single line feed, whether or not a line feed follows it.
+         *
+         * Where the script of the UI put the answer into a page, this is that page.
          */
-        val page: Document by lazy { Jsoup.parse(body.replace("\r\n", "\n").replace('\r', '\n'), address) }
+        val page: Document by lazy { shown ?: Jsoup.parse(asRead, address) }
+
+        /** The body as a browser reads it, with a single line feed for every line break. */
+        val asRead: String
+            get() = body.replace("\r\n", "\n").replace('\r', '\n')
 
         /** Returns the one value of the header [name], or `null` when the answer has no such header, or several. */
         fun header(name: String): String? = headers[name.lowercase()]?.singleOrNull()
@@ -49,7 +60,10 @@ internal class Browser(
 
         /** What the page says of a form that the UI has done, or `null` when it says nothing. */
         val notice: String?
-            get() = page.select("main .notice").singleOrNull()?.text()
+            get() {
+                val said = page.select("main .notice").singleOrNull()?.text()
+                return said?.takeIf { it.isNotEmpty() }
+            }
 
         /** The messages at the fields of the form of the page, by the names of the fields. */
         val fieldProblems: Map<String, List<String>>
@@ -171,44 +185,102 @@ internal class Browser(
         pressed: Element? = form.select(BUTTONS).firstOrNull(),
         rows: Map<String, List<String>> = emptyMap(),
     ): Response {
+        val fields = held(form, edits, pressed, rows).map { (name, value) -> name to asSent(value) }
+        val action = form.attr("action")
+        if (!form.attr("method").equals("post", ignoreCase = true)) return get("$action?${encoded(fields)}")
+        if (form.attr("enctype") != "multipart/form-data") return post(action, fields)
+        val boundary = "----browser${System.nanoTime()}"
+        val sent = fileFieldsOf(form).associateWith { files[it] ?: Chosen("", ByteArray(0)) }
+        return request("POST", action, body = parts(fields, sent, boundary), contentType = "multipart/form-data; boundary=$boundary")
+    }
+
+    /**
+     * Sends [form] as the script of the UI sends a form that is marked for it, see [Enhancement]: to the
+     * address that the mark names, with the header of the script, and with the fields as [submit] reads
+     * them from the page and from [edits], [files], [pressed], and [rows].
+     *
+     * The script differs from a browser in two ways. It sends a field of several lines as the page holds
+     * it, with line feeds alone, unless the form holds files: the browser then writes the form for the
+     * script and puts a carriage return before every line feed. And it leaves out a file field for which
+     * no file was chosen.
+     */
+    fun submitWithScript(
+        form: FormElement,
+        edits: Map<String, String?> = emptyMap(),
+        files: Map<String, Chosen> = emptyMap(),
+        pressed: Element? = form.select(BUTTONS).firstOrNull(),
+        rows: Map<String, List<String>> = emptyMap(),
+    ): Response {
+        val address = form.attr("hx-post")
+        check(address.isNotEmpty()) { "The form for ${form.attr("action")} is not marked for the script." }
+        val fields = held(form, edits, pressed, rows)
+        if (form.attr("hx-encoding") != "multipart/form-data") {
+            return request("POST", address, SCRIPT_HEADERS, writtenByScript(fields).toByteArray(), "application/x-www-form-urlencoded")
+        }
+        val boundary = "----script${System.nanoTime()}"
+        val sent = fileFieldsOf(form).filter { it in files }.associateWith { files.getValue(it) }
+        val body = parts(fields.map { (name, value) -> name to asSent(value) }, sent, boundary)
+        return request("POST", address, SCRIPT_HEADERS, body, "multipart/form-data; boundary=$boundary")
+    }
+
+    /** Asks for [path] as the script of the UI asks for it when it brings a part of a page up to date. */
+    fun getWithScript(path: String): Response = get(path, SCRIPT_HEADERS)
+
+    /**
+     * Returns the fields that [form] holds when its button is pressed, each with the value that the page
+     * gave it or that a person entered, before anything is done to the line breaks of a field of several lines.
+     */
+    private fun held(
+        form: FormElement,
+        edits: Map<String, String?>,
+        pressed: Element?,
+        rows: Map<String, List<String>>,
+    ): List<Pair<String, String>> {
         val areas = form.select("textarea").associate { it.attr("name") to it.wholeText() }
         val data = form.formData().map { it.key() to it.value() }.toMutableList()
         form.select(BUTTONS).forEach { data.remove(it.attr("name") to it.attr("value")) }
         if (pressed != null && pressed.hasAttr("name")) data += pressed.attr("name") to pressed.attr("value")
-        val fileFields = form.select("input[type=file]").map { it.attr("name") }
+        val fileFields = fileFieldsOf(form)
         val ofThePage = data.filter { (name, _) -> name !in fileFields }.map { (name, value) -> name to (areas[name] ?: value) }
         val kept = ofThePage.filter { (name, _) -> name !in edits && name !in rows }
         val edited = edits.mapNotNull { (name, value) -> value?.let { name to it } }
         val ofRows = rows.flatMap { (name, values) -> values.map { name to it } }
         val oneLine = form.select(ONE_LINE_FIELDS).map { it.attr("name") }.toSet()
-        val held = (kept + edited + ofRows).map { (name, value) -> name to if (name in oneLine) withoutLineBreaks(value) else value }
-        val fields = held.map { (name, value) -> name to asSent(value) }
-        val action = form.attr("action")
-        if (!form.attr("method").equals("post", ignoreCase = true)) return get("$action?${encoded(fields)}")
-        if (form.attr("enctype") != "multipart/form-data") return post(action, fields)
-        val boundary = "----browser${System.nanoTime()}"
-        val sent = fileFields.associateWith { files[it] ?: Chosen("", ByteArray(0)) }
-        return request("POST", action, body = parts(fields, sent, boundary), contentType = "multipart/form-data; boundary=$boundary")
+        return (kept + edited + ofRows).map { (name, value) -> name to if (name in oneLine) withoutLineBreaks(value) else value }
     }
+
+    private fun fileFieldsOf(form: FormElement): List<String> = form.select("input[type=file]").map { it.attr("name") }
 
     private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
 
-    private fun asSent(value: String): String = value.replace("\r\n", "\n").replace('\r', '\n').replace("\n", "\r\n")
+    private fun asSent(value: String): String = withLineFeeds(value).replace("\n", "\r\n")
 
-    private fun encoded(fields: List<Pair<String, String>>): String =
-        fields.joinToString("&") { (name, value) -> "${escaped(name)}=${escaped(value)}" }
+    companion object {
+        /** The header that the script of the UI adds to every request that it sends, as htmx names it. */
+        val SCRIPT_HEADERS = mapOf("HX-Request" to "true")
 
-    private fun escaped(text: String): String = URLEncoder.encode(text, Charsets.UTF_8)
+        /**
+         * Returns [fields] as the script of the UI writes a form of fields: every line break of a value is a
+         * line feed alone. A browser that sends such a form itself writes a carriage return before it.
+         */
+        fun writtenByScript(fields: List<Pair<String, String>>): String =
+            encoded(fields.map { (name, value) -> name to withLineFeeds(value) })
 
-    private companion object {
+        private fun withLineFeeds(value: String): String = value.replace("\r\n", "\n").replace('\r', '\n')
+
+        private fun encoded(fields: List<Pair<String, String>>): String =
+            fields.joinToString("&") { (name, value) -> "${escaped(name)}=${escaped(value)}" }
+
+        private fun escaped(text: String): String = URLEncoder.encode(text, Charsets.UTF_8)
+
         /** For how long a request over a socket waits for its answer. An answer that does not come fails the test. */
-        const val RAW_TIMEOUT_MILLIS = 10_000
+        private const val RAW_TIMEOUT_MILLIS = 10_000
 
         /** What finds the buttons that send the form that they are in. */
-        const val BUTTONS = "button:not([type=button]):not([type=reset]), input[type=submit]"
+        private const val BUTTONS = "button:not([type=button]):not([type=reset]), input[type=submit]"
 
         /** The selector of the one-line text fields of a form. */
-        const val ONE_LINE_FIELDS = "input[type=text], input:not([type])"
+        private const val ONE_LINE_FIELDS = "input[type=text], input:not([type])"
     }
 
     private fun parts(
