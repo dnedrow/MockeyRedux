@@ -13,10 +13,13 @@ internal class Started : AutoCloseable {
     /** Starts a stand-in server that doesn't hold anything yet. */
     fun api(): FakeAdminApi = FakeAdminApi().also { fakes += it }
 
-    /** Starts a UI for [api] and returns a browser that talks to it. */
-    fun browserFor(api: FakeAdminApi): Browser {
+    /** Starts a UI for [api] and returns a browser that talks to it. The pages of the UI are those of [areas]. */
+    fun browserFor(
+        api: FakeAdminApi,
+        areas: List<Area> = UiApplication.AREAS,
+    ): Browser {
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(api.url), logLevel = LogLevel.WARN)
-        return Browser(MockeyUi.start(settings).also { uis += it })
+        return Browser(MockeyUi.start(settings, areas = areas).also { uis += it })
     }
 
     override fun close() {

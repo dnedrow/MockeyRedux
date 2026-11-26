@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5 to 13.10 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5 to 13.11 of the change `kotlin-rewrite-modular`, on 2026-11-25.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -984,6 +984,67 @@ times.
 - The page doesn't list the inspectors that are installed. The form of a service offers them where one is
   chosen.
 
+## The coverage of the admin API
+
+Task 13.11 checks two requirements for the UI as a whole: everything works without scripting, and the UI
+offers every management operation of the admin API. One test class does both, `UiCoverageTest`.
+
+### Requirements
+
+- Every function of the UI is usable in a browser with scripting disabled, through links, forms, and full
+  page loads (`admin-ui`: Usable without JavaScript, with the scenario "Core flow with scripting disabled").
+- The UI offers every management operation of the admin API (`admin-ui`: Coverage of management
+  operations).
+
+### The walk
+
+- The test walks through the UI the way someone with a browser without scripting does. The walk starts at
+  the first page. From there on, it only opens an address that one of its pages refers to, and it only
+  submits a form that one of its pages shows. Anything else fails the test, and so does an answer that isn't
+  a page or a file.
+- The walk leaves nothing out. The test asks Ktor for the routes of the UI and compares them with the walk:
+  it opened each of the 42 addresses for pages and files, and it submitted a form to each of the 40
+  addresses that take one. It also submitted every form that one of its pages showed.
+- A stand-in for the server records which operations of the admin API each step of the walk reaches. It
+  also checks every request against the description of the admin API, as in all tests of the UI.
+- A separate test goes through the scenario "Core flow with scripting disabled" and checks the result that
+  each step shows.
+- The rules of the walk have tests of their own, in `JourneyTest`: an address that no page refers to, a form
+  that no page shows, and an answer that reports a failure each count against a walk.
+
+### The coverage list
+
+The coverage list is `COVERAGE` in `UiCoverageTest`. For each operation, it names the step of the walk that
+reaches it, such as "the merge of services" for `mergeServices`. The test fails in three cases: the walk
+doesn't reach an operation at its step, the list lacks an operation that the description of the admin API
+names, or the UI asks for an operation that the list doesn't have.
+
+The description names 61 operations, and the UI asks the server for 58 of them. The other three:
+
+- `listScenarios` returns the scenarios of a service. The page of a service lists them, but they're part
+  of the service, which the page gets with `getService`.
+- `getTagFilter` returns the tag filter. The page for tags shows it, but it's part of the status of the
+  server, which every page gets with `getSystem`.
+- `getDescription` returns the description of the admin API itself. It manages nothing, so the UI doesn't
+  offer it.
+
+For the first two, there was a choice:
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. The pages ask for the scenarios and for the tag filter with their own operations as well. | Every entry of the coverage list is of one kind. | Each page load sends a request for something that the UI already has. Two answers about the same thing can also disagree. |
+| 2. The two operations count as covered, and a test checks that the pages show what they return. | The UI sends no request that it doesn't need. | The coverage list has a second kind of entry. |
+
+Way 2. The test asks the stand-in server for the scenarios and for the tag filter with the two operations,
+and it compares the answers with what the page of a service and the page for tags show.
+
+### What the test doesn't cover
+
+- The server of the test is a stand-in. The smoke runs of each task used the real server, and task 15.1
+  adds an end-to-end check.
+- The walk submits each form once, with input that the server accepts. Rejected forms are covered by the
+  tests of each page.
+
 ## A look in a browser
 
 The tests read the pages without a browser. The overview was looked at once in a browser, which is no test and
@@ -1024,4 +1085,6 @@ same for plans, twist configurations, tags, and the outbound proxy. `UiHistoryTe
 and `UiStatisticsTest` cover the history and the statistics. `UiDefinitionsTest`, `UiSearchTest`,
 `UiMergeTest`, `UiRealUrlsTest`, `UiSchemaReportTest`, and `UiSystemTest` cover the pages of task 13.10, and
 `ImportFormTest` checks how the import form tells XML from JSON. `UiCrawlTest` follows every link from the first
-page on, also with a server that states content that is written to be read as markup.
+page on, also with a server that states content that is written to be read as markup. `UiCoverageTest` walks
+through the whole UI without scripting and holds the coverage list, and `JourneyTest` checks the rules of
+such a walk.

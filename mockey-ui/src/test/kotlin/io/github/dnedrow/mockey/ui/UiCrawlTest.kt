@@ -45,7 +45,7 @@ class UiCrawlTest {
     @Test
     fun everyLinkOfAPageLeadsToAPageOfTheUiAndToAPlaceThatThePageHas() {
         val api = FakeAdminApi().also { fakes += it }
-        holdSamples(api)
+        api.holdSamples()
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(api.url), logLevel = LogLevel.WARN)
         val browser = Browser(MockeyUi.start(settings).also { uis += it })
 
@@ -93,7 +93,7 @@ class UiCrawlTest {
     @Test
     fun followingTheLinksChangesNothingAndEveryFormThatChangesSomethingHoldsTheToken() {
         val api = FakeAdminApi().also { fakes += it }
-        holdSamples(api)
+        api.holdSamples()
         val settings = UiSettings(port = 0, adminUrl = AdminUrl.of(api.url), logLevel = LogLevel.WARN)
         val browser = Browser(MockeyUi.start(settings).also { uis += it })
 
@@ -181,18 +181,6 @@ class UiCrawlTest {
             }
         }
         assertEquals(emptyList(), api.violations)
-    }
-
-    /** Makes [api] hold the samples: services, a plan, a twist configuration, proxy settings, and a history entry. */
-    private fun holdSamples(api: FakeAdminApi) {
-        val services = api.hold(diagnostics = listOf(Samples.diagnostic))
-        val plans = api.holdPlans(services)
-        api.holdTwists()
-        api.holdTags(services, plans)
-        api.holdProxy()
-        api.holdHistory(services = services)
-        api.holdDefinitions(services, plans)
-        api.holdSystem(services, plans)
     }
 
     private companion object {

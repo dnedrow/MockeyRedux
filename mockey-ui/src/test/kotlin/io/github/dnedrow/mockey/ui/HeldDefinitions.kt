@@ -134,3 +134,20 @@ internal fun FakeAdminApi.holdSystem(
         done()
     }
 }
+
+/**
+ * Makes the stand-in hold samples of every kind: services with a diagnostic, a plan, a twist configuration,
+ * tags, proxy settings, and a history entry. It also answers everything about the definitions as a whole and
+ * about the server itself. Returns the live view of the services.
+ */
+internal fun FakeAdminApi.holdSamples(): MutableMap<String, ServiceDto> {
+    val services = hold(diagnostics = listOf(Samples.diagnostic))
+    val plans = holdPlans(services)
+    holdTwists()
+    holdTags(services, plans)
+    holdProxy()
+    holdHistory(services = services)
+    holdDefinitions(services, plans)
+    holdSystem(services, plans)
+    return services
+}
