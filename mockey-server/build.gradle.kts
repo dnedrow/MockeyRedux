@@ -59,9 +59,9 @@ tasks.test {
     )
 
     // The test of the documents runs their commands, with definitions of Mockey 2.x that the tests of the
-    // importer have.
+    // importer have. It also reads the README for the files of the program that its quick start names.
     inputs
-        .files("../docs/server.md", "../docs/migrating-from-2x.md", "../docs/admin-api.md")
+        .files("../docs/server.md", "../docs/migrating-from-2x.md", "../docs/admin-api.md", "../README.md")
         .withPropertyName("serverDocuments")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs

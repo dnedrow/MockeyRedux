@@ -33,6 +33,7 @@ import kotlin.test.assertTrue
  */
 class UiDocumentsTest {
     private val document = Path("../docs/ui.md")
+    private val readme = Path("../README.md")
     private val distribution = Path(System.getProperty("mockey.distribution"))
     private val runnableJar = Path(System.getProperty("mockey.runnableJar"))
     private val started = Started()
@@ -104,10 +105,14 @@ class UiDocumentsTest {
         assertEquals(UiSettings().summary().keys.toList(), ofTheDocument.map { it.first.single().removePrefix("--") })
     }
 
-    /** The files of the program that the document names are the ones that the build of this version delivers. */
+    /**
+     * The files of the program that the document names are the ones that the build of this version delivers.
+     * So are the ones that the README names: its quick start starts the UI from the runnable jar.
+     */
     @Test
     fun theArtifactsThatTheDocumentNamesAreTheOnesOfThisVersion() {
-        val named = ARTIFACT.findAll(Files.readString(document)).map { it.value }.toSet()
+        assertContains(Files.readString(readme), "java -jar ${runnableJar.name}\n")
+        val named = listOf(document, readme).flatMap { ARTIFACT.findAll(Files.readString(it)).map { artifact -> artifact.value } }.toSet()
 
         val distribution = "$PROGRAM_NAME-${UiVersion.text}"
         assertEquals(setOf("$distribution.zip", "$distribution.tar.gz", runnableJar.name), named)

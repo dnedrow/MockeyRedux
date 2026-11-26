@@ -10,6 +10,7 @@ import kotlin.io.path.Path
 import kotlin.io.path.name
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -38,6 +39,7 @@ class ServerDocumentsTest {
     private val serverDocument = Path("../docs/server.md")
     private val migrationDocument = Path("../docs/migrating-from-2x.md")
     private val adminApiDocument = Path("../docs/admin-api.md")
+    private val readme = Path("../README.md")
     private val legacyFixtures = Path("../mockey-legacy/src/test/resources/legacy")
     private val distribution = Path(System.getProperty("mockey.distribution"))
     private val runnableJar = Path(System.getProperty("mockey.runnableJar"))
@@ -133,11 +135,15 @@ class ServerDocumentsTest {
         assertEquals(ServerSettings().summary().keys.toList(), ofTheDocument.map { it.first.first().removePrefix("--") })
     }
 
-    /** The files of the program that the documents name are the ones that the build of this version delivers. */
+    /**
+     * The files of the program that the documents name are the ones that the build of this version delivers.
+     * The README is one of the documents: its quick start starts the server from the runnable jar.
+     */
     @Test
     fun theArtifactsThatTheDocumentsNameAreTheOnesOfThisVersion() {
+        assertContains(Files.readString(readme), "java -jar ${runnableJar.name}\n")
         val named =
-            listOf(serverDocument, migrationDocument)
+            listOf(serverDocument, migrationDocument, readme)
                 .flatMap { ARTIFACT.findAll(Files.readString(it)).map { artifact -> artifact.value }.toList() }
                 .toSet()
 

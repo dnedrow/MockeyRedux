@@ -61,4 +61,6 @@ tasks.test {
         .files(fileTree("../docs") { include("*.md", "decisions/*.md") })
         .withPropertyName("documents")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // It also reads the README for the files of the program that its quick start names.
+    inputs.file("../README.md").withPropertyName("readme").withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -101,6 +101,21 @@ val endToEndCheck = tasks.register<Exec>("endToEndCheck") {
     }
 }
 
+// The quick-start check follows the quick start of the README in a container that has a Java runtime and
+// nothing else that a build has. It needs a container tool, so it is no part of `check`. The property
+// `quickStartImage` names another image than the one of the script.
+tasks.register<Exec>("quickStartCheck") {
+    group = "verification"
+    description = "Follows the quick start of the README in a container that has only a Java 21 runtime."
+    val version = project.version.toString()
+    val serverJar = layout.projectDirectory.file("mockey-server/build/libs/mockey-server-$version-runnable.jar")
+    val uiJar = layout.projectDirectory.file("mockey-ui/build/libs/mockey-ui-$version-runnable.jar")
+    val script = layout.projectDirectory.file("scripts/quick-start-check.sh")
+    val image = providers.gradleProperty("quickStartImage")
+    dependsOn(":mockey-server:runnableJar", ":mockey-ui:runnableJar")
+    commandLine(listOf("bash", script.asFile.path, serverJar.asFile.path, uiJar.asFile.path) + listOfNotNull(image.orNull))
+}
+
 tasks.register("check") {
     dependsOn("checkModuleDependencies")
     dependsOn(subprojects.map { "${it.path}:check" })
