@@ -141,7 +141,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 
 - [x] 14.1 Implement the shim as an optional server module on the mock listener that is off by default. Verify with tests for 404 responses when disabled and JSON responses when enabled.
 - [x] 14.2 Implement `/config/service` with its parameters, the ignored `transientState` (DEV-22), and its result. Verify with tests against the result shapes recorded in task 2.8.
-- [ ] 14.3 Implement `/plan/setup` with its four actions and result, and `/definitions`. Verify with tests against the result shapes recorded in task 2.8.
+- [x] 14.3 Implement `/plan/setup` with its four actions and result, and `/definitions`. Verify with tests against the result shapes recorded in task 2.8.
 - [ ] 14.4 Implement `/home` for `init` and `deleteAllServices`, confined to the definitions location and refusing `url` (DEV-27), and the identifier round trip (DEV-20). Verify with tests for each scenario of those requirements.
 - [ ] 14.5 Add the shim to `docs/migrating-from-2x.md`: how to enable it and how it differs from Mockey 2.x. Verify that the documented requests run in a test.
 - [ ] 14.6 Replay the 44 parity recordings that address the shim's endpoints against the new server with the shim enabled, and fix differences. Task 11.8 replays the other 223. Verify that the parity suite replays every recording and that each one is answered as its label says.

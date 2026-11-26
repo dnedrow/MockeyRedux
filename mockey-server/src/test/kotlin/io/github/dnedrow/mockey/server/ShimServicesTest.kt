@@ -51,7 +51,7 @@ class ShimServicesTest {
     }
 
     /** Returns the service [name] as the engine of this listener has it now. */
-    private fun ShimUnderTest.serviceNamed(name: String): Service = engine.definitions.services.single { it.name == name }
+    private fun ShimUnderTest.serviceNamed(name: String): Service = definitions.services.single { it.name == name }
 
     /** Returns the result of the answer to a `GET` request for `/config/service` with [query]. */
     private fun ShimUnderTest.configured(query: String): JsonObject = document("/config/service?$query").getValue("result").jsonObject
@@ -150,7 +150,7 @@ class ShimServicesTest {
     fun aRecordedRequestGetsTheAnswerThatItsRecordingStatesAndChangesTheServiceThatWay() {
         for (recording in recorded) {
             val script = script()
-            val before = script.engine.definitions
+            val before = script.definitions
 
             val answer =
                 if (recording.asForm) script.post("/config/service", recording.query) else script.get("/config/service?${recording.query}")
@@ -159,7 +159,7 @@ class ShimServicesTest {
             assertEquals("HTTP/1.1 200 OK", answer.statusLine, recording.name)
             assertEquals(stated(recording.stated, service), documentOf(answer.body), recording.name)
             val expected = before.copy(services = before.services.map { if (it.id == service.id) recording.change(it) else it })
-            assertEquals(expected, script.engine.definitions, recording.name)
+            assertEquals(expected, script.definitions, recording.name)
         }
     }
 
@@ -172,7 +172,7 @@ class ShimServicesTest {
     @Test
     fun aRequestThatNamesNoServiceGetsAResultThatSaysSoAndChangesNothing() {
         val script = script()
-        val before = script.engine.definitions
+        val before = script.definitions
         val text = "Unable to update service configuration. No service has the serviceId or the serviceName of the request."
 
         for (query in listOf("serviceId=1&scenarioId=3", "serviceName=Nobody&hangTime=5", "hangTime=5", "serviceName=&hangTime=5")) {
@@ -182,7 +182,7 @@ class ShimServicesTest {
             assertEquals("""{"result":{"fail":"$text"}}""", answer.body, query)
         }
         assertEquals("""{"result":{"fail":"$text"}}""", script.get("/config/service").body)
-        assertEquals(before, script.engine.definitions)
+        assertEquals(before, script.definitions)
     }
 
     /**
@@ -207,12 +207,12 @@ class ShimServicesTest {
     @Test
     fun theSecondPathOfMockey2xGetsTheStatus404() {
         val script = script()
-        val before = script.engine.definitions
+        val before = script.definitions
 
         val answer = script.get("/service_scenario?serviceName=Customers&hangTime=5")
 
         assertEquals("HTTP/1.1 404 Not Found" to "", answer.statusLine to answer.body)
-        assertEquals(before, script.engine.definitions)
+        assertEquals(before, script.definitions)
     }
 
     /**
@@ -422,14 +422,14 @@ class ShimServicesTest {
     @Test
     fun requestRulesThatAreNotWellFormedAreRefusedWithEverythingElseOfTheRequest() {
         val script = script()
-        val before = script.engine.definitions
+        val before = script.definitions
 
         val result = script.configured("serviceName=Orders&hangTime=5&serviceResponseType=static&requestInspectorJsonRules=%7Bnot+json")
 
         val text = result.text("fail")
         assertEquals(setOf("fail"), result.keys)
         assertTrue(text.startsWith("Unable to update service configuration. The request rules are not a well-formed rule set. "), text)
-        assertEquals(before, script.engine.definitions)
+        assertEquals(before, script.definitions)
     }
 
     /**
@@ -459,7 +459,7 @@ class ShimServicesTest {
         val listed = script.document("/definitions").objects("serviceDefinitions")
         val orders = listed.single { it.text("serviceName") == "Orders" }
         val closed = orders.objects("scenarioArray").single { it.text("scenarioName") == "closed" }
-        val before = script.engine.definitions
+        val before = script.definitions
 
         val result = script.configured("serviceId=${orders.text("serviceId")}&scenarioId=${closed.text("scenarioId")}&hangTime=30")
         val byName = script.configured("serviceId=2&serviceName=Orders&scenarioId=1&scenarioName=open")
@@ -467,7 +467,7 @@ class ShimServicesTest {
         assertEquals(listOf("updated", "Orders", "closed"), listOf("success", "serviceName", "scenarioName").map(result::text))
         assertEquals(orders.text("serviceId") to closed.text("scenarioId"), result.text("serviceId") to result.text("scenarioId"))
         assertEquals(listOf("updated", "Orders", "open"), listOf("success", "serviceName", "scenarioName").map(byName::text))
-        val after = script.engine.definitions
+        val after = script.definitions
         assertEquals(before.services.filter { it.name != "Orders" }, after.services.filter { it.name != "Orders" })
         assertEquals(30L, script.serviceNamed("Orders").delayMillis)
     }
@@ -511,7 +511,7 @@ class ShimServicesTest {
         val text = "The server could not write its definitions location, and nothing was changed. The log of the server says why."
         assertEquals("HTTP/1.1 200 OK", answer.statusLine)
         assertEquals("""{"result":{"fail":"$text"}}""", answer.body)
-        assertEquals(fixture, script.engine.definitions)
+        assertEquals(fixture, script.definitions)
         val errors = TestLog.messages(log, "ERROR")
         assertEquals("The request for /config/service of the legacy shim failed at the definitions location.", errors.first())
         assertTrue("StorageException: No space is left on /var/lib/mockey." in log, log)

@@ -31,8 +31,7 @@ internal class ShimServices(
         val named = engine.definitions.serviceNamedBy(parameters) ?: return ShimResult.fail("$UNABLE $NO_SERVICE")
         return when (val result = engine.services.update(named.id) { changed(it, parameters) }) {
             is ChangeResult.Changed -> updated(result.value)
-            is ChangeResult.Rejected -> ShimResult.fail("$UNABLE ${result.failure.errors.joinToString(" ") { it.message }}")
-            is ChangeResult.NotFound -> ShimResult.fail("$UNABLE $NO_SERVICE")
+            else -> ShimResult.fail("$UNABLE ${reasonOf(result)}")
         }
     }
 

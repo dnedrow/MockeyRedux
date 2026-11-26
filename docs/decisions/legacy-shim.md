@@ -1,6 +1,6 @@
 # The legacy shim
 
-Decided in tasks 14.1 and 14.2 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 14.1 to 14.3 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The legacy shim answers the automation endpoints of Mockey 2.x, so that the scripts that were written for
 them keep working. It's a handler on the mock listener, and a server has it only when it's started with
@@ -149,6 +149,51 @@ the text of that branch does, with "Unable to update service configuration.", an
 
 The second path of the servlet of Mockey 2.x, `/service_scenario`, isn't served (DEV-26).
 
+## `/plan/setup`
+
+The endpoint does one of four things with a plan, and the parameter `action` says which. A request names
+the plan by `plan_id` or by `service_plan_name`. The identifier counts first, and then the name, as for a
+service. Mockey 2.x found a plan in that order too.
+
+| Action | What it does | The text of `success` |
+|---|---|---|
+| `save_plan` | Saves the settings that the services of `service_ids[]` have now as the items of the plan, or of a new plan when the request names none that is there. The plan gets the name of `service_plan_name` and the tags of `service_plan_tag`, where the request has them. | `Service plan Evening saved` |
+| `set_plan` | Applies the plan. | `Service plan Gold path set` |
+| `delete_plan` | Deletes the plan. | `Service plan 'Silver path' deleted` |
+| `set_as_default_plan` | Designates the plan as the default plan. With `none` for `plan_id`, it ends the designation. | `Set as Default Service Plan`, or `Removed default plan.` |
+
+The texts are the ones of Mockey 2.x, because the recordings state them for the new server. After an action
+on a plan, the result states the identifier of the plan as `planid` and as `planId`, and its name as
+`planName` (DEV-48). Mockey 2.x wrote `planId` after `delete_plan` and `planid` after the other actions, so a
+script reads the one or the other. `Removed default plan.` is about no plan, and its result states none.
+
+**A request that names no plan that is there gets a `fail`.** Two of the texts are the ones of Mockey 2.x:
+`Service plan not deleted. Please check your logs for insight.` and `Unable to set Default Service Plan.
+Unknown Service Plan ID.` The first one sends its reader to the log. So the server writes a line to its log
+when that happens, at the level of information, which says that the request names no plan that is there.
+Mockey 2.x answered `set_plan` for such a plan with its home page (DEV-50). The shim says `Service plan not
+set.` and why.
+
+**A request that names none of the four actions gets a `fail` that lists them.** Mockey 2.x answered it with
+its home page as well. An action is named as it's written, in lower case.
+
+**`save_plan` for a value of `service_ids[]` that identifies no service saves nothing.** The result has
+`fail`, and its text names the value, such as `Service plan not saved. No service has the identifier 3.`
+The specification doesn't say what such a request answers, and the three recordings of `save_plan` state
+the envelope only: they name their services by the numbers of Mockey 2.x, which name nothing here (DEV-20).
+Mockey 2.x has no answer for an unknown number: its servlet fails on it. A plan for the services that are
+there would be a plan that the script didn't ask for, so nothing is saved. The core refuses such a save, for
+the admin API as well, and the shim passes on what the core says.
+
+**A save keeps what the request doesn't mention.** A plan that exists keeps its name without
+`service_plan_name` and its tags without `service_plan_tag`. An empty `service_plan_tag` removes the tags.
+The tags are the words of the parameter in lower case, as everywhere in this server. A new plan without a
+name gets the name `Plan (auto-generated-name)`, as in Mockey 2.x, and every such save makes a plan of its
+own.
+
+The endpoint takes `transient_state` and doesn't use it (DEV-22). It takes `type` as well: Mockey 2.x
+answered with a page without `type=json`, and the shim always answers with the result envelope.
+
 ## No admin token
 
 The shim asks for no admin token. Mockey 2.x had none, the scripts that the shim is for send none, and the
@@ -175,11 +220,13 @@ takes a token.
 ## Repeating the tests
 
 ```shell
-./gradlew :mockey-server:test --tests '*ShimTest' --tests '*ShimServicesTest' --tests '*MockeyServerTest' --tests '*ServerProgramTest'
+./gradlew :mockey-server:test --tests '*Shim*Test' --tests '*MockeyServerTest' --tests '*ServerProgramTest'
 ```
 
 `LegacyShimTest` sends requests to a listener that runs the module of the mock listener, with the shim and
 without it. `ShimFixture` defines the services of the parity fixture `automation.xml`, and the test compares
-the answers of `/definitions` with the ones that the recordings state. `ShimServicesTest` does the same for
-`/config/service`: it sends the request of each recording, compares the answer, and compares the service
-after the request with the service that the request asks for.
+the answers of `/definitions` with the ones that the recordings state. `ShimServicesTest` and
+`ShimPlansTest` do the same for `/config/service` and `/plan/setup`: each sends the requests of the
+recordings, compares the answers, and compares the definitions after a request with the ones that the
+request asks for. Where a recording names a service by a number of Mockey 2.x, a test also sends the request
+with the identifier of this server, to see what the request does when it finds its service.

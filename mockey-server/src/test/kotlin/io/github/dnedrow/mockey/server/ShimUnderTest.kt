@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
+import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Service
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -19,6 +20,10 @@ internal class ShimUnderTest private constructor(
     val engine: MockeyEngine,
     private val listener: Listener,
 ) : AutoCloseable {
+    /** The definitions that the engine has now. */
+    val definitions: Definitions
+        get() = engine.definitions
+
     /** Sends a request as a script does, and returns the answer. */
     fun send(
         method: String,
@@ -55,7 +60,7 @@ internal class ShimUnderTest private constructor(
                 val added = engine.scenarios.create(created.id) { it.copy(name = scenario, responseBody = scenario) }
                 added.getOrThrow()
             }
-            engine.definitions.services.single { it.id == created.id }
+            definitions.services.single { it.id == created.id }
         }
 
     override fun close() {

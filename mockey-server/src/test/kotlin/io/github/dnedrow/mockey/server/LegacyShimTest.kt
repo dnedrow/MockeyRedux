@@ -1,6 +1,9 @@
 package io.github.dnedrow.mockey.server
 
+import io.github.dnedrow.mockey.core.engine.ChangeResult
+import io.github.dnedrow.mockey.core.engine.FieldError
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
+import io.github.dnedrow.mockey.core.engine.ValidationFailure
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.ResponseMode
 import io.github.dnedrow.mockey.core.model.Scenario
@@ -50,7 +53,7 @@ class LegacyShimTest {
     fun withoutTheShimThePathsOfTheEndpointsGetTheStatus404() {
         val script = listener(withShim = false)
         script.service("Customers", "customers", "silver")
-        val before = script.engine.definitions
+        val before = script.definitions
 
         for (path in ENDPOINTS) {
             val toGet = script.get("$path?serviceName=Customers&hangTime=5&action=deleteAllServices&type=json")
@@ -59,7 +62,7 @@ class LegacyShimTest {
             assertEquals("HTTP/1.1 404 Not Found" to "", toGet.statusLine to toGet.body, path)
             assertEquals("HTTP/1.1 404 Not Found" to "", toPost.statusLine to toPost.body, path)
         }
-        assertEquals(before, script.engine.definitions)
+        assertEquals(before, script.definitions)
     }
 
     /** The scenario "Shim enabled": with the shim, `/definitions` answers with a JSON document of the services. */
@@ -426,6 +429,20 @@ class LegacyShimTest {
         assertEquals("The request for /definitions of the legacy shim failed.", errors.first())
         assertTrue("java.lang.IllegalStateException: The endpoint is broken." in log, log)
         assertFalse("tk-71c0" in log, log)
+    }
+
+    /**
+     * A change that the core doesn't make comes with its reason: what is wrong with each invalid field, or
+     * what the change found missing. The endpoints that change something state that reason in their answer.
+     */
+    @Test
+    fun theReasonOfAResultThatIsNoChangeIsWhatTheCoreSays() {
+        val errors = listOf(FieldError("name", "The name of a plan must not be empty."), FieldError("items", "An item names no service."))
+        val rejected = ChangeResult.Rejected(ValidationFailure(errors))
+
+        assertEquals("The name of a plan must not be empty. An item names no service.", reasonOf(rejected))
+        assertEquals("No plan has the identifier 7.", reasonOf(ChangeResult.NotFound("No plan has the identifier 7.")))
+        assertEquals("", reasonOf(ChangeResult.Changed(Definitions.EMPTY, Unit)))
     }
 
     private companion object {

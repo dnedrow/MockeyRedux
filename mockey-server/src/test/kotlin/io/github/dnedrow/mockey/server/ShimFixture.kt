@@ -2,16 +2,19 @@ package io.github.dnedrow.mockey.server
 
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.MatchCriterion
+import io.github.dnedrow.mockey.core.model.Plan
+import io.github.dnedrow.mockey.core.model.PlanItem
 import io.github.dnedrow.mockey.core.model.ResponseMode
 import io.github.dnedrow.mockey.core.model.Scenario
 import io.github.dnedrow.mockey.core.model.Service
 import io.github.dnedrow.mockey.core.model.ServiceId
+import io.github.dnedrow.mockey.core.model.Tags
 import kotlinx.coroutines.runBlocking
 
 /**
  * The definitions of the parity fixture `automation.xml`, from which the recordings of the automation
- * endpoints of Mockey 2.x start. A test of the legacy shim defines them, and it then compares an answer of
- * the shim with the one that a recording states for the new server.
+ * endpoints of Mockey 2.x start: three services and two plans. A test of the legacy shim defines them, and
+ * it then compares an answer of the shim with the one that a recording states for the new server.
  */
 internal object ShimFixture {
     /**
@@ -56,6 +59,20 @@ internal object ShimFixture {
                 )
             }
             engine.definitions.services
+        }
+
+    /**
+     * Defines the plans of the fixture in [engine] and returns them in the order of the fixture: `Gold path`,
+     * which has the tag `premium` and sets `Customers` and `Orders`, and `Silver path`, which sets
+     * `Customers` with a delay.
+     */
+    fun plans(engine: MockeyEngine): List<Plan> =
+        runBlocking {
+            val gold = listOf(PlanItem("Customers", "gold", ResponseMode.STATIC), PlanItem("Orders", "closed", ResponseMode.STATIC))
+            val silver = listOf(PlanItem("Customers", "silver", ResponseMode.STATIC, delayMillis = 50))
+            engine.plans.create { it.copy(name = "Gold path", tags = Tags.of("premium"), items = gold) }.getOrThrow()
+            engine.plans.create { it.copy(name = "Silver path", items = silver) }.getOrThrow()
+            engine.definitions.plans
         }
 
     /** Creates the service that [define] describes, and returns its identifier. */

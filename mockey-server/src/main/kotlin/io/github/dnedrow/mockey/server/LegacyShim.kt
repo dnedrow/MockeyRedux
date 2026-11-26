@@ -1,5 +1,6 @@
 package io.github.dnedrow.mockey.server
 
+import io.github.dnedrow.mockey.core.engine.ChangeResult
 import io.github.dnedrow.mockey.core.engine.MockeyEngine
 import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Header
@@ -100,7 +101,11 @@ internal class LegacyShim(
     internal companion object {
         /** Returns the endpoints of the shim for [engine], by their paths. */
         fun endpointsOf(engine: MockeyEngine): Map<String, ShimEndpoint> =
-            mapOf(ShimDefinitions.PATH to ShimDefinitions(engine), ShimServices.PATH to ShimServices(engine))
+            mapOf(
+                ShimDefinitions.PATH to ShimDefinitions(engine),
+                ShimServices.PATH to ShimServices(engine),
+                ShimPlans.PATH to ShimPlans(engine),
+            )
 
         private val log = LoggerFactory.getLogger(LegacyShim::class.java)
 
@@ -142,6 +147,17 @@ internal object ShimResult {
 
     private const val RESULT = "result"
 }
+
+/**
+ * Returns why [result] is no change, in sentences for a person: what is wrong with each invalid field, or
+ * what the change found missing. For a change, there is nothing to say.
+ */
+internal fun reasonOf(result: ChangeResult<*>): String =
+    when (result) {
+        is ChangeResult.Changed -> ""
+        is ChangeResult.Rejected -> result.failure.errors.joinToString(" ") { it.message }
+        is ChangeResult.NotFound -> result.message
+    }
 
 /**
  * The parameters of a request to the legacy shim, as Mockey 2.x read them: those of the query string, and
