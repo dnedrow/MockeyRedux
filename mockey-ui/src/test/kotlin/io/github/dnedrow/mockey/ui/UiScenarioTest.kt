@@ -20,13 +20,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Task 13.7: the pages for a single scenario. The page of a scenario is the form that edits its status code,
- * headers, body, match criterion, method restriction, delay, and tags. Another form creates a scenario,
- * buttons assign and remove the default and error designations, and the UI asks for confirmation before it
- * deletes a scenario.
+ * Task 13.7: the pages for a single scenario. The scenario page is the form that edits the status code,
+ * headers, body, match criterion, method restriction, delay, and tags. There's also a form that creates a
+ * scenario, buttons that assign and remove the default and error designations, and a confirmation step before
+ * a scenario is deleted.
  *
- * Each test drives the UI over HTTP as a browser without scripting does, see [Browser], and checks the
- * requests that the admin API received.
+ * Each test drives the UI over HTTP the way a browser without scripting would (see [Browser]), and then
+ * checks which requests reached the admin API.
  */
 class UiScenarioTest {
     private val fakes = mutableListOf<FakeAdminApi>()
@@ -40,7 +40,7 @@ class UiScenarioTest {
 
     private val cookies = listOf(HeaderDto("Set-Cookie", "a=1"), HeaderDto("Set-Cookie", "b=2"))
 
-    /** A scenario with a value for every attribute that the form edits. */
+    /** A scenario that has a value for every attribute the form can edit. */
     private val gold =
         ScenarioDto(
             id = "sc-gold",
@@ -70,7 +70,7 @@ class UiScenarioTest {
             errorScenarioId = basic.id,
         )
 
-    /** Starts a stand-in for a server that holds [services], see [hold]. [universal] is its universal error scenario. */
+    /** Starts a stand-in server that holds [services] (see [hold]). [universal] is its universal error scenario. */
     private fun holding(
         services: List<ServiceDto> = listOf(plans, Samples.orders),
         paths: Map<String, String> = emptyMap(),
@@ -89,10 +89,10 @@ class UiScenarioTest {
         serviceId: String = plans.id,
     ): String = Address.of(path, "service" to serviceId, "id" to scenarioId)
 
-    /** Returns the form of [answer] that edits or creates a scenario. */
+    /** Returns the form in [answer] that edits or creates a scenario. */
     private fun scenarioForm(answer: Browser.Response): FormElement = answer.form("main > form")
 
-    /** Returns the values of the fields of [form] by name, as a browser submits them if nothing is entered. */
+    /** Returns the field values of [form] by name, the way a browser would submit them if nobody typed anything. */
     private fun shown(form: FormElement): Map<String, List<String>> {
         val areas = form.select("textarea").associate { it.attr("name") to it.wholeText() }
         val entered = form.formData().filter { it.key() != "_token" && !it.key().startsWith(Shown.PREFIX) }
@@ -100,25 +100,25 @@ class UiScenarioTest {
         return fields.groupBy({ it.first }, { it.second })
     }
 
-    /** Returns the requests that can change something, each as its request line and its body. */
+    /** Returns the requests that could change something, each as a pair of its request line and its body. */
     private fun changing(api: FakeAdminApi): List<Pair<String, String>> =
         api.requests.filter { it.method != "GET" }.map { it.line to it.body }
 
-    /** Returns the names of the attributes that [body] states, and the attributes. [body] is the JSON body of a request. */
+    /** Returns the names of the attributes in [body] along with the attributes themselves. [body] is the JSON body of a request. */
     private fun stated(body: String): Pair<Set<String>, ScenarioAttributesDto> {
         val document = AdminApiJson.instance.parseToJsonElement(body)
         return document.jsonObject.keys to AdminApiJson.instance.decodeFromString(ScenarioAttributesDto.serializer(), body)
     }
 
-    /** Returns the designation forms of [page], each with its action, the value of its button, and the label of its button. */
+    /** Returns the designation forms on [page], each as its action, the value of its button, and the button's label. */
     private fun designationButtons(page: Document): List<Triple<String, String, String>> =
         page.select("main .designation form").map { Triple(it.attr("action"), it.select("button").attr("value"), it.text()) }
 
     // The page of a scenario
 
     /**
-     * The page of a scenario is the form that edits the scenario. The form shows the stored values, and it
-     * sends no attribute if it is submitted unchanged.
+     * The scenario page is the form that edits the scenario. It shows the stored values, and it doesn't send
+     * any attribute if it's submitted unchanged.
      */
     @Test
     fun thePageOfAScenarioShowsTheStoredValuesAndSendsNoAttributeIfNothingIsChanged() {
@@ -166,7 +166,7 @@ class UiScenarioTest {
         assertEquals(emptyList(), api.violations)
     }
 
-    /** The form shows a rule set with the check box checked, and it shows an empty field for a scenario without a criterion. */
+    /** The form shows a rule set with the check box checked, and it leaves the field empty for a scenario without a criterion. */
     @Test
     fun theFormShowsARuleSetAndAScenarioWithoutACriterion() {
         val browser = browserFor(holding())
@@ -182,7 +182,7 @@ class UiScenarioTest {
 
     // What the form sends
 
-    /** The form sends only the attributes whose fields were changed. Each submission of this test changes one field of the same page. */
+    /** The form only sends the attributes whose fields were changed. Each submission in this test changes one field of the same page. */
     @Test
     fun theFormSendsOnlyTheAttributesThatWereChanged() {
         val api = holding()
@@ -221,9 +221,9 @@ class UiScenarioTest {
     }
 
     /**
-     * The server sends a body exactly as it is stored, so an edited body keeps the line endings of the stored
-     * body. A browser submits every line break as a carriage return and a line feed, and the form restores
-     * the stored style. The same applies to the match criterion.
+     * The server sends a body exactly as it's stored, so an edited body has to keep the line endings of the
+     * stored body. Browsers submit every line break as a carriage return plus a line feed, and the form
+     * restores the stored style. The same goes for the match criterion.
      */
     @Test
     fun anEditedTextKeepsTheLineEndingsOfTheStoredText() {
@@ -273,7 +273,7 @@ class UiScenarioTest {
         assertEquals(asked, changing(api).map { it.second })
     }
 
-    /** The body field shows the empty lines and the spaces of a body, and the form sends an edited body with them. */
+    /** The body field shows the empty lines and the spaces of a body, and the form sends them along with an edited body. */
     @Test
     fun theBodyFieldKeepsEmptyLinesAndSpaces() {
         val body = "\n\n  indented \n\n"
@@ -290,9 +290,9 @@ class UiScenarioTest {
     }
 
     /**
-     * A browser alters some values by itself: it removes the line breaks from the value of a one-line field,
-     * and it replaces every NUL character with U+FFFD. The form does not report such a value as changed, so
-     * the server keeps the stored value until a person edits the field.
+     * Browsers change some values on their own: they strip the line breaks from the value of a one-line
+     * field, and they replace every NUL character with U+FFFD. The form doesn't treat such a value as
+     * changed, so the server keeps the stored value until someone edits the field.
      */
     @Test
     fun theFormDoesNotSendAValueThatOnlyTheBrowserAltered() {
@@ -318,7 +318,7 @@ class UiScenarioTest {
         assertEquals(listOf("X-Odd: $inLines"), fields["headers"])
     }
 
-    /** A stored method restriction that the form does not list stays a choice, so the form does not change it on its own. */
+    /** A stored method restriction that isn't on the form's list stays available, so the form doesn't change it on its own. */
     @Test
     fun theFormOffersAStoredMethodThatIsNotInItsList() {
         val scenarios = listOf(gold.copy(methodRestriction = "*"), basic.copy(methodRestriction = "get"))
@@ -340,8 +340,8 @@ class UiScenarioTest {
     // A new scenario
 
     /**
-     * The form for a new scenario states every attribute, and the browser goes to the page of the new
-     * scenario. A form that is submitted as it is displayed creates a scenario with the default values.
+     * The form for a new scenario sends every attribute, and the browser ends up on the page of the new
+     * scenario. Submitting the form as it's displayed creates a scenario with the default values.
      */
     @Test
     fun theFormForANewScenarioCreatesTheScenario() {
@@ -395,9 +395,9 @@ class UiScenarioTest {
     // A form that is rejected
 
     /**
-     * The UI checks the status code, the delay, and the header lines itself. It displays an invalid form
-     * again with the entered values and the messages, and it sends no request. The form that is displayed
-     * again still sends only the changed attributes.
+     * The UI checks the status code, the delay, and the header lines itself. An invalid form is displayed
+     * again with the entered values and the messages, and no request is sent. The form that's displayed again
+     * still only sends the changed attributes.
      */
     @Test
     fun theUiRejectsAnInvalidStatusCodeDelayAndHeaderLineWithoutSendingARequest() {
@@ -433,7 +433,7 @@ class UiScenarioTest {
         assertEquals(listOf(asked), changing(api).map { it.second })
     }
 
-    /** A status code is a whole number from 100 to 999, and a delay is a whole number that is 0 or greater. */
+    /** A status code is a whole number from 100 to 999, and a delay is a whole number that's 0 or greater. */
     @Test
     fun theUiAcceptsAStatusCodeFrom100To999AndADelayOf0OrMore() {
         val api = holding()
@@ -462,9 +462,9 @@ class UiScenarioTest {
     }
 
     /**
-     * The form that the server rejects is displayed again with the entered values. Each message of the server
-     * appears next to the field that it concerns, and a message for a field that the form does not have
-     * appears at the end of the form.
+     * A form that the server rejects is displayed again with the entered values. Each message from the server
+     * shows up next to the field it's about, and a message for a field the form doesn't have shows up at the
+     * end of the form.
      */
     @Test
     fun aFormThatTheServerRejectsShowsTheMessagesNextToTheFields() {
@@ -516,7 +516,7 @@ class UiScenarioTest {
         assertEquals(lines, changing(api).map { it.first })
     }
 
-    /** A stored value that the form would reject does not prevent the form from saving another field. */
+    /** A stored value that the form would reject doesn't stop the form from saving a different field. */
     @Test
     fun anInvalidStoredValueDoesNotPreventSavingAnotherField() {
         val noHeaders = listOf(HeaderDto("", "no name"), HeaderDto("a:b", "c"))
@@ -537,8 +537,8 @@ class UiScenarioTest {
 
     /**
      * The page says whether the scenario is the default scenario, the error scenario of its service, and the
-     * universal error scenario. Each designation has the button that changes it, and the default designation
-     * has no button that removes it.
+     * universal error scenario. Each designation comes with the button that changes it, except that the
+     * default designation has no button to remove it.
      */
     @Test
     fun thePageShowsTheDesignationsOfTheScenarioWithTheirButtons() {
@@ -581,7 +581,7 @@ class UiScenarioTest {
         assertEquals(emptyList(), changing(api))
     }
 
-    /** Each designation button asks the admin API for its change, and the page of the scenario reports the result. */
+    /** Each designation button asks the admin API for its change, and the scenario page reports the result. */
     @Test
     fun theDesignationButtonsAssignAndRemoveTheDesignations() {
         val api = holding()
@@ -627,8 +627,8 @@ class UiScenarioTest {
     }
 
     /**
-     * A button removes a designation only from the scenario of its page. If another scenario received the
-     * designation after the page was rendered, the button changes nothing.
+     * A button only removes a designation from the scenario of its own page. If another scenario took over
+     * the designation after the page was rendered, the button doesn't change anything.
      */
     @Test
     fun aStalePageDoesNotRemoveTheDesignationOfAnotherScenario() {
@@ -654,7 +654,7 @@ class UiScenarioTest {
         assertEquals(listOf("no", "no"), ofGold.map { it.second })
     }
 
-    /** Scenarios of different services can share an identifier. A designation of one of them does not apply to the other. */
+    /** Scenarios of different services can share an identifier. A designation of one of them doesn't apply to the other. */
     @Test
     fun aDesignationAppliesOnlyToTheScenarioOfItsService() {
         val twin = plans.copy(id = "svc-twin", name = "Twin", mockUrl = "twin", errorScenarioId = null)
@@ -682,7 +682,7 @@ class UiScenarioTest {
         assertEquals(emptyList(), changing(api))
     }
 
-    /** A designation request that does not say whether to designate the scenario is rejected, and nothing is changed. */
+    /** A designation request that doesn't say whether to designate the scenario is rejected, and nothing changes. */
     @Test
     fun aDesignationRequestWithoutAChoiceIsRejected() {
         val api = holding()
@@ -702,8 +702,8 @@ class UiScenarioTest {
 
     /**
      * The requirement "Confirmation of destructive actions" for a scenario: the link leads to a page that
-     * asks for confirmation, nothing is deleted before the form of that page is submitted, and the page of
-     * the service then reports the deletion.
+     * asks for confirmation, nothing is deleted until the form on that page is submitted, and the service
+     * page then reports the deletion.
      */
     @Test
     fun theUiAsksForConfirmationBeforeItDeletesAScenario() {
@@ -732,7 +732,7 @@ class UiScenarioTest {
         assertEquals(emptyList(), api.violations)
     }
 
-    /** The confirmation page lists the designations that end with the scenario. */
+    /** The confirmation page lists the designations that go away with the scenario. */
     @Test
     fun theConfirmationPageListsTheDesignationsThatEndWithTheScenario() {
         val single = plans.copy(id = "svc-single", name = "Single", mockUrl = "single", scenarios = listOf(gold), errorScenarioId = null)
@@ -755,7 +755,7 @@ class UiScenarioTest {
 
     // Addresses
 
-    /** The pages of a scenario or of a service that does not exist report this, and nothing is changed for them. */
+    /** The pages of a scenario or a service that doesn't exist say so, and nothing changes. */
     @Test
     fun thePagesOfAMissingScenarioReportThatItDoesNotExist() {
         val api = holding()
@@ -787,7 +787,7 @@ class UiScenarioTest {
         assertEquals(lines, changing(api).map { it.first })
     }
 
-    /** The pages of a scenario work with any identifier, because the identifiers are parameters of their addresses. */
+    /** The scenario pages work with any identifier, because identifiers are passed as address parameters. */
     @Test
     fun thePagesOfAScenarioWorkWithAnyIdentifier() {
         val ids = mapOf("a/b c" to "a%2Fb%20c", ".." to "..", "x?y#z&w=1" to "x%3Fy%23z%26w%3D1")
@@ -824,8 +824,8 @@ class UiScenarioTest {
     // Stored content is text
 
     /**
-     * The requirement "Stored content is shown as text" for the pages of a scenario: the fields of the form
-     * hold the stored texts exactly, and the headings show the name of the scenario as text.
+     * The requirement "Stored content is shown as text" for the scenario pages: the form fields hold the
+     * stored texts exactly, and the headings show the scenario name as plain text.
      */
     @Test
     fun thePagesOfAScenarioShowStoredContentAsText() {
@@ -842,7 +842,7 @@ class UiScenarioTest {
             val asked = browser.get(at("/scenario/delete", text, text)).page
 
             val fields = shown(scenarioForm(page))
-            // A one-line field holds its value without line breaks, as a browser holds it.
+            // A one-line field holds its value without line breaks, just like in a browser.
             val inOneLine = text.replace("\n", "")
             assertEquals(listOf(inOneLine), listOf("name", "tags").flatMap(fields::getValue).distinct(), text)
             assertEquals(listOf(text), listOf("body", "criterion", "method").flatMap(fields::getValue).distinct(), text)
@@ -858,7 +858,7 @@ class UiScenarioTest {
     }
 
     private companion object {
-        /** The attributes of a scenario, all of which the form for a new scenario states. */
+        /** The attributes of a scenario. The form for a new scenario sends all of them. */
         val ATTRIBUTES =
             setOf("name", "responseBody", "statusCode", "headers", "matchCriterion", "methodRestriction", "delayMillis", "tags")
 

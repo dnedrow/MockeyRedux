@@ -27,11 +27,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * The pages for a single scenario: the page of the scenario, which is also the form that edits it, the form
- * that creates a scenario, the confirmation step before a deletion, and the actions that designate a
- * scenario as the default scenario or the error scenario of its service, or as the universal error scenario.
+ * The pages for a single scenario: the scenario page itself, which doubles as the form that edits it, the
+ * form that creates a scenario, the confirmation step before a deletion, and the actions that make a scenario
+ * the default scenario or the error scenario of its service, or the universal error scenario.
  *
- * See `docs/decisions/ui-pages.md`.
+ * See `docs/decisions/ui-pages.md` for the reasoning behind these pages.
  */
 internal val ScenarioArea =
     Area { routing, ui ->
@@ -95,7 +95,7 @@ internal val ScenarioArea =
                     val designate = ScenarioPages.designates(input)
                     val (service, scenario) = ui.client.scenarioWithService(serviceId, id)
                     val wasDesignated = service.errorScenarioId == id
-                    // A page removes the designation only from its own scenario, never from another one.
+                    // A page only removes the designation from its own scenario, never from another one.
                     if (designate || wasDesignated) {
                         ui.client.updateService(serviceId, buildJsonObject { put("errorScenarioId", id.takeIf { designate }) })
                     }
@@ -110,7 +110,7 @@ internal val ScenarioArea =
                     val designate = ScenarioPages.designates(input)
                     val scenario = ui.client.getScenario(serviceId, id)
                     val wasDesignated = ui.client.getUniversalErrorScenario() == ScenarioReferenceDto(serviceId, id)
-                    // A page removes the designation only from its own scenario, never from another one.
+                    // A page only removes the designation from its own scenario, never from another one.
                     when {
                         designate -> ui.client.setUniversalErrorScenario(serviceId, id)
                         wasDesignated -> ui.client.clearUniversalErrorScenario()
@@ -127,8 +127,8 @@ private fun ApplicationCall.scenarioOfAddress(): Pair<String, String> =
     partOfAddress(ScenarioPages.SERVICE) to partOfAddress(ScenarioPages.ID)
 
 /**
- * Returns the service [serviceId] and its scenario [id]. If the service has no such scenario, the function
- * requests the scenario from the server, so that the request fails with the problem that the server reports.
+ * Returns the service [serviceId] together with its scenario [id]. If the service doesn't have that scenario,
+ * the scenario is requested from the server anyway, so the request fails with the server's own error message.
  */
 private suspend fun AdminClient.scenarioWithService(
     serviceId: String,
@@ -140,42 +140,42 @@ private suspend fun AdminClient.scenarioWithService(
 
 /** The pages for a single scenario. */
 internal object ScenarioPages {
-    /** The path of the page of a scenario, which is also the form that edits the scenario. */
+    /** The path of the scenario page, which is also the form that edits the scenario. */
     const val PAGE = "/scenario"
 
     /** The path of the form that creates a scenario. */
     const val NEW = "/scenario/new"
 
-    /** The path of the confirmation step before a scenario is deleted. */
+    /** The path of the confirmation step that comes before a scenario is deleted. */
     const val DELETE = "/scenario/delete"
 
     /** The path of the action that makes a scenario the default scenario of its service. */
     const val DEFAULT = "/scenario/default"
 
-    /** The path of the action that designates a scenario as the error scenario of its service, or removes that designation. */
+    /** The path of the action that makes a scenario the error scenario of its service, or undoes that. */
     const val ERROR = "/scenario/error"
 
-    /** The path of the action that designates a scenario as the universal error scenario, or removes that designation. */
+    /** The path of the action that makes a scenario the universal error scenario, or undoes that. */
     const val UNIVERSAL_ERROR = "/scenario/universal-error"
 
-    /** The address parameter that holds the identifier of the service of a scenario. */
+    /** The address parameter that holds the identifier of the scenario's service. */
     const val SERVICE = "service"
 
-    /** The address parameter that holds the identifier of a scenario. */
+    /** The address parameter that holds the identifier of the scenario. */
     const val ID = "id"
 
-    /** The field of a designation button. Its value is [YES] to designate the scenario, or [NO] to remove the designation. */
+    /** The field that a designation button sends: [YES] to designate the scenario, or [NO] to undo the designation. */
     const val DESIGNATE = "designate"
     const val YES = "yes"
     const val NO = "no"
 
-    /** Returns the address of the page of the scenario [id] of the service [serviceId]. */
+    /** Returns the address of the page for the scenario [id] of the service [serviceId]. */
     fun addressOf(
         serviceId: String,
         id: String,
     ): String = Address.of(PAGE, SERVICE to serviceId, ID to id)
 
-    /** Returns the address of the form that creates a scenario of the service [serviceId]. */
+    /** Returns the address of the form that creates a scenario for the service [serviceId]. */
     fun addressOfNew(serviceId: String): String = Address.of(NEW, SERVICE to serviceId)
 
     private fun addressOf(
@@ -185,9 +185,9 @@ internal object ScenarioPages {
     ): String = Address.of(path, SERVICE to service.id, ID to scenario.id)
 
     /**
-     * Returns whether the form of a designation button asks to designate its scenario.
+     * Returns whether a designation button asked to designate its scenario.
      *
-     * @throws InvalidInput if the form asks neither to designate the scenario nor to remove the designation.
+     * @throws InvalidInput if the form doesn't say whether to designate the scenario or to undo that.
      */
     fun designates(input: FormInput): Boolean =
         when (input.text(DESIGNATE)) {
@@ -197,9 +197,9 @@ internal object ScenarioPages {
         }
 
     /**
-     * Returns the notice for a designation action on [scenario]. [role] names the designation, such as "the
-     * universal error scenario". The action asked to [designate] the scenario or to remove the designation,
-     * and the scenario [wasDesignated] before the action.
+     * Returns the notice to show after a designation action on [scenario]. [role] names the designation, for
+     * example "the universal error scenario". [designate] says whether the action asked to designate the
+     * scenario or to undo that, and [wasDesignated] says whether the scenario held the designation before.
      */
     fun designationNotice(
         scenario: ScenarioDto,
@@ -216,10 +216,10 @@ internal object ScenarioPages {
     }
 
     /**
-     * Returns the page of [scenario], which belongs to [service]. The page holds the form that edits the
-     * scenario, displayed with [state], the designations of the scenario with the buttons that change them,
-     * and a link to the deletion step. [universal] is the universal error scenario of the server, or `null`
-     * if the server has none.
+     * Returns the page of [scenario], which belongs to [service]. The page contains the form that edits the
+     * scenario (displayed with [state]), the scenario's designations with the buttons that change them, and a
+     * link to the deletion step. [universal] is the server's universal error scenario, or `null` if there
+     * isn't one.
      */
     fun scenario(
         view: View,
@@ -242,7 +242,7 @@ internal object ScenarioPages {
             p(classes = "actions") { a(href = addressOf(DELETE, service, scenario)) { +"Delete the scenario" } }
         }
 
-    /** Returns the page with the form that creates a scenario of [service]. The form is displayed with [state]. */
+    /** Returns the page with the form that creates a scenario for [service]. The form is displayed with [state]. */
     fun new(
         view: View,
         service: ServiceDto,
@@ -255,9 +255,9 @@ internal object ScenarioPages {
         }
 
     /**
-     * Returns the page that asks whether to delete [scenario], which belongs to [service]. The page lists the
-     * designations that end with the scenario. [universal] is the universal error scenario of the server, or
-     * `null` if the server has none.
+     * Returns the page that asks whether to delete [scenario], which belongs to [service]. The page spells out
+     * which designations go away with the scenario. [universal] is the server's universal error scenario, or
+     * `null` if there isn't one.
      */
     fun deletion(
         view: View,
@@ -278,7 +278,7 @@ internal object ScenarioPages {
         return Confirmation.page(view, title, consequences, "Delete the scenario", action, addressOf(service.id, scenario.id))
     }
 
-    /** Names the service that the scenario of the page belongs to, with a link to the page of the service. */
+    /** Says which service the scenario belongs to, with a link to the page of that service. */
     private fun FlowContent.serviceOf(service: ServiceDto) {
         p {
             +"A scenario of the service "
@@ -288,8 +288,8 @@ internal object ScenarioPages {
     }
 
     /**
-     * Shows whether the scenario of the page holds [designation], and the button that changes this. The
-     * scenario holds the designation if [isHeld] is true. The button submits its form to [action].
+     * Shows whether the scenario holds [designation], along with the button that changes it. [isHeld] says
+     * whether the scenario holds the designation right now. The button submits its form to [action].
      */
     private fun FlowContent.designationOf(
         view: View,
@@ -312,9 +312,9 @@ internal object ScenarioPages {
     }
 
     /**
-     * The form of a scenario. A browser submits it to [action], and it is displayed with [state]. The form
-     * of an existing scenario is [marked]: it records the initial values of its fields, see [Shown]. The
-     * button of the form is labeled [save], and the link next to it leads to [back].
+     * Renders the scenario form. The browser submits it to [action], and it's displayed with [state]. The form
+     * of an existing scenario is [marked], which means it tracks the initial values of its fields (see
+     * [Shown]). The button is labeled [save], and the link next to it leads to [back].
      */
     private fun FlowContent.scenarioForm(
         view: View,
@@ -348,9 +348,9 @@ internal object ScenarioPages {
     }
 
     /**
-     * Returns the methods that the form offers, after the choice of any method. If the scenario names a
-     * method that is not among them, the form offers that method as well, so that it does not change the
-     * method restriction on its own.
+     * Returns the methods that the form offers, starting with the "any method" choice. If the scenario uses a
+     * method that isn't on the list, that method is offered too. That way, the form never changes the method
+     * restriction on its own.
      */
     private fun methodChoices(named: String): List<Pair<String, String>> {
         val known = listOf("" to "Any method") + METHODS.map { it to it }
@@ -358,9 +358,9 @@ internal object ScenarioPages {
     }
 
     /**
-     * A designation that a scenario can hold: the texts that describe it on the page of a scenario, and the
-     * labels of the buttons that assign it and remove it. A designation without a [remove] label cannot be
-     * removed. It ends only when another scenario receives it.
+     * A designation that a scenario can hold: the texts that describe it on the scenario page, and the labels
+     * of the buttons that assign and remove it. A designation without a [remove] label can't be removed. It
+     * only goes away when another scenario takes it over.
      */
     private class Designation(
         val held: String,
@@ -425,9 +425,9 @@ internal object ScenarioPages {
 }
 
 /**
- * The form of a scenario: the names of its fields, the state that it displays for a scenario, and the
- * attributes that it asks the admin API to set. The form of an existing scenario states the attributes whose
- * fields were changed, see [Shown]. The form of a new scenario states every attribute.
+ * The scenario form: the names of its fields, the state it displays for a scenario, and the attributes it
+ * asks the admin API to set. The form of an existing scenario only sends the attributes whose fields were
+ * changed (see [Shown]). The form for a new scenario sends all of them.
  */
 internal object ScenarioForm {
     const val NAME = "name"
@@ -440,16 +440,16 @@ internal object ScenarioForm {
     const val DELAY = "delay"
     const val TAGS = "tags"
 
-    /** The hidden field that holds the line endings of the stored body, see [LineEndings]. */
+    /** The hidden field that remembers the line endings of the stored body (see [LineEndings]). */
     const val BODY_LINE_ENDINGS = "bodyLineEndings"
 
-    /** The hidden field that holds the line endings of the stored match criterion, see [LineEndings]. */
+    /** The hidden field that remembers the line endings of the stored match criterion (see [LineEndings]). */
     const val CRITERION_LINE_ENDINGS = "criterionLineEndings"
 
-    /** The fields whose initial values the form of an existing scenario records, see [Shown]. */
+    /** The fields whose initial values the form of an existing scenario tracks (see [Shown]). */
     val FIELDS = listOf(NAME, STATUS, HEADERS, BODY, CRITERION, CRITERION_IS_RULES, METHOD, DELAY, TAGS)
 
-    /** The hidden fields that hold line endings. */
+    /** The hidden fields that remember line endings. */
     val LINE_ENDING_FIELDS = listOf(BODY_LINE_ENDINGS, CRITERION_LINE_ENDINGS)
 
     private val STATUS_CODES = 100..999
@@ -458,13 +458,13 @@ internal object ScenarioForm {
     private const val INVALID_DELAY = "The delay is a whole number of milliseconds, 0 or more."
     private const val HEADER_FORMAT = "A header has the form Name: value, for example Content-Type: text/plain."
 
-    /** Returns the initial state of the form for a new scenario: the status code 200 and no delay. */
+    /** Returns the initial state of the form for a new scenario: status code 200 and no delay. */
     fun blank(): FormState {
         val lineEndings = LINE_ENDING_FIELDS.map { it to LineEndings.DEFAULT }
         return FormState.of(STATUS to "200", DELAY to "0", *lineEndings.toTypedArray())
     }
 
-    /** Returns the initial state of the form for [scenario], which holds the values that the server holds. */
+    /** Returns the initial state of the form for [scenario], filled with the values the server holds. */
     fun of(scenario: ScenarioDto): FormState {
         val criterion = scenario.matchCriterion
         val criterionText =
@@ -491,12 +491,12 @@ internal object ScenarioForm {
     }
 
     /**
-     * Returns the attributes that the form asks the admin API to set. The form of an existing scenario
-     * states the attributes whose fields were changed, see [Shown]. The form of a new scenario records no
-     * initial values, so it states every attribute.
+     * Returns the attributes that the form asks the admin API to set. For an existing scenario, that's only
+     * the attributes whose fields were changed (see [Shown]). The form for a new scenario doesn't track
+     * initial values, so it sends every attribute.
      *
      * @throws InvalidInput if a changed field holds an invalid status code, an invalid delay, or a line that
-     *   is not a header.
+     *   isn't a header.
      */
     fun attributesOf(input: FormInput): JsonObject {
         val enteredStatus = input.text(STATUS).trim()
@@ -533,12 +533,12 @@ internal object ScenarioForm {
         }
     }
 
-    /** Returns the header that [line] holds: the name before the first colon, and the value after it. */
+    /** Returns the header in [line]: the name is everything before the first colon, and the value is the rest. */
     private fun headerOf(line: String): HeaderDto = HeaderDto(line.substringBefore(':').trim(), line.substringAfter(':').trim())
 
     /**
-     * Returns the match criterion that the form holds: none if the field is blank, a rule set if the check
-     * box is checked, and a text otherwise.
+     * Returns the match criterion from the form: none if the field is blank, a rule set if the check box is
+     * checked, and a text criterion otherwise.
      */
     private fun criterionOf(input: FormInput): MatchCriterionDto {
         val entered = LineEndings.apply(input.text(CRITERION_LINE_ENDINGS), input.lines(CRITERION))

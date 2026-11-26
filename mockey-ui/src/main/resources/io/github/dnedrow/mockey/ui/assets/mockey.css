@@ -389,7 +389,7 @@ table.services td p {
   margin: 0.25rem 0 0;
 }
 
-/* A cell of the scenario list is as wide as its words. The match criterion and the tags wrap first. */
+/* Cells in the scenario list are as wide as their words. The match criterion and the tags are the first to wrap. */
 table.scenarios th[scope="col"],
 table.scenarios td {
   white-space: nowrap;
@@ -405,7 +405,7 @@ table.scenarios td:nth-child(6) {
   white-space: normal;
 }
 
-/* A designation of a scenario: its description, and the button that changes it. */
+/* One designation of a scenario: its description, with the button that changes it next to it. */
 .designation {
   display: flex;
   flex-wrap: wrap;

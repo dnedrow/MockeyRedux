@@ -24,20 +24,20 @@ import java.util.concurrent.atomic.AtomicReference
  */
 
 /**
- * Makes the stand-in hold [services], report [diagnostics], and list [inspectors]. The function returns a
- * live view of the services that the stand-in holds, by their identifiers. [universal] is the initial
- * universal error scenario.
+ * Makes the stand-in hold [services], report [diagnostics], and list [inspectors]. It returns a live view of
+ * the services the stand-in holds, keyed by their identifiers. [universal] is the universal error scenario to
+ * start with.
  *
- * The stand-in lists the services that carry one of the tags of a request. It creates, updates, deletes, and
- * duplicates a service, and it creates, updates, and deletes a scenario of a service. It also designates the
- * universal error scenario and removes that designation. Like a server, it reports proxy mode as the
- * effective mode of a service without a scenario, and it makes the first scenario of a service the default
- * scenario. Apart from that, the stand-in stores every attribute exactly as a request states it, because it
- * does not implement the validation rules of a server.
+ * The stand-in lists the services that carry one of the tags of a request. It can create, update, delete, and
+ * duplicate a service, and it can create, update, and delete the scenarios of a service. It can also set and
+ * clear the universal error scenario. Like a real server, it reports proxy mode as the effective mode of a
+ * service without a scenario, and it makes the first scenario of a service the default scenario. Apart from
+ * that, the stand-in stores every attribute exactly as a request sends it, because it doesn't implement the
+ * validation rules of a server.
  *
  * A request names a service and a scenario by their identifiers in its path. [paths] maps an identifier to
- * the path segment that a client writes for it. It is needed only for an identifier that a client does not
- * write verbatim.
+ * the path segment that a client writes for it. That's only needed for identifiers that a client has to
+ * escape.
  */
 internal fun FakeAdminApi.hold(
     services: List<ServiceDto> = listOf(Samples.customers, Samples.orders),
@@ -150,9 +150,9 @@ private fun ScenarioDto.with(body: String): ScenarioDto {
 }
 
 /**
- * Returns this service without its scenario [scenarioId], as a server leaves the service after the deletion.
- * If the deleted scenario was the default scenario, the oldest remaining scenario becomes the default
- * scenario. If it was the error scenario, the service has no error scenario.
+ * Returns this service without its scenario [scenarioId], the way a server leaves the service after the
+ * deletion. If the deleted scenario was the default scenario, the oldest remaining scenario takes over. If it
+ * was the error scenario, the service ends up without one.
  */
 private fun ServiceDto.without(scenarioId: String): ServiceDto {
     val left = scenarios.filter { it.id != scenarioId }

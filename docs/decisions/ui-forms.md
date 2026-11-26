@@ -149,40 +149,39 @@ nothing.
 
 ## What a form asks the server for
 
-An edit form displays the values that the server holds, and a request to the admin API changes only the
-attributes that the request contains. A form can therefore send every attribute that it has a field for, or
-only the attributes that a person changed.
+An edit form shows the values the server currently holds, and a request to the admin API only changes the
+attributes it contains. That leaves a choice: a form can send every attribute it has a field for, or just the
+ones someone actually changed.
 
 | Option | Advantages | Disadvantages |
 |---|---|---|
-| 1. The form sends every attribute that it has a field for. | It needs the least code. After a save, the server holds exactly what the form displayed. | The form reverts changes that someone else made after the page was rendered, such as a plan that a test applied or a switch on the overview in another window. A multi-line text is stored with different line endings, because a browser submits every line break as a carriage return and a line feed. Renaming a scenario would therefore change its body. |
-| 2. The form sends the attributes whose fields differ from the values that the server holds when the form is submitted. | The form never sets an attribute to the value that the server already holds. | Every submission requires one more request to the server. The form still reverts the changes that someone else made in the meantime, because its fields hold the values of the page, which differ from the values on the server by then. |
-| 3. The form sends the attributes whose fields differ from their initial values. The page records the initial value of each field. | The form changes what the person changed, and nothing else. It needs no additional request. | The form has one hidden field for every field. |
+| 1. Send every attribute the form has a field for. | It takes the least code, and after a save the server holds exactly what the form displayed. | The form undoes changes that someone else made after the page was rendered, such as a plan that a test applied or a switch on the overview in another window. Multi-line text also ends up with different line endings, because browsers submit every line break as a carriage return plus a line feed. Just renaming a scenario would change its body. |
+| 2. Send the attributes whose fields differ from what the server holds when the form is submitted. | The form never sets an attribute to the value the server already has. | Every submission costs an extra request to the server. The form still undoes what someone else changed in the meantime, because its fields hold the values from the page, and those no longer match the server. |
+| 3. Send the attributes whose fields differ from their initial values. The page records the initial value of each field. | The form changes exactly what the person changed, and nothing else. It doesn't need an extra request. | The form carries one hidden field for every field. |
 
-The UI uses option 3.
+The UI goes with option 3. Here's how that works:
 
-- For each field, the form has a hidden field that holds a mark of the initial value: the first 12 bytes of
-  the SHA-256 hash of the value. A mark is not a secret, and it protects nothing. A copy of the value would
-  serve the same purpose, but it would double the size of a form with a long body.
-- A browser alters some values without any action by a person. A mark does not report such an alteration as
-  a change, so the server keeps the stored value until a person edits the field.
-  - A browser submits every line break as a carriage return and a line feed. The mark of a text does not
-    depend on its line endings.
-  - An HTML page cannot contain a NUL character. A browser reads one as U+FFFD, so the mark treats the two
-    characters as equal. A scenario body that was saved from a recorded binary response can contain NUL
-    characters.
-  - A browser removes the line breaks from the value of a one-line field. The form fills such a field with
-    the stored value without its line breaks, and it computes the mark from that text.
-- If a person edits a field, the server receives the value as the browser holds it. An edited body loses its
-  NUL characters, and an edited name loses its line breaks.
-- A form that is displayed again after the server rejected it keeps the marks that it was submitted with.
-  The marks still describe the values of the first page.
-- A form without marks sends every attribute. The form for a new object is such a form.
-- The form validates only the fields that were changed, for example that a delay is a number. A stored value
-  that the form would reject does not prevent the form from saving another field.
+- Each field gets a hidden companion field that holds a mark of the initial value: the first 12 bytes of its
+  SHA-256 hash. A mark isn't a secret, and it doesn't protect anything. A copy of the value would do the same
+  job, but it would double the size of a form with a long body.
+- Browsers change some values on their own. A mark doesn't count those changes as edits, so the server keeps
+  the stored value until someone really edits the field:
+  - Every line break is submitted as a carriage return plus a line feed, so a mark ignores line endings.
+  - An HTML page can't contain a NUL character. Browsers read it as U+FFFD, so a mark treats the two
+    characters as the same. This matters for a scenario body that was saved from a recorded binary response,
+    which can contain NUL characters.
+  - Line breaks are stripped from the value of a one-line field. The form fills such a field with the stored
+    value minus its line breaks, and it computes the mark from that text.
+- Once someone edits a field, the server gets the value the way the browser holds it. An edited body loses
+  its NUL characters, and an edited name loses its line breaks.
+- When the server rejects a form and the form is displayed again, it keeps the marks it was submitted with.
+  They still describe the values of the first page.
+- A form without marks sends every attribute. The form for a new object works that way.
+- The form only validates the fields that were changed, for example that a delay is a number. A stored value
+  that the form would reject doesn't stop it from saving a different field.
 
-Chrome 158 in headless mode confirmed the three alterations for a text field, a hidden field, a text area,
-and a select option.
+Headless Chrome 158 confirmed all three browser behaviors for a text field, a hidden field, a text area, and a
+select option.
 
 ## What this does not cover
 

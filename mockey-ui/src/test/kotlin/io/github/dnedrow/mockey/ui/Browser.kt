@@ -31,8 +31,8 @@ internal class Browser(
         private val address: String,
     ) {
         /**
-         * The body as the page that a browser makes of it. A browser reads every carriage return, with or
-         * without a line feed after it, as one line feed, before it parses the page.
+         * The body, parsed into a page the way a browser would do it. Before a browser parses a page, it turns
+         * every carriage return into a single line feed, whether or not a line feed follows it.
          */
         val page: Document by lazy { Jsoup.parse(body.replace("\r\n", "\n").replace('\r', '\n'), address) }
 
@@ -153,7 +153,7 @@ internal class Browser(
      * address of the form, with the fields that the form has and their values, of which [edits] replace the
      * ones that a person changed. A field with the value `null` is not sent, as a check box that is not
      * checked. A field of several lines is sent with a carriage return before every line feed. A one-line
-     * text field is sent without the line breaks of its value, because a browser removes them. [files] are
+     * text field is sent without the line breaks of its value, because browsers strip them. [files] are
      * the files that were chosen in the file fields.
      *
      * [pressed] is the button of the form that is pressed, which is its first one unless a test presses

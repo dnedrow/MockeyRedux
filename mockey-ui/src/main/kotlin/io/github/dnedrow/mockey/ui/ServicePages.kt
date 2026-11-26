@@ -138,8 +138,8 @@ internal object ServicePages {
     /**
      * The page of [service]: what the service is set to, with the URL at which a client calls it at the
      * server that states [system], its scenarios, and what leads to the forms that change it. The service
-     * has [diagnostics] diagnostics, which a marker leads to. [universal] is the universal error scenario of
-     * the server, or `null` if the server has none.
+     * has [diagnostics] diagnostics, which a marker leads to. [universal] is the server's universal error
+     * scenario, or `null` if there isn't one.
      */
     fun service(
         view: View,
@@ -273,10 +273,10 @@ internal object ServicePages {
     }
 
     /**
-     * Shows the scenarios of [service] in a table, sorted by name. Each row links to the page of its scenario
-     * and shows the status code, the match criterion, the method restriction, the delay, the tags, and the
-     * last-used time of the scenario. A row also marks the default scenario and the error scenario of the
-     * service, and the universal error scenario of the server, which is [universal].
+     * Shows the scenarios of [service] in a table, sorted by name. Each row links to the scenario page and
+     * shows the status code, match criterion, method restriction, delay, tags, and last-used time. A row also
+     * marks the default scenario and the error scenario of the service, as well as the server's universal
+     * error scenario, which is [universal].
      */
     private fun FlowContent.scenariosOf(
         service: ServiceDto,
@@ -318,8 +318,8 @@ internal object ServicePages {
     }
 
     /**
-     * Returns the marks for the designations that [scenario] of [service] holds. [universal] is the universal
-     * error scenario of the server, or `null` if the server has none.
+     * Returns the marks for the designations that [scenario] of [service] holds. [universal] is the server's
+     * universal error scenario, or `null` if there isn't one.
      */
     private fun marksOf(
         service: ServiceDto,
@@ -332,7 +332,7 @@ internal object ServicePages {
             "universal error scenario".takeIf { universal == ScenarioReferenceDto(service.id, scenario.id) },
         )
 
-    /** Returns the text that the table shows for [criterion]: its kind, and for a text criterion also the beginning of the text. */
+    /** Returns what the table shows for [criterion]: its kind, plus the beginning of the text for a text criterion. */
     private fun criterionOf(criterion: MatchCriterionDto): String =
         when (criterion) {
             is MatchCriterionDto.None -> NONE
@@ -519,7 +519,7 @@ internal object ServiceForm {
         return FormState(mapOf(MODE to listOf(proxy), DELAY to listOf("0"), REAL_URL to rows, DEFAULT_REAL_URL to listOf("0")))
     }
 
-    /** Returns the initial state of the form for [service], which holds the values that the server holds. */
+    /** Returns the initial state of the form for [service], filled with the values the server holds. */
     fun of(service: ServiceDto): FormState {
         val texts =
             mapOf(

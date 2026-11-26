@@ -18,7 +18,7 @@ class ShownTest {
         assertTrue(Regex("[A-Za-z0-9_-]{16}").matches(Shown.markOf(listOf("one"))))
     }
 
-    /** A page cannot hold a NUL character, and a browser returns U+FFFD in its place. The mark treats the two as equal. */
+    /** A page can't contain a NUL character, and browsers send back U+FFFD in its place. A mark treats the two as the same. */
     @Test
     fun theMarkOfAValueIsTheSameWhenABrowserReplacesItsNulCharacters() {
         val marks = listOf("a\u0000b", "a\uFFFDb", "ab", "a b").map { Shown.markOf(listOf(it)) }
@@ -27,7 +27,7 @@ class ShownTest {
         assertEquals(3, marks.toSet().size)
     }
 
-    /** A browser removes the line breaks from the value of a one-line field, and nothing else. */
+    /** Browsers strip the line breaks from the value of a one-line field, and nothing else. */
     @Test
     fun aOneLineFieldHoldsItsValueWithoutLineBreaks() {
         assertEquals("abcd", inOneLine("a\nb\r\nc\rd"))

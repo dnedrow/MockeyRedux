@@ -184,7 +184,7 @@ class UiServiceTest {
         assertEquals(emptyList(), api.violations)
     }
 
-    /** The list of the scenarios shows only the beginning of a long text criterion. */
+    /** The scenario list only shows the beginning of a long text criterion. */
     @Test
     fun theScenarioListShortensALongTextCriterion() {
         val long = due.copy(matchCriterion = MatchCriterionDto.Text("x".repeat(200)))
@@ -516,9 +516,9 @@ class UiServiceTest {
     }
 
     /**
-     * A browser alters some values by itself: it removes the line breaks from the value of a one-line field,
-     * and it replaces every NUL character with U+FFFD. The form does not report such a value as changed, so
-     * the server keeps the stored value until a person edits the field.
+     * Browsers change some values on their own: they strip the line breaks from the value of a one-line
+     * field, and they replace every NUL character with U+FFFD. The form doesn't treat such a value as
+     * changed, so the server keeps the stored value until someone edits the field.
      */
     @Test
     fun theFormOfAServiceDoesNotStateAValueThatOnlyTheBrowserAltered() {
@@ -812,7 +812,7 @@ class UiServiceTest {
             val fields = shown(edit.form())
             val ofLines = listOf("description", "defaultScenario", "rules", "inspector", "schema")
             assertEquals(ofLines.associateWith { listOf(text) }, fields.filterKeys { it in ofLines }, text)
-            // A one-line field holds its value without line breaks, as a browser holds it.
+            // A one-line field holds its value without line breaks, just like in a browser.
             val inOneLine = text.replace("\n", "")
             val ofOneLine = listOf("name", "mockUrl", "tags")
             assertEquals(ofOneLine.associateWith { listOf(inOneLine) }, fields.filterKeys { it in ofOneLine }, text)

@@ -24,35 +24,37 @@ private val BETWEEN_TAGS = Regex("""[\s\p{Z}]+""")
 internal fun tagsIn(text: String): List<String> = text.split(BETWEEN_TAGS).filter { it.isNotEmpty() }
 
 /**
- * Returns [text] as a one-line field holds it. A browser removes every line break from the value of such a
- * field. A form that marks its initial values, see [Shown], fills a one-line field with this text. Otherwise,
- * the field would count as changed whenever the stored value contains a line break.
+ * Returns [text] the way a one-line field holds it. Browsers strip every line break from the value of a
+ * one-line field, so a form that tracks its initial values (see [Shown]) has to start from the stripped text.
+ * Otherwise, the field would look changed whenever the stored value contains a line break.
  */
 internal fun inOneLine(text: String): String = text.filterNot { it == '\r' || it == '\n' }
 
 /**
- * The line endings of a multi-line text whose exact characters matter, such as a response body. A browser
- * submits every line break as a carriage return and a line feed, so a form cannot tell from a submitted text
- * which line endings the stored text has. A form therefore keeps the style of the stored text in a hidden
- * field and applies that style to the submitted text.
+ * Remembers the line endings of a multi-line text where every character counts, such as a response body.
+ *
+ * Browsers submit every line break as a carriage return plus a line feed (CRLF), no matter what the page
+ * contained. That means a form can't tell from the submitted text which line endings the stored text uses.
+ * To work around that, a form keeps the style of the stored text in a hidden field and applies it to whatever
+ * the browser sends back.
  */
 internal object LineEndings {
     private const val CRLF = "crlf"
     private const val LF = "lf"
 
-    /** The style of a text that is entered in the form for a new object: every line ends with a line feed. */
+    /** The style for text that's typed into the form of a new object: plain line feeds. */
     const val DEFAULT = LF
 
     /**
-     * Returns the style of [text]. The style is a carriage return and a line feed if every line break of the
-     * text has this form. Otherwise, it is a line feed.
+     * Returns the style of [text]. It's CRLF only if every line break in the text is a CRLF. Anything else,
+     * including a mix of line endings, counts as plain line feeds.
      */
     fun styleOf(text: String): String {
         val rest = text.replace("\r\n", "")
         return if ("\r\n" in text && '\r' !in rest && '\n' !in rest) CRLF else LF
     }
 
-    /** Returns [text], whose lines end with a line feed, with the line endings of [style]. */
+    /** Returns [text] with the line endings of [style]. The text is expected to use plain line feeds. */
     fun apply(
         style: String,
         text: String,
@@ -60,41 +62,38 @@ internal object LineEndings {
 }
 
 /**
- * Marks of the initial values of form fields. They let the UI detect which fields a person changed, so that
- * it asks the server to set only the attributes of those fields. A form that changes a few attributes of an
- * object leaves the other attributes as the server holds them, even if they changed after the page was
- * rendered.
+ * Tracks the initial values of form fields, so the UI can tell which fields someone actually changed. Only
+ * the attributes of those fields are sent to the server. Everything else stays the way the server has it,
+ * even if it changed after the page was rendered.
  *
- * For each marked field, the form has a hidden field. Its name is [PREFIX] followed by the name of the
- * marked field, and its value is the mark of the initial value. A browser returns the mark unchanged, next
- * to the current value of the field. A form that is displayed again after a rejection keeps the marks that
- * it was submitted with, so the marks still describe the values of the first page.
+ * Each tracked field gets a hidden companion field. Its name is [PREFIX] plus the name of the tracked field,
+ * and its value is a mark, which is a short hash of the initial value. The browser sends the mark back
+ * untouched, right next to the current value of the field. When a rejected form is displayed again, it keeps
+ * the marks it was submitted with, so they still describe the values of the first page.
  *
- * A browser alters some values without any action by a person, and a mark does not report such an
- * alteration as a change:
+ * Browsers change some values on their own, and those changes shouldn't count as edits:
  *
- * - A browser submits every line break as a carriage return and a line feed. The mark of a text therefore
- *   does not depend on its line endings.
- * - An HTML page cannot contain a NUL character, and a browser reads one as U+FFFD. The mark therefore
- *   treats the two characters as equal.
- * - A browser removes the line breaks from the value of a one-line field. A form therefore fills such a
- *   field with [inOneLine].
+ * - Every line break is submitted as a carriage return plus a line feed, so a mark ignores line endings.
+ * - An HTML page can't contain a NUL character. Browsers read it as U+FFFD, so a mark treats the two
+ *   characters as the same.
+ * - Line breaks are stripped from the value of a one-line field. That's why forms fill those fields with
+ *   [inOneLine].
  */
 internal object Shown {
-    /** The prefix of the name of a hidden field that holds a mark. */
+    /** The prefix for the name of a hidden field that holds a mark. */
     const val PREFIX = "_shown."
 
     private const val MARK_BYTES = 12
     private const val NUL = '\u0000'
     private const val REPLACEMENT_CHARACTER = '\uFFFD'
 
-    /** Returns the mark of [values], which are the values of the fields that share one name, in form order. */
+    /** Returns the mark of [values]: the values of all the fields that share one name, in form order. */
     fun markOf(values: List<String>): String {
         val digest = MessageDigest.getInstance("SHA-256")
         for (value in values) {
             val text = value.replace("\r\n", "\n").replace('\r', '\n').replace(NUL, REPLACEMENT_CHARACTER)
             val bytes = text.toByteArray(Charsets.UTF_8)
-            // The length prefix distinguishes two values from one value that is their concatenation.
+            // The length prefix keeps two values apart from a single value that happens to be their concatenation.
             digest.update("${bytes.size}:".toByteArray(Charsets.UTF_8))
             digest.update(bytes)
         }

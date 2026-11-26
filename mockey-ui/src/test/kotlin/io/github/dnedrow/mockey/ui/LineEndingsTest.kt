@@ -3,9 +3,9 @@ package io.github.dnedrow.mockey.ui
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** The line endings that a form restores in an edited text, see [LineEndings]. */
+/** Checks how a form detects and restores the line endings of an edited text (see [LineEndings]). */
 class LineEndingsTest {
-    /** The style is a carriage return and a line feed only if every line break of the text has this form. */
+    /** The style is CRLF only if every line break in the text is a CRLF. Everything else counts as plain line feeds. */
     @Test
     fun theStyleOfATextFollowsItsLineBreaks() {
         val withBoth = listOf("a\r\nb", "a\r\nb\r\n", "\r\n", "a\r\n\r\nb")
@@ -16,7 +16,7 @@ class LineEndingsTest {
         assertEquals("lf", LineEndings.DEFAULT)
     }
 
-    /** Applying a style to a submitted text restores the line endings of the stored text. */
+    /** Applying the stored style to a submitted text brings back the line endings of the stored text. */
     @Test
     fun applyingAStyleRestoresTheLineEndings() {
         assertEquals("a\r\nb\r\n\r\nc", LineEndings.apply("crlf", "a\nb\n\nc"))
