@@ -275,8 +275,9 @@ no link with the expected text. That defect of the script is corrected.
 
 ### What stays open
 
-- No release is published yet, so nobody can follow the download step. Task 15.5 builds the release
-  candidate, and the check runs again with its jars, see "The release candidate".
+- When the check ran for this task, no release was published, so nobody could follow the download step.
+  The release candidate is published now, and the check has passed with the two jars from its page, see
+  "The publication".
 - The script takes `podman` where there's no `docker`, with the same commands. That wasn't tried, because
   the machine of the run has no engine for it.
 - The CI job doesn't run the check. A step with `./gradlew quickStartCheck` would do it, and that's a change
@@ -391,6 +392,26 @@ distribution without its start script. The check failed for each with a message 
 The assembly refused 8 kinds of wrong input, and the version script was tried for a candidate, a release,
 and the version after a release. The script that publishes was run with a stand-in for `gh`.
 
+### The publication
+
+The tag `v3.0.0-rc.1` is on the commit `1113d73`, whose CI job was green before the tag was pushed. The push
+of the tag started the workflow "Release".
+[Its run 45891913650](https://github.com/dnedrow/MockeyRedux/actions/runs/45891913650) passed at the first
+attempt, in under 16 minutes. It checked the build with its 2522 tests, ran the release check and the
+quick-start check, and published the pre-release
+[Mockey Redux 3.0.0-rc.1](https://github.com/dnedrow/MockeyRedux/releases/tag/v3.0.0-rc.1) with the seven
+files. The page of the release shows the release notes with the register.
+
+After that, the published release was checked as a reader gets it:
+
+- The seven files were downloaded from the page of the release, without signing in.
+- The release check passed for the downloaded files, with the release notes of the page.
+- The quick-start check passed with the two downloaded jars. So the quick start of the README works from
+  its first step, the download, to its last.
+- Every link of the release notes leads to a page that's there.
+- The checksums of the published files are those of the files that were built on macOS before the tag. The
+  runner and that machine built the same files, byte for byte.
+
 ### Making a release
 
 1. Set the version with `scripts/set-version.sh <version>`, and read what the README and the release notes
@@ -410,8 +431,7 @@ and the version after a release. The script that publishes was run with a stand-
   release, or the version of another candidate.
 - The library `mockey-core` isn't published to an artifact repository. The design leaves open whether it
   is, and where.
-- The release workflow can't run before a tag is pushed. Its steps were run one by one, on macOS and on
-  Linux, and its first run is the publication of this candidate.
+- What the trial of the candidate finds decides what comes next: another candidate, or the release.
 
 ## Repeating the checks
 
