@@ -698,7 +698,8 @@ class ShimHomeTest {
         assertTrue(warnings.all { it.startsWith("Of the definitions of dangling.xml: The service 'Suite") }, log)
         assertTrue(warnings.first().startsWith("Of the definitions of dangling.xml: The service 'Suite tagged' names the scenario 9"), log)
         assertTrue(warnings.last().startsWith("Of the definitions of dangling.xml: The service 'Suite untagged' names the scenario 9"), log)
-        assertEquals(4, log.lines().count { it.isNotEmpty() }, log)
+        // Every message is one line. The line with which Ktor says where a listener responds can arrive late.
+        assertEquals(4, TestLog.messages(log).size, log)
         assertFalse("tk-71c0" in log, log)
         assertFalse("detour" in log, log)
     }
@@ -760,7 +761,7 @@ class ShimHomeTest {
         val log = TestLog.of { answer = script.get("/home?action=init&file=two%0Alines.xml") }
 
         assertEquals("""{"result":{"success":"Loaded definitions from two\nlines.xml"}}""", answer.body)
-        assertEquals(1, log.lines().count { it.isNotEmpty() }, log)
+        assertEquals(1, TestLog.messages(log).size, log)
         val line = TestLog.messages(log).single()
         assertTrue(line.startsWith("A request for /home of the legacy shim put the definitions of two lines.xml in"), log)
     }
