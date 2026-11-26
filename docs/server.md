@@ -92,6 +92,7 @@ The help prints what this table holds:
 | `--upstream-response-timeout` | `MOCKEY_UPSTREAM_RESPONSE_TIMEOUT` | `1m` | The time within which the complete response of a real service has to arrive. |
 | `--max-request-body` | `MOCKEY_MAX_REQUEST_BODY` | `52428800` (50 MiB) | The number of bytes that the body of a request may have. |
 | `--forward-unknown-targets`, `--no-forward-unknown-targets` | `MOCKEY_FORWARD_UNKNOWN_TARGETS` | `--forward-unknown-targets` | Whether a request for an absolute target that no service knows is forwarded to that target, or answered with the status 404. |
+| `--legacy-shim` | `MOCKEY_LEGACY_SHIM` | off | Lets the mock listener answer the automation endpoints of Mockey 2.x, for the scripts that were written for them. |
 | `--log-level` | `MOCKEY_LOG_LEVEL` | `info` | The level from which on messages are written to the log: `error`, `warn`, `info`, `debug`, or `trace`. |
 | `--shutdown-grace-period` | `MOCKEY_SHUTDOWN_GRACE_PERIOD` | `10s` | The time that requests in progress get to finish in when the server is told to stop. |
 

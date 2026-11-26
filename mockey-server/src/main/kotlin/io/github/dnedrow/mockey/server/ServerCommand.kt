@@ -138,6 +138,11 @@ internal class ServerCommand(
         "Forwards a request for an absolute target that no service knows to that target, or answers 404.",
     ).flag("--no-forward-unknown-targets", default = defaults.forwardUnknownTargets, defaultForHelp = "--forward-unknown-targets")
 
+    private val legacyShim by setting(
+        "legacy-shim",
+        "Answers the automation endpoints of Mockey 2.x on the mock listener, for the scripts that were written for them.",
+    ).flag(default = defaults.legacyShim, defaultForHelp = "off")
+
     private val logLevel by setting("log-level", "Level from which on messages are written to the log.")
         .choice(LogLevel.entries.associateBy { it.name.lowercase() }, ignoreCase = true)
         .default(defaults.logLevel, defaultForHelp = defaults.logLevel.name.lowercase())
@@ -195,6 +200,7 @@ internal class ServerCommand(
                 upstreamResponseTimeout = upstreamResponseTimeout,
                 maxRequestBody = maxRequestBody,
                 forwardUnknownTargets = forwardUnknownTargets,
+                legacyShim = legacyShim,
                 logLevel = logLevel,
                 shutdownGracePeriod = shutdownGracePeriod,
             )

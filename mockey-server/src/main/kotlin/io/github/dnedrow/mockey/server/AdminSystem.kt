@@ -20,13 +20,14 @@ import java.time.temporal.ChronoUnit
  *
  * [engine] is the engine of the server. [since] is the time at which the server started, [definitions] is
  * its definitions location, and [mock] is the address and the port on which its mock listener accepts
- * connections.
+ * connections. [legacyShim] says whether the server was started with the legacy shim.
  */
 internal class AdminSystem(
     private val engine: MockeyEngine,
     private val since: Instant,
     private val definitions: Path,
     private val mock: InetSocketAddress,
+    private val legacyShim: Boolean = false,
 ) {
     /** The routes of the operations. */
     val routes: List<AdminRoute> =
@@ -68,8 +69,7 @@ internal class AdminSystem(
      * mode, its tag filter, the twist configuration that is enabled, the base URL of its mock endpoint, see
      * [mockBaseUrl], and whether the legacy shim is enabled.
      *
-     * The time is stated in ISO 8601 and to the millisecond, as `/status` states it. The server has no
-     * legacy shim, so none is enabled.
+     * The time is stated in ISO 8601 and to the millisecond, as `/status` states it.
      */
     private fun status(host: String): SystemStatusDto {
         val current = engine.definitions
@@ -82,7 +82,7 @@ internal class AdminSystem(
             tagFilter = engine.tagFilter.toList(),
             enabledTwist = enabledTwist?.toAdminDto(),
             mockBaseUrl = mockBaseUrl(host),
-            legacyShimEnabled = false,
+            legacyShimEnabled = legacyShim,
         )
     }
 

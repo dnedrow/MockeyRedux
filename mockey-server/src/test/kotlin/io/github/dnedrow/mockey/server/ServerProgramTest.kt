@@ -173,6 +173,48 @@ class ServerProgramTest {
         }
     }
 
+    /** The scenario "Shim enabled", for the program: the setting `--legacy-shim` starts a server with the legacy shim. */
+    @Test
+    fun theProgramStartsAServerWithTheLegacyShimWhenItIsToldTo() {
+        val arguments = arrayOf("--legacy-shim", "--mock-host", "127.0.0.1", "--mock-port", "0", "--admin-port", "0")
+
+        ServerProgram.start(*arguments, prepare = { StoredDefinitions.customers(it.resolve("mockey-definitions")) }).use { program ->
+            val listening = program.listening()
+
+            val definitions = RawHttp.get(listening.mock, "/definitions")
+            assertEquals("HTTP/1.1 200 OK", definitions.statusLine)
+            assertTrue(definitions.body.startsWith("""{"serviceDefinitions":[{"serviceName":"Customers","serviceId":""""), definitions.body)
+            assertEquals(404, RawHttp.get(listening.admin, "/definitions").status)
+            assertContains(RawHttp.get(listening.admin, "/api/v1/system").body, "\"legacyShimEnabled\":true")
+            assertContains(messages(program.output), "  legacy-shim = true")
+            assertContains(
+                program.output,
+                " WARN  [main] i.g.d.mockey.server.MockeyServer - " +
+                    "The legacy shim is enabled: the mock listener answers the automation endpoints of Mockey 2.x, " +
+                    "which ask for no admin token. Whoever reaches it can read and change the definitions.\n",
+            )
+            assertEquals("", program.errors)
+        }
+    }
+
+    /** The scenario "Shim disabled", for the program: a server that isn't told otherwise has no legacy shim. */
+    @Test
+    fun theProgramStartsAServerWithoutTheLegacyShimWhenItIsNotToldOtherwise() {
+        ServerProgram.start("--mock-host", "127.0.0.1", "--mock-port", "0", "--admin-port", "0").use { program ->
+            val listening = program.listening()
+
+            for (path in listOf("/definitions", "/config/service", "/plan/setup", "/home")) {
+                val answer = RawHttp.get(listening.mock, "$path?action=deleteAllServices&type=json")
+
+                assertEquals("HTTP/1.1 404 Not Found" to "", answer.statusLine to answer.body, path)
+            }
+            assertContains(RawHttp.get(listening.admin, "/api/v1/system").body, "\"legacyShimEnabled\":false")
+            assertContains(messages(program.output), "  legacy-shim = false")
+            assertFalse(" WARN " in program.output, program.output)
+            assertEquals("", program.errors)
+        }
+    }
+
     @Test
     fun aTokenLetsAnAdminListenerOnAllAddressesStart() {
         val variables = mapOf("MOCKEY_ADMIN_HOST" to "0.0.0.0", "MOCKEY_ADMIN_TOKEN" to "tk-2d9e61a07c43")

@@ -10,9 +10,7 @@ import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.content.OutgoingContent
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
-import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
-import kotlinx.io.readByteArray
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.ZoneOffset
@@ -57,7 +55,7 @@ internal class MockEndpoint(
         val connection = call.request.local
         val host = checkNotNull(RequestHost.of(call)) { "A listener passes no request on that names no host." }
         val url = target.url ?: "$SCHEME$host${target.path}"
-        val body = bodyOf(call) ?: return refuse(call, HttpStatusCode.PayloadTooLarge, tooLarge())
+        val body = bodyOf(call, maxRequestBody) ?: return refuse(call, HttpStatusCode.PayloadTooLarge, tooLarge())
         val headers = headersOf(call)
         val method = connection.method.value
         val response =
@@ -107,29 +105,6 @@ internal class MockEndpoint(
         return headers.names().filter { seen.add(it.lowercase()) }.flatMap { name ->
             headers.getAll(name).orEmpty().map { Header(name, it) }
         }
-    }
-
-    /**
-     * Returns the body of the request, or `null` when it is longer than the server takes. A request that
-     * states a length beyond that is not read at all, and any other is read as far as the limit goes. What
-     * is not read here is read and dropped before the answer or after it, see [UnreadBody].
-     *
-     * The body is read from the channel of the request itself. The channel that Ktor gives a call for its
-     * body is the same one, but on the way to it Ktor writes the request target with its query string to
-     * the log, at the most verbose level.
-     */
-    private suspend fun bodyOf(call: ApplicationCall): ByteArray? {
-        val stated =
-            call.request.headers[HttpHeaders.ContentLength]
-                ?.trim()
-                ?.toLongOrNull()
-        if (stated != null && stated > maxRequestBody) return null
-        val bytes =
-            call.request
-                .receiveChannel()
-                .readBuffer(maxRequestBody + 1)
-                .readByteArray()
-        return bytes.takeUnless { it.size > maxRequestBody }
     }
 
     private fun tooLarge(): String =

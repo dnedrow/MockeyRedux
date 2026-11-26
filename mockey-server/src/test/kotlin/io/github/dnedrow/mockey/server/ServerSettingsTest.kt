@@ -34,6 +34,7 @@ class ServerSettingsTest {
                 upstreamResponseTimeout = 2.minutes,
                 maxRequestBody = 2_097_152,
                 forwardUnknownTargets = false,
+                legacyShim = true,
                 logLevel = LogLevel.DEBUG,
                 shutdownGracePeriod = 3.seconds,
             )
@@ -56,6 +57,7 @@ class ServerSettingsTest {
                 "upstream-response-timeout" to "2m",
                 "max-request-body" to "2097152",
                 "forward-unknown-targets" to "false",
+                "legacy-shim" to "true",
                 "log-level" to "debug",
                 "shutdown-grace-period" to "3s",
             )

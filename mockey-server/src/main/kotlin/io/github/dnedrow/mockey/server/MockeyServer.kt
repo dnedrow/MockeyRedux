@@ -13,7 +13,8 @@ import kotlin.time.Duration
  * The server while it runs: its engine, and its two listeners, which accept connections from the moment
  * that [start] returns. [since] is the time at which the server started.
  *
- * The mock listener serves the mock endpoint and `/status`. The admin listener serves the admin API, and
+ * The mock listener serves the mock endpoint and `/status`, and the automation endpoints of Mockey 2.x when
+ * the server is started with the legacy shim, see [LegacyShim]. The admin listener serves the admin API, and
  * neither listener serves what the other one does. What the mock endpoint forwards does not get to the admin
  * API either, see [ForwardMark].
  */
@@ -87,7 +88,8 @@ internal class MockeyServer private constructor(
             val mark = ForwardMark(addresses.admin.port.takeUnless { it == 0 })
             val engine = ServerEngine.start(settings, mark)
             val since = clock.instant()
-            val mockModule = mockListenerModule(MockEndpoint(engine, settings.maxRequestBody, clock), StatusEndpoint(since))
+            val shim = if (settings.legacyShim) LegacyShim(engine, settings.maxRequestBody) else null
+            val mockModule = mockListenerModule(MockEndpoint(engine, settings.maxRequestBody, clock), StatusEndpoint(since), shim)
             val listeners =
                 try {
                     Listeners.start(addresses, mockModule) { mock ->
@@ -108,21 +110,30 @@ internal class MockeyServer private constructor(
                     ListenerKind.ADMIN.title,
                 )
             }
+            if (shim != null) {
+                log.warn(
+                    "The legacy shim is enabled: the {} answers the automation endpoints of Mockey 2.x, which ask for no admin token. " +
+                        "Whoever reaches it can read and change the definitions.",
+                    ListenerKind.MOCK.title,
+                )
+            }
             return MockeyServer(engine, listeners, since)
         }
 
         /**
          * Returns the module of the mock listener: the [mock] endpoint for every path under `/service/`, and
-         * `/status`, which says that the server runs since the time of [status]. Ktor answers every other
-         * request with the status 404.
+         * `/status`, which says that the server runs since the time of [status]. A server with the legacy
+         * shim also answers the automation endpoints of Mockey 2.x, which are those of [shim]. Ktor answers
+         * every other request with the status 404.
          */
         fun mockListenerModule(
             mock: MockEndpoint,
             status: StatusEndpoint,
+            shim: LegacyShim? = null,
         ): suspend Application.() -> Unit =
             {
                 intercept(ApplicationCallPipeline.Call) {
-                    if (!status.handle(call)) mock.handle(call)
+                    if (!status.handle(call) && shim?.handle(call) != true) mock.handle(call)
                 }
             }
 

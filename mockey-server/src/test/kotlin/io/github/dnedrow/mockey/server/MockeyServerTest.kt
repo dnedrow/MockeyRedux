@@ -1,6 +1,7 @@
 package io.github.dnedrow.mockey.server
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.ServerSocket
@@ -170,6 +171,69 @@ class MockeyServerTest {
             ),
             ofMock,
         )
+    }
+
+    /**
+     * The requirement "The legacy shim is opt-in", for a server: its settings say whether it has the shim,
+     * only the mock listener answers the endpoints of the shim, and the admin API says whether the shim is
+     * there.
+     */
+    @Test
+    fun onlyAServerThatIsStartedWithTheLegacyShimAnswersItsEndpoints() {
+        val plain = start(settings().copy(definitions = definitionsLocation()))
+        val withShim = start(settings().copy(definitions = definitionsLocation(), legacyShim = true))
+
+        fun shimEnabled(server: MockeyServer): JsonElement? {
+            val system = RawHttp.get(server.listeners.admin.address, "/api/v1/system")
+            return (Json.parseToJsonElement(system.body) as JsonObject)["legacyShimEnabled"]
+        }
+
+        val ofPlain = RawHttp.get(plain.listeners.mock.address, "/definitions")
+        val ofShim = RawHttp.get(withShim.listeners.mock.address, "/definitions")
+        val ofAdmin = RawHttp.get(withShim.listeners.admin.address, "/definitions")
+        assertEquals("HTTP/1.1 404 Not Found" to "", ofPlain.statusLine to ofPlain.body)
+        assertEquals("HTTP/1.1 200 OK", ofShim.statusLine)
+        assertTrue(ofShim.body.startsWith("""{"serviceDefinitions":[{"serviceName":"Customers","serviceId":""""), ofShim.body)
+        assertEquals("HTTP/1.1 404 Not Found" to "", ofAdmin.statusLine to ofAdmin.body)
+        assertEquals(JsonPrimitive(false) to JsonPrimitive(true), shimEnabled(plain) to shimEnabled(withShim))
+        // A request to the shim is no mock traffic, and it leaves the mock endpoint as it is.
+        assertEquals(200, RawHttp.get(withShim.listeners.mock.address, "/service/customer/7").status)
+        assertEquals(200, RawHttp.get(withShim.listeners.mock.address, "/status").status)
+        assertEquals(
+            listOf("customer/7"),
+            withShim.engine.history
+                .entries()
+                .map { it.target },
+        )
+    }
+
+    /** The shim asks for no admin token, so a server that has it says in its log what that means. */
+    @Test
+    fun aServerWithTheLegacyShimWarnsThatItsEndpointsAskForNoToken() {
+        val ofPlain = TestLog.of { start(settings()) }
+        val ofShim = TestLog.of { start(settings().copy(legacyShim = true)) }
+
+        assertEquals(emptyList(), TestLog.messages(ofPlain))
+        assertEquals(
+            listOf(
+                "The legacy shim is enabled: the mock listener answers the automation endpoints of Mockey 2.x, " +
+                    "which ask for no admin token. Whoever reaches it can read and change the definitions.",
+            ),
+            TestLog.messages(ofShim, "WARN"),
+        )
+        assertEquals(TestLog.messages(ofShim, "WARN"), TestLog.messages(ofShim))
+    }
+
+    /** The legacy shim takes a body that is as long as the mock endpoint takes it. */
+    @Test
+    fun theLegacyShimTakesBodiesAsLongAsTheSettingsOfTheServerSay() {
+        val server = start(settings().copy(maxRequestBody = 10, legacyShim = true))
+        val mock = server.listeners.mock.address
+
+        val atTheLimit = RawHttp.exchange(mock, RawHttp.request("POST", "/definitions", body = "0123456789"))
+        val oneMore = RawHttp.exchange(mock, RawHttp.request("POST", "/definitions", body = "0123456789a"))
+
+        assertEquals(200 to 413, atTheLimit.status to oneMore.status)
     }
 
     @Test

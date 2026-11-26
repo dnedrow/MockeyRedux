@@ -289,7 +289,7 @@ internal class AdminApi(
                     AdminUpstream(engine).routes +
                     AdminHistory(engine).routes +
                     AdminDefinitions(engine).routes +
-                    AdminSystem(engine, since, settings.definitions, mock).routes +
+                    AdminSystem(engine, since, settings.definitions, mock, settings.legacyShim).routes +
                     description
             return AdminApi(settings.adminToken, settings.maxRequestBody, routes)
         }

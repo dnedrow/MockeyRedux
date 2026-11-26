@@ -44,6 +44,8 @@ internal data class ServerSettings(
     val maxRequestBody: Long = 50L * MEBIBYTE,
     /** Whether a request for an absolute target that no service knows is forwarded to that target. */
     val forwardUnknownTargets: Boolean = true,
+    /** Whether the mock listener answers the automation endpoints of Mockey 2.x, see [LegacyShim]. */
+    val legacyShim: Boolean = false,
     /** The level from which on messages are written to the log. */
     val logLevel: LogLevel = LogLevel.INFO,
     /** The time that requests in progress get to finish in when the server is told to stop. */
@@ -72,6 +74,7 @@ internal data class ServerSettings(
             "upstream-response-timeout" to upstreamResponseTimeout.toString(),
             "max-request-body" to maxRequestBody.toString(),
             "forward-unknown-targets" to forwardUnknownTargets.toString(),
+            "legacy-shim" to legacyShim.toString(),
             "log-level" to logLevel.name.lowercase(),
             "shutdown-grace-period" to shutdownGracePeriod.toString(),
         )

@@ -110,6 +110,8 @@ class ServerCommandTest {
             Case("max-request-body", listOf("--max-request-body", "2097152"), 2_097_152L, "1048576", 1_048_576L) { it.maxRequestBody },
             Case("forward-unknown-targets", listOf("--no-forward-unknown-targets"), false, "true", true) { it.forwardUnknownTargets },
             Case("forward-unknown-targets", listOf("--forward-unknown-targets"), true, "false", false) { it.forwardUnknownTargets },
+            Case("legacy-shim", listOf("--legacy-shim"), true, "false", false) { it.legacyShim },
+            Case("legacy-shim", listOf("--legacy-shim"), true, "true", true) { it.legacyShim },
             Case("log-level", listOf("--log-level", "debug"), LogLevel.DEBUG, "warn", LogLevel.WARN) { it.logLevel },
             Case(
                 "shutdown-grace-period",
@@ -160,6 +162,7 @@ class ServerCommandTest {
         assertEquals(60.seconds, settings.upstreamResponseTimeout)
         assertEquals(52_428_800L, settings.maxRequestBody)
         assertTrue(settings.forwardUnknownTargets)
+        assertFalse(settings.legacyShim)
         assertEquals(LogLevel.INFO, settings.logLevel)
         assertEquals(10.seconds, settings.shutdownGracePeriod)
     }
@@ -292,6 +295,7 @@ class ServerCommandTest {
             "upstream-response-timeout" to "1m",
             "max-request-body" to "52428800 (50 MiB)",
             "forward-unknown-targets" to "--forward-unknown-targets",
+            "legacy-shim" to "off",
             "log-level" to "info",
             "shutdown-grace-period" to "10s",
         )
@@ -424,6 +428,8 @@ class ServerCommandTest {
                 refusedOption("--max-request-body", "2147483640"),
                 refusedOption("--max-request-body", "9223372036854775808"),
                 refusedVariable("MOCKEY_FORWARD_UNKNOWN_TARGETS", "2"),
+                Refused("--legacy-shim", listOf("--legacy-shim=on")),
+                refusedVariable("MOCKEY_LEGACY_SHIM", "perhaps"),
                 refusedOption("--log-level", "loud"),
                 refusedVariable("MOCKEY_LOG_LEVEL", ""),
                 refusedOption("--shutdown-grace-period", "-1s"),
