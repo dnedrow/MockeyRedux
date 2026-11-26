@@ -367,20 +367,36 @@ pre.body {
   color: var(--quiet);
 }
 
-form.filter {
+/* The forms above a list stand side by side where there is room. */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 2.5rem;
+}
+
+.tools form {
+  flex: 1 1 24rem;
+}
+
+/* A form that asks for a page has its field and its button side by side. */
+form.filter,
+form.search {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 0.5rem 0.75rem;
 }
 
-form.filter .field {
+form.filter .field,
+form.search .field {
   flex: 1 1 16rem;
   max-width: 32rem;
   margin: 0;
 }
 
-form.filter button {
+form.filter button,
+form.search button {
   margin-top: 1.7rem;
 }
 
@@ -522,8 +538,26 @@ section.diagnostics {
   padding: 0 0.5rem;
 }
 
-section.diagnostics .kind {
+section.diagnostics .kind,
+ul.report .kind {
   font-weight: 600;
+}
+
+/* The entries of a report, such as the additions of an import. A long report stays readable line by line. */
+ul.report li {
+  margin: 0 0 0.25rem;
+}
+
+/* Lists that are as wide as their content: search results, derived real URLs, and schema reports. */
+table.results,
+table.derived,
+table.conformance {
+  width: auto;
+  min-width: min(100%, 36rem);
+}
+
+table.conformance td:nth-child(2) {
+  white-space: nowrap;
 }
 
 /* In the history list, the request and the answer wrap. The other cells stay on one line. */

@@ -160,6 +160,7 @@ internal object ServicePages {
                 a(href = addressOf(EDIT, service)) { +"Edit" }
                 postForm(view, addressOf(DUPLICATE, service), classes = "inline") { submit("Duplicate") }
                 a(href = HistoryPages.addressOfService(service.id)) { +"History of this service" }
+                a(href = MergePages.addressOf(service.id)) { +"Merge services into this one" }
                 a(href = addressOf(DELETE, service)) { +"Delete" }
             }
             dl {
@@ -184,7 +185,13 @@ internal object ServicePages {
                 dt { +"Inspector" }
                 dd { +(service.inspectorName ?: NONE) }
                 dt { +"Response schema" }
-                dd { +usedOrNot(service.responseSchema, service.responseSchemaEnabled, SCHEMA_ON, SCHEMA_OFF) }
+                dd {
+                    +usedOrNot(service.responseSchema, service.responseSchemaEnabled, SCHEMA_ON, SCHEMA_OFF)
+                    if (service.responseSchema != null) {
+                        +". "
+                        a(href = SchemaReportPages.addressOf(service.id)) { +"Check the scenarios against the schema" }
+                    }
+                }
                 dt { +"Last used" }
                 dd {
                     val used = service.lastUsedTime

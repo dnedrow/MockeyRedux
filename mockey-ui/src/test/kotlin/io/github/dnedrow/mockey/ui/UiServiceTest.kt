@@ -145,7 +145,7 @@ class UiServiceTest {
                 "Real URLs" to "http://qa1.example.com/billing http://qa2.example.com/billing (default)",
                 "Request rules" to "A rule set, which the server evaluates",
                 "Inspector" to "Audit",
-                "Response schema" to "A schema, to which the diagnostics do not hold the scenarios",
+                "Response schema" to "A schema, to which the diagnostics do not hold the scenarios. $CHECK_SCHEMA",
                 "Last used" to "2026-01-02 03:04:05 UTC",
             )
         assertEquals(200, answer.status)
@@ -168,10 +168,13 @@ class UiServiceTest {
             mapOf(
                 "Edit" to "/service/edit?id=svc-billing",
                 "History of this service" to "/history?service=svc-billing",
+                "Merge services into this one" to "/service/merge?id=svc-billing",
                 "Delete" to "/service/delete?id=svc-billing",
                 "New scenario" to "/scenario/new?service=svc-billing",
             )
         assertEquals(leading, links)
+        val ofSchema = page.select("main dd a:not(.tag)").map { it.text() to it.attr("href") }
+        assertEquals(listOf(CHECK_SCHEMA to "/service/schema-report?id=svc-billing"), ofSchema)
         val duplicate = page.select("main .actions form").single()
         val ofDuplicate = Triple(duplicate.attr("method"), duplicate.attr("action"), duplicate.text())
         assertEquals(Triple("post", "/service/duplicate?id=svc-billing", "Duplicate"), ofDuplicate)
@@ -215,7 +218,7 @@ class UiServiceTest {
                 "Real URLs" to "http://qa1.example.com/orders",
                 "Request rules" to "A rule set, which the server does not evaluate",
                 "Inspector" to "none",
-                "Response schema" to "A schema, to which the diagnostics hold the scenarios",
+                "Response schema" to "A schema, to which the diagnostics hold the scenarios. $CHECK_SCHEMA",
                 "Last used" to "never",
             )
         assertEquals(facts, described(page))
@@ -225,6 +228,7 @@ class UiServiceTest {
         val without = browserFor(holding(listOf(Samples.customers))).get("/service?id=svc-customers").page
         val unset = listOf("Real URLs", "Request rules", "Response schema")
         assertEquals(listOf("none", "none", "none"), unset.map(described(without)::getValue))
+        assertEquals(0, without.select("main dd a[href^=/service/schema-report]").size)
     }
 
     /** The overview and the page of the diagnostics lead to the page of a service, and the overview leads to the form of a new one. */
@@ -238,7 +242,8 @@ class UiServiceTest {
 
         val names = overview.select("main table.services th a:not(.marker)").associate { it.text() to it.attr("href") }
         assertEquals(mapOf("Billing" to "/service?id=svc-billing", "Orders" to "/service?id=svc-orders"), names)
-        assertEquals(listOf("New service" to "/service/new"), overview.select("main p.actions a").map { it.text() to it.attr("href") })
+        val actions = listOf("New service" to "/service/new", "Derive real URLs" to "/services/real-urls", "Diagnostics" to "/diagnostics")
+        assertEquals(actions, overview.select("main p.actions a").map { it.text() to it.attr("href") })
         val headings = diagnostics.select("main section h2 a").map { it.text() to it.attr("href") }
         assertEquals(listOf("Billing" to "/service?id=svc-billing"), headings)
     }
@@ -825,6 +830,9 @@ class UiServiceTest {
     }
 
     private companion object {
+        /** The link in the row of the response schema, which leads to the schema report. */
+        const val CHECK_SCHEMA = "Check the scenarios against the schema"
+
         /** The attributes of a service that the form of a service states, whatever is entered. */
         val ATTRIBUTES =
             setOf("name", "mockUrl", "description", "tags", "responseMode", "delayMillis", "realUrls", "defaultRealUrlIndex")

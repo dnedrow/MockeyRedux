@@ -155,7 +155,8 @@ internal class Browser(
      * ones that a person changed. A field with the value `null` is not sent, as a check box that is not
      * checked. A field of several lines is sent with a carriage return before every line feed. A one-line
      * text field is sent without the line breaks of its value, because browsers strip them. [files] are
-     * the files that were chosen in the file fields.
+     * the files that were chosen in the file fields. A file field without a chosen file is sent as a file
+     * without a name and without bytes, which is what browsers do.
      *
      * [pressed] is the button of the form that is pressed, which is its first one unless a test presses
      * another. Of the buttons of a form, a browser sends the one that was pressed, when it has a name.
@@ -174,7 +175,8 @@ internal class Browser(
         val data = form.formData().map { it.key() to it.value() }.toMutableList()
         form.select(BUTTONS).forEach { data.remove(it.attr("name") to it.attr("value")) }
         if (pressed != null && pressed.hasAttr("name")) data += pressed.attr("name") to pressed.attr("value")
-        val ofThePage = data.filter { (name, _) -> name !in files }.map { (name, value) -> name to (areas[name] ?: value) }
+        val fileFields = form.select("input[type=file]").map { it.attr("name") }
+        val ofThePage = data.filter { (name, _) -> name !in fileFields }.map { (name, value) -> name to (areas[name] ?: value) }
         val kept = ofThePage.filter { (name, _) -> name !in edits && name !in rows }
         val edited = edits.mapNotNull { (name, value) -> value?.let { name to it } }
         val ofRows = rows.flatMap { (name, values) -> values.map { name to it } }
@@ -185,7 +187,8 @@ internal class Browser(
         if (!form.attr("method").equals("post", ignoreCase = true)) return get("$action?${encoded(fields)}")
         if (form.attr("enctype") != "multipart/form-data") return post(action, fields)
         val boundary = "----browser${System.nanoTime()}"
-        return request("POST", action, body = parts(fields, files, boundary), contentType = "multipart/form-data; boundary=$boundary")
+        val sent = fileFields.associateWith { files[it] ?: Chosen("", ByteArray(0)) }
+        return request("POST", action, body = parts(fields, sent, boundary), contentType = "multipart/form-data; boundary=$boundary")
     }
 
     private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
@@ -218,7 +221,9 @@ internal class Browser(
             body.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
         }
         for ((name, file) in files) {
-            val disposition = "Content-Disposition: form-data; name=\"$name\"; filename=\"${file.fileName}\""
+            // A browser writes a line break and a quote in a file name as their escapes, so the header stays one line.
+            val oneLine = file.fileName.replace("\r", "%0D").replace("\n", "%0A")
+            val disposition = "Content-Disposition: form-data; name=\"$name\"; filename=\"${oneLine.replace("\"", "%22")}\""
             body.write("--$boundary\r\n$disposition\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray())
             body.write(file.bytes)
             body.write("\r\n".toByteArray())

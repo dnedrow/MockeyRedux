@@ -1,13 +1,21 @@
 package io.github.dnedrow.mockey.ui
 
 import io.github.dnedrow.mockey.api.AdminApiJson
+import io.github.dnedrow.mockey.api.DerivedRealUrlDto
 import io.github.dnedrow.mockey.api.DiagnosticDto
+import io.github.dnedrow.mockey.api.FieldErrorDto
 import io.github.dnedrow.mockey.api.InspectorDto
 import io.github.dnedrow.mockey.api.MatchCriterionDto
+import io.github.dnedrow.mockey.api.MergeReportDto
+import io.github.dnedrow.mockey.api.MergedScenarioDto
+import io.github.dnedrow.mockey.api.RealUrlDerivationRequestDto
 import io.github.dnedrow.mockey.api.ResponseModeDto
+import io.github.dnedrow.mockey.api.ScenarioConformanceDto
 import io.github.dnedrow.mockey.api.ScenarioDto
 import io.github.dnedrow.mockey.api.ScenarioReferenceDto
+import io.github.dnedrow.mockey.api.SchemaReportDto
 import io.github.dnedrow.mockey.api.ServiceDto
+import io.github.dnedrow.mockey.api.ServiceMergeRequestDto
 import io.github.dnedrow.mockey.ui.FakeAdminApi.Companion.done
 import io.github.dnedrow.mockey.ui.FakeAdminApi.Companion.json
 import io.github.dnedrow.mockey.ui.FakeAdminApi.Companion.problem
@@ -35,6 +43,14 @@ import java.util.concurrent.atomic.AtomicReference
  * that, the stand-in stores every attribute exactly as a request sends it, because it doesn't implement the
  * validation rules of a server.
  *
+ * The stand-in also merges services and derives real URLs by the rules of a server. A merge copies the
+ * scenarios that the destination doesn't have with the same name and response body, and it deletes the
+ * merged services only if no scenario was skipped. A derivation adds no real URL that a service lists
+ * already.
+ *
+ * A service with a response schema has a schema report. The report is the one that [schemaReports] holds for
+ * the identifier of the service. Without one, the report says that every scenario conforms.
+ *
  * A request names a service and a scenario by their identifiers in its path. [paths] maps an identifier to
  * the path segment that a client writes for it. That's only needed for identifiers that a client has to
  * escape.
@@ -45,6 +61,7 @@ internal fun FakeAdminApi.hold(
     paths: Map<String, String> = emptyMap(),
     inspectors: List<InspectorDto> = listOf(Samples.inspector),
     universal: ScenarioReferenceDto? = null,
+    schemaReports: Map<String, SchemaReportDto> = emptyMap(),
 ): MutableMap<String, ServiceDto> {
     val held = Collections.synchronizedMap(LinkedHashMap<String, ServiceDto>())
     val universalError = AtomicReference(universal)
@@ -81,11 +98,64 @@ internal fun FakeAdminApi.hold(
         }
     }
 
+    /** Merges the services [sourceIds] into [destination] by the rules of a server, and returns the report. */
+    fun merged(
+        destination: ServiceDto,
+        sourceIds: List<String>,
+    ): MergeReportDto {
+        val sources = sourceIds.map(held::getValue)
+        val copied = mutableListOf<MergedScenarioDto>()
+        val skipped = mutableListOf<MergedScenarioDto>()
+        var scenarios = destination.scenarios
+        for (source in sources) {
+            for (scenario in source.scenarios) {
+                val item = MergedScenarioDto(source.name, scenario.name)
+                if (scenarios.any { it.name == scenario.name && it.responseBody == scenario.responseBody }) {
+                    skipped += item
+                } else {
+                    val copy = scenario.copy(id = "${scenario.id}-merged", lastUsedTime = null)
+                    scenarios = scenarios + copy
+                    copied += item
+                    takeScenario(destination.id, copy.id)
+                }
+            }
+        }
+        val deleted = skipped.isEmpty() && sources.isNotEmpty()
+        val realUrls = if (deleted) (destination.realUrls + sources.flatMap { it.realUrls }).distinct() else destination.realUrls
+        val tags = (destination.tags + sources.flatMap { it.tags }).distinct()
+        val default = destination.defaultScenarioId ?: scenarios.firstOrNull()?.id
+        val mode = if (scenarios.isEmpty()) ResponseModeDto.PROXY else destination.responseMode
+        val after = destination.copy(realUrls = realUrls, tags = tags, scenarios = scenarios, defaultScenarioId = default)
+        held[destination.id] = after.copy(effectiveResponseMode = mode)
+        if (deleted) sourceIds.forEach(held::remove)
+        return MergeReportDto(copied, skipped, deleted)
+    }
+
     fun take(service: ServiceDto) {
         val id = service.id
         val path = "services/${paths[id] ?: id}"
         held[id] = service
         service.scenarios.forEach { takeScenario(id, it.id) }
+        on("POST", "$path/merge") { request ->
+            val destination = held[id]
+            val asked = AdminApiJson.instance.decodeFromString(ServiceMergeRequestDto.serializer(), request.body)
+            val unknown = asked.sourceIds.indices.filter { asked.sourceIds[it] !in held }
+            when {
+                destination == null -> gone(id)
+                unknown.isNotEmpty() -> problem(INVALID, NOT_VALID, unknown.map { FieldErrorDto("sourceIds[$it]", NO_SUCH_SERVICE) })
+                else -> json(merged(destination, asked.sourceIds.distinct() - id))
+            }
+        }
+        on("GET", "$path/schema-report") {
+            val current = held[id]
+            val everyOneConforms = current?.scenarios.orEmpty().map { ScenarioConformanceDto(it.id, it.name, conforms = true, emptyList()) }
+            val report: SchemaReportDto = schemaReports[id] ?: SchemaReportDto.Checked(everyOneConforms)
+            when {
+                current == null -> gone(id)
+                current.responseSchema == null -> problem(NOT_FOUND, "The service '${current.name}' has no response schema.")
+                else -> json(report)
+            }
+        }
         on("GET", "$path/scenarios") { held[id]?.let { json(it.scenarios) } ?: gone(id) }
         on("POST", "$path/scenarios") { request ->
             val before = held[id]
@@ -121,6 +191,16 @@ internal fun FakeAdminApi.hold(
         val created = ServiceDto("svc-new-${held.size + 1}", "", "").with(request.body)
         json(created.also(::take), CREATED)
     }
+    on("POST", "services/real-urls/derive") { request ->
+        val asked = AdminApiJson.instance.decodeFromString(RealUrlDerivationRequestDto.serializer(), request.body)
+        val regex = asked.expression.takeIf { it.isNotEmpty() }?.let { runCatching { Regex(it) }.getOrNull() }
+        val used = asked.replacements.filter { it.isNotBlank() }
+        when {
+            regex == null -> problem(INVALID, NOT_VALID, listOf(FieldErrorDto("expression", NO_EXPRESSION)))
+            used.isEmpty() -> problem(INVALID, NOT_VALID, listOf(FieldErrorDto("replacements", NO_REPLACEMENT)))
+            else -> json(derived(held, regex, used))
+        }
+    }
     on("GET", "diagnostics") { json(diagnostics) }
     on("GET", "inspectors") { json(inspectors) }
     on("GET", "universal-error-scenario") {
@@ -140,6 +220,31 @@ internal fun FakeAdminApi.hold(
 private const val OK = 200
 private const val CREATED = 201
 private const val NOT_FOUND = 404
+private const val INVALID = 422
+private const val NOT_VALID = "The request is not valid."
+private const val NO_SUCH_SERVICE = "No service has this identifier."
+private const val NO_EXPRESSION = "The expression must be a regular expression that is not empty."
+private const val NO_REPLACEMENT = "At least one replacement that is not blank is needed."
+
+/**
+ * Adds real URLs to the services in [held] by the rules of a server, and returns the ones that were added.
+ * Each real URL gives one URL for each of [replacements]: the URL in which the matches of [regex] are
+ * replaced. A URL that a service already lists isn't added.
+ */
+private fun derived(
+    held: MutableMap<String, ServiceDto>,
+    regex: Regex,
+    replacements: List<String>,
+): List<DerivedRealUrlDto> {
+    val listed = held.values.flatMap { it.realUrls }.toMutableSet()
+    val added = mutableListOf<DerivedRealUrlDto>()
+    for ((id, service) in held.toMap()) {
+        val urls = service.realUrls.flatMap { url -> replacements.map { url.replace(regex, it) } }.filter(listed::add)
+        added += urls.map { DerivedRealUrlDto(id, service.name, it) }
+        if (urls.isNotEmpty()) held[id] = service.copy(realUrls = service.realUrls + urls)
+    }
+    return added
+}
 
 /** Returns this scenario with the attributes that [body] states. [body] is the JSON body of a request. */
 private fun ScenarioDto.with(body: String): ScenarioDto {

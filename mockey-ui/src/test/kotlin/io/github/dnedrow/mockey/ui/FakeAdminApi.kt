@@ -36,15 +36,18 @@ internal class FakeAdminApi(
 ) : AutoCloseable {
     /**
      * A request that the API got: its [method], its [path] and its [query] as the client wrote them, its
-     * [headers] by their names in lower case, and its [body].
+     * [headers] by their names in lower case, and its body. [bytes] is the body exactly as it arrived, and
+     * [body] is the same body read as text in UTF-8.
      */
     class Request(
         val method: String,
         val path: String,
         val query: String?,
         val headers: Map<String, List<String>>,
-        val body: String,
+        val bytes: ByteArray,
     ) {
+        val body: String = String(bytes, Charsets.UTF_8)
+
         /** The request line without the prefix of the API: the method, and the path with the query string. */
         val line: String = "$method ${path.removePrefix(AdminApiDescription.PREFIX + "/")}" + (query?.let { "?$it" } ?: "")
 
@@ -118,7 +121,7 @@ internal class FakeAdminApi(
         val headers = exchange.requestHeaders.entries.associate { (name, values) -> name.lowercase() to values.toList() }
         val bytes = exchange.requestBody.readAllBytes()
         val target = exchange.requestURI
-        val request = Request(exchange.requestMethod, target.rawPath, target.rawQuery, headers, String(bytes, Charsets.UTF_8))
+        val request = Request(exchange.requestMethod, target.rawPath, target.rawQuery, headers, bytes)
         requests += request
         val answer = if (presentsToken(request)) answerTo(request, bytes) else problem(UNAUTHORIZED, NO_TOKEN)
         val body = answer.body.toByteArray(Charsets.UTF_8)

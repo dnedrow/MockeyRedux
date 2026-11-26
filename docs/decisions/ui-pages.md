@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5 to 13.9 of the change `kotlin-rewrite-modular`, on 2026-11-25.
+Decided in tasks 13.5 to 13.10 of the change `kotlin-rewrite-modular`, on 2026-11-25.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -69,9 +69,11 @@ effective mode, and says that the service has no scenario to answer with where t
 ### The marker and the page of the diagnostics
 
 - The marker says how many diagnostics concern the service, and it leads to the page of the diagnostics, at
-  the place of the service. Task 13.10 lists the diagnostics among its pages. The page is here already,
-  because the marker has to lead somewhere, and the scenario "Diagnostics marker" asks that it leads to the
-  diagnostic.
+  the place of the service. Task 13.10 lists the diagnostics among its pages. The page came with the overview
+  in task 13.5, because the marker has to lead somewhere, and the scenario "Diagnostics marker" asks that it
+  leads to the diagnostic.
+- Since task 13.10, a link above the list leads to the page as well. That way, the page can be opened when no
+  service has a marker.
 - The page shows the diagnostics service by service, in the order of the overview, each with its kind in
   words and with what the server says of it. A kind that the UI does not know is shown by the name that the
   admin API has for it, so a server of a later version loses nothing.
@@ -89,6 +91,9 @@ effective mode, and says that the service has no scenario to answer with where t
   the same list show the same page.
 - This filter isn't a setting of the server. The server's tag filter decides which services answer requests,
   and it has a page of its own (see [The page for tags](#the-page-for-tags)).
+- The search form stands next to the filter form. It looks for a term in the services, the scenarios, and the
+  plans, and it leads to a page of its own (see [The search page](#the-search-page)). The filter narrows the
+  list of the overview, and the search doesn't.
 
 ### After a switch
 
@@ -171,8 +176,11 @@ long.
 
 ### What the pages of a service do not have
 
-- The report of the response schema, the merge of services, and the derivation of real URLs are pages of
-  task 13.10.
+- The report of the response schema and the merge of services have pages of their own, and the page of a
+  service links to both (see [The schema report](#the-schema-report) and
+  [The pages that merge services](#the-pages-that-merge-services)).
+- The derivation of real URLs concerns all services at once, so the overview links to it (see
+  [The pages that derive real URLs](#the-pages-that-derive-real-urls)).
 
 ## The pages of a scenario
 
@@ -670,6 +678,312 @@ downloaded as CSV and as JSON.
 - Before it hands out a file, the UI asks for the status of the server, as it does for every page. An
   unreachable or incompatible server gets its failure page, and no file.
 
+## The page for import and export
+
+One page offers the definitions as a download and holds the form that imports a document. After an import,
+the browser goes to a page that shows the import report.
+
+### Requirements
+
+- The UI offers the import and the export of the admin API (`admin-ui`: Coverage of management operations).
+- When a user uploads a Mockey 2.x export document with a tag, the UI shows the additions and the conflicts
+  from the import report (the scenario "Import with a report").
+- The UI shows any report that the admin API returns, on a page that can be reloaded without repeating the
+  action (`admin-ui`: Result feedback).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/definitions` | The page with the download link and the import form. |
+| `/definitions/export` | The download of the definitions document. |
+| `/definitions/import` | Imports the uploaded document (`POST`) and leads to the report. |
+
+### The export
+
+- The download is the document exactly as `GET definitions/export` returns it. It's marked as an attachment
+  with the name `mockey-definitions.json`, so a browser saves it and never reads it as a page.
+- As with the statistics downloads, the UI asks for the status of the server first. An unreachable or
+  incompatible server gets its failure page, and no file.
+- The page says what the document holds and what it leaves out: the history, the tag filter, and the
+  credentials of the outbound proxy. It also says what the document is good for. A server can start from it
+  (`--initial-definitions`), and the import form reads it.
+
+### The import form
+
+The form has a file field for the document and a text field for the tags. It's the only form of the UI that
+a browser sends as `multipart/form-data`, because a form can't upload a file any other way.
+
+The admin API takes two kinds of documents: a definitions document in JSON, and an export document of
+Mockey 2.x in XML. It tells them apart by the `Content-Type` of the request, so the UI has to know which
+kind it got.
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. A choice of the kind next to the file field. | Nothing is guessed. | It's one more thing to get wrong. After a wrong choice, the server complains about a format that the document doesn't have. |
+| 2. The file name, or the media type that the browser states for the file. | No code reads the document. | A browser derives the media type from the file name, and an export of Mockey 2.x is often saved under a name without `.xml`. |
+| 3. The content of the document. | There's nothing to choose, and the file name doesn't matter. | The UI looks at the first bytes of the document. |
+
+Way 3. A document is XML if its first character is `<`, after an optional byte order mark and whitespace. A
+JSON document never starts that way. A document that starts with the byte order mark of UTF-16 is XML as
+well: the admin API only reads JSON in UTF-8, while an XML document declares its own encoding. Everything
+else is sent as JSON. If it isn't a definitions document, the server says what's wrong with it.
+
+- The UI rejects a form without a file, and a form with an empty file, with a message next to the file
+  field. Everything else is up to the server. The admin API reports a document that it can't import for the
+  field `document`. The file field has that name, so the message appears next to it.
+- A page can't put a file back into a file field. A rejected form shows its tags again, but the file has to
+  be chosen again.
+- Tags have spaces between them, as in every tags field of the UI. The UI sends them the way they were
+  entered. The report shows them in lower case and each once, because that's how the server holds them.
+- The form has no field for a URL. Legacy could fetch the document from a URL. The new server only reads
+  document content at runtime, and it takes files and URLs as startup options (DEV-27 in
+  [deviations.md](../deviations.md)).
+
+### The import report
+
+- The page starts with a sentence that names the file and counts the additions and the conflicts. The tags
+  of the import, if it had any, come next, and then the additions and the conflicts. Each item has its kind
+  in words and the sentence that the server wrote about it. A kind that the UI doesn't know is shown by its
+  name in the admin API.
+- The sections "Additions" and "Conflicts" are always there. An empty section says that the import added
+  nothing, or that it found no conflicts.
+- Three more sections appear only when the report has something for them: the default plan that the import
+  designated and applied, the parts of a Mockey 2.x document that the server couldn't read, and the rule
+  sets of such a document that aren't well formed. The section for the default plan shows what the report
+  of applying a plan shows. A rule set is listed with a link to its service, because that's where it can be
+  fixed.
+- Like every report, the page has an address of its own (see [ui-forms.md](ui-forms.md)). Loading it again
+  doesn't import the document again. The UI keeps the report for that address, and it doesn't keep the
+  document.
+
+### What the page doesn't have
+
+- There's no preview of an import. The admin API has no dry run, so the only way to get the report is to
+  import the document.
+- The export is the JSON document of the new server. The admin API doesn't export the XML format of
+  Mockey 2.x.
+
+## The search page
+
+The search page finds services, scenarios, and plans. Its form is also on the overview of the services, next
+to the tag filter.
+
+### Requirements
+
+- The UI offers the search of the admin API (`admin-ui`: Coverage of management operations).
+- The UI keeps list filters in the address of the page, so that the same address shows the same view in
+  another browser (`admin-ui`: View state lives in the address). A search term is treated like such a
+  filter.
+
+### The page
+
+- The address is `/search?term=`. The form is sent with the method GET, so the term is part of the address,
+  and a search can be bookmarked or passed on.
+- The server finds nothing for a blank term. The UI doesn't ask it in that case, and the page only shows the
+  form.
+- The results keep the order of the server: the plans come first, and the scenarios of a service follow
+  that service. Sorting the list by name would separate the scenarios from their services.
+- Each result has its name as a link to its page, and its kind. A scenario also has a link to its service.
+  A kind that the UI doesn't know is shown by its name in the admin API, and it has no link.
+- A line above the results says how many there are and repeats the term. A long term is cut there, as every
+  text that a sentence of the UI repeats.
+
+### What the search page doesn't have
+
+- The page doesn't say where in a result the term was found. The admin API only names the result.
+- There are no pages and no filter by kind.
+- The navigation has no search field. The form is on the overview, which is the first page of the UI, and
+  on the search page itself.
+
+## The pages that merge services
+
+A merge copies the scenarios of other services into a service. The page of a service links to the form that
+chooses those services. A confirmation step follows, and the merge leads to a page with its report.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for services (`admin-ui`: Coverage of management
+  operations). Task 13.10 names the merge.
+- The UI shows the report that the admin API returns (`admin-ui`: Result feedback).
+- The UI asks for confirmation before it deletes a service (`admin-ui`: Confirmation of destructive actions).
+  A merge deletes the merged services if every one of their scenarios was copied.
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/service/merge?id=` | The form that chooses the services to merge into the service. |
+| `/service/merge?id=&step=confirm&source=` | The confirmation step for the services that the address names. Its form merges them (`POST`) and leads to the report. |
+
+### Choosing and confirming
+
+The form lists every other service with a check box, by name as on the overview, and says how many
+scenarios each one has. What happens after "Continue" was the question:
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. The form is sent with POST, and the server merges at once. | One step. | The merged services can be deleted, and the UI asks before it deletes a service. |
+| 2. The form is sent with POST to a page that asks, and that page holds the choice in hidden fields. | The address stays short. | The page that asks is the answer to a POST, so loading it again sends the form again. Every other confirmation step of the UI is a page with an address. |
+| 3. The form is sent with GET, so the choice is in the address of the page that asks. | It's the confirmation step that the UI already has. The page can be loaded again, and "Cancel" and the back button lead where one expects. | An address with many services is long. |
+
+Way 3. The form and the confirmation step share one path. A parameter `step=confirm` asks for the
+confirmation step, and each chosen service is a parameter `source`. The form of the confirmation step is
+sent to the same address, so the merge covers exactly the services that the page asked about.
+
+- The confirmation step names the chosen services and says what a merge does: a scenario is skipped if the
+  destination already has one with the same name and response body, the tags are added in any case, and the
+  merged services are deleted only if nothing was skipped. The UI can't say in advance which scenarios will
+  be skipped, because the admin API has no dry run.
+- Without a choice, the page is the form again, with the message "Choose at least one service to merge."
+  The server would accept an empty list and do nothing, which helps no one.
+- If a chosen service doesn't exist any longer, the page is the form again as well. It says so and keeps the
+  rest of the choice. Asking about the remaining services alone would confirm something that wasn't chosen.
+- Nothing is merged unless the form of the confirmation step is submitted. A request to the same address
+  without the confirmation field gets the page that asks.
+
+### The merge report
+
+- The report says how many scenarios were copied and skipped, and what became of the merged services: they
+  were deleted and their tags and real URLs now belong to the destination, or they were kept because a
+  scenario was skipped.
+- The copied and the skipped scenarios are listed with the names of their services.
+- The report has an address of its own, like every report. Loading it again doesn't merge again.
+
+### What the merge pages don't have
+
+- A service can't be chosen if its identifier contains a line break, because a browser rewrites line breaks
+  in every form value. The identifiers that the server generates never contain one. The same limit holds
+  for the other check boxes and choices of the UI that send an identifier.
+
+## The pages that derive real URLs
+
+The form at `/services/real-urls` adds real URLs to all services at once. For each real URL of a service, the
+server replaces what a regular expression finds, and it adds the result to the service as another real URL.
+That's how the services of an environment `qa1` get the URLs of an environment `qa2`. The overview links to
+the form.
+
+### Requirements
+
+- The UI offers every management operation of the admin API for services (`admin-ui`: Coverage of management
+  operations). Task 13.10 names the bulk derivation.
+- A form that the admin API rejects is shown again with what was entered, and with each message next to the
+  field that it concerns (`admin-ui`: Validation feedback).
+- The UI shows the report that the admin API returns (`admin-ui`: Result feedback).
+
+### The form
+
+- The form has a field for the regular expression and a text area for the replacements, one per line. Each
+  replacement gives one new real URL per existing real URL. Legacy has a single replacement field. The admin
+  API takes a list, so the form takes one as well.
+- Blank lines are left out. Every other line is sent exactly as it was typed.
+- The fields have the names of the members of the request, `expression` and `replacements`. The UI doesn't
+  check either of them. The server compiles the expression, and what it rejects appears next to the field.
+- The server replaces with the regular expression functions of Kotlin, so `$1` in a replacement refers to a
+  group of the expression. The hint below the field says so.
+- The form doesn't ask for confirmation. A derivation only adds real URLs, and the report lists every one of
+  them.
+
+### The report
+
+- The report says how many real URLs were added, and it lists each one with a link to its service.
+- If nothing was added, the report gives the two possible reasons: the expression found nothing in the real
+  URLs, or the services already list every derived URL.
+- The report has an address of its own, like every report.
+
+## The schema report
+
+The page at `/service/schema-report?id=` shows what the response schema of a service says about the response
+body of each scenario. The page of a service links to it, in the row of the response schema. A service
+without a schema has no such link.
+
+### Requirements
+
+- The UI offers the schema reports of the admin API (`admin-ui`: Coverage of management operations).
+
+### The page
+
+- The report changes nothing on the server, so it's a plain page. It can be loaded again and passed on.
+- If the server checked the scenarios, the page says how many don't conform. A table lists each scenario with
+  a link to its page, the result, and the violations.
+- If the schema declares a dialect that the server doesn't support, the page says so and shows the dialect.
+  If the server can't apply the schema for another reason, the page lists the problems that the server
+  reports.
+- The page says that the report has no effect on its own: a scenario that doesn't conform is stored and
+  served as before.
+- The server answers with 404 for a service without a response schema. The UI shows its message on the page
+  that it has for everything that isn't there.
+
+### What the page doesn't have
+
+- Legacy has a tool that checks any JSON text against any schema. The admin API reports on the scenarios of
+  a service, so the UI does the same.
+
+## The page of the server
+
+The page at `/system` shows what the server reports about itself. From there, a user switches between
+read-only mode and writable mode, reloads the definitions, resets the server, and clears the last-used
+times.
+
+### Requirements
+
+- The UI offers the read-only mode, the reload, the reset, and the clearing of the last-used times
+  (`admin-ui`: Coverage of management operations). Task 13.10 also names the status.
+- The UI asks for confirmation before a reset, and nothing is removed unless the user confirms (`admin-ui`:
+  Confirmation of destructive actions, with the scenario "Reset needs confirmation").
+- After an action, the UI says whether it succeeded (`admin-ui`: Result feedback).
+
+### The addresses
+
+| Address | Page or action |
+|---|---|
+| `/system` | The status of the server, with the links and buttons for everything below. |
+| `/system/read-only` | Switches the server to read-only mode (`POST`). |
+| `/system/writable` | The confirmation step for the switch to writable mode. |
+| `/system/reload` | The confirmation step for a reload of the definitions. |
+| `/system/reset` | The confirmation step for a reset. |
+| `/system/clear-last-used` | Clears the last-used times (`POST`). |
+
+### The status
+
+- The page shows the version, the start time, the definitions location, the mode, the address of the mock
+  endpoint, the tag filter, the enabled twist configuration, and whether the legacy shim is enabled. A link
+  leads to the page for the outbound proxy.
+- All of that comes from the status of the server, which the UI asks for on every page anyway. The page asks
+  for nothing else.
+
+### Read-only mode
+
+- The switch to read-only mode is a button that acts at once. The switch stores nothing and discards
+  nothing, and it's easy to undo.
+- The switch to writable mode has a confirmation step. The specification doesn't ask for one. The step is
+  there because the switch stores the definitions that the server holds in memory, and they take the place
+  of the stored ones. The page that asks names the definitions location.
+- If the server is in writable mode already, that page says so and asks nothing.
+
+### Reload and reset
+
+- A reset has a confirmation step, as the specification requires. A reload has one as well: in read-only
+  mode, it discards every change that the server hasn't stored.
+- Each page that asks says what happens in the mode that the server is in. In writable mode, the server has
+  already stored every change, so a reload loses none. A reset in writable mode also removes the stored
+  definitions.
+- Both pages offer the download of the definitions before anything is discarded.
+- After the action, the browser goes back to the page of the server, which says what was done.
+
+### The last-used times
+
+- The button that clears the last-used times is in a section of its own on the page of the server. The hint
+  below the list of the overview, which says how long the server keeps these times, links to that section.
+- The button acts at once. The times say when something was last used, and no definition depends on them.
+
+### What the page doesn't have
+
+- Legacy can set the response mode of every service at once. As noted for the overview, the admin API has no
+  operation for that.
+- The page doesn't list the inspectors that are installed. The form of a service offers them where one is
+  chosen.
+
 ## A look in a browser
 
 The tests read the pages without a browser. The overview was looked at once in a browser, which is no test and
@@ -686,6 +1000,14 @@ is not repeated by one:
   page for removing a tag, the proxy page, and the overview with its note about the tag filter.
 - Chrome displayed the history list at widths of 1,280 and 560 pixels, the page of an entry with a text body
   and with a body that isn't text, the replay form, and the statistics page with and without a time range.
+- Chrome displayed the overview with the tag filter and the search form side by side at 1,280 pixels and one
+  below the other at 560 pixels, the page for import and export at both widths, an import report, and the
+  search page.
+- Chrome displayed the merge form at 560 pixels, its message for an empty choice, its confirmation step, the
+  derivation form with a rejected expression, the derivation report, a schema report, and the page of a
+  service with its links to the merge and to the schema report.
+- Chrome displayed the page of the server in both modes, and the confirmation pages for the switch to
+  writable mode, the reload, and the reset.
 - With the automatic refresh on, Chrome loaded a copy of the history list three times in 13 seconds. The copy
   was served with the content security policy of the UI, so the policy doesn't get in the way of the reload.
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
@@ -699,5 +1021,7 @@ the forms of the switches. `UiServiceTest` sends the forms of a service and read
 asked for. `UiScenarioTest` submits the scenario forms, presses the designation buttons, and checks
 which requests reached the admin API. `UiPlansTest`, `UiTwistsTest`, `UiTagsTest`, and `UiProxyTest` do the
 same for plans, twist configurations, tags, and the outbound proxy. `UiHistoryTest`, `UiHistoryEntryTest`,
-and `UiStatisticsTest` cover the history and the statistics. `UiCrawlTest` follows every link from the first
+and `UiStatisticsTest` cover the history and the statistics. `UiDefinitionsTest`, `UiSearchTest`,
+`UiMergeTest`, `UiRealUrlsTest`, `UiSchemaReportTest`, and `UiSystemTest` cover the pages of task 13.10, and
+`ImportFormTest` checks how the import form tells XML from JSON. `UiCrawlTest` follows every link from the first
 page on, also with a server that states content that is written to be read as markup.

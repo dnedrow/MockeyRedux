@@ -348,19 +348,8 @@ internal object PlanPages {
      */
     fun applied(report: PlanApplyReportDto): Page {
         val plan = report.plan
-        val applied = plan.items.size - report.skippedItems.size
         return Page("The plan ${plan.name} was applied") {
-            p { +appliedTo(applied) }
-            if (report.skippedItems.isNotEmpty()) {
-                h2 { +"Skipped services" }
-                p { +SKIPPED }
-                ul { report.skippedItems.forEach { li { +it.serviceName } } }
-            }
-            if (report.unresolvedScenarios.isNotEmpty()) {
-                h2 { +"Scenarios that were not found" }
-                p { +UNRESOLVED }
-                ul { report.unresolvedScenarios.forEach { li { +"${it.serviceName}: ${it.scenarioName}" } } }
-            }
+            planOutcomeOf(report) { h2 { +it } }
             p(classes = "actions") {
                 a(href = addressOf(plan.id)) { +"Back to the plan" }
                 a(href = ServicesPages.OVERVIEW) { +"Services" }
@@ -446,14 +435,6 @@ internal object PlanPages {
         }
     }
 
-    /** Returns the sentence that says how many services got their settings from a plan. */
-    private fun appliedTo(services: Int): String =
-        when (services) {
-            0 -> "No service was changed."
-            1 -> "1 service now has the settings of the plan."
-            else -> "$services services now have the settings of the plan."
-        }
-
     private val AS_DEFAULT =
         Designation(
             held = "This is the default plan. The server applies it when it starts.",
@@ -469,9 +450,6 @@ internal object PlanPages {
     private const val REPLACES_ITEMS =
         "This replaces everything the plan holds with the current response mode, delay, and default scenario " +
             "of the services that are checked below."
-    private const val SKIPPED = "The plan names these services, but they do not exist. Their settings were skipped."
-    private const val UNRESOLVED =
-        "These services have no scenario with the name in the plan. Their default scenario was left as it is."
     private const val KEEPS_SERVICES = "Deleting a plan does not change any service."
     private const val DEFAULT_ENDS = "It is the default plan. The server will have no default plan."
 
@@ -483,6 +461,39 @@ internal object PlanPages {
     private const val SERVICES_HINT =
         "The plan takes the current response mode, delay, and default scenario of the services that are checked."
 }
+
+/**
+ * Shows what applying a plan did, which is [report]: how many services got their settings, which items were
+ * skipped, and which scenario names the server couldn't find. The two lists each get a heading, which
+ * [heading] writes, so that a page can fit them into its own outline.
+ */
+internal fun FlowContent.planOutcomeOf(
+    report: PlanApplyReportDto,
+    heading: FlowContent.(String) -> Unit,
+) {
+    p { +appliedTo(report.plan.items.size - report.skippedItems.size) }
+    if (report.skippedItems.isNotEmpty()) {
+        heading("Skipped services")
+        p { +SKIPPED }
+        ul { report.skippedItems.forEach { li { +it.serviceName } } }
+    }
+    if (report.unresolvedScenarios.isNotEmpty()) {
+        heading("Scenarios that were not found")
+        p { +UNRESOLVED }
+        ul { report.unresolvedScenarios.forEach { li { +"${it.serviceName}: ${it.scenarioName}" } } }
+    }
+}
+
+/** Returns the sentence that says how many services got their settings from a plan. */
+private fun appliedTo(services: Int): String =
+    when (services) {
+        0 -> "No service was changed."
+        1 -> "1 service now has the settings of the plan."
+        else -> "$services services now have the settings of the plan."
+    }
+
+private const val SKIPPED = "The plan names these services, but they do not exist. Their settings were skipped."
+private const val UNRESOLVED = "These services have no scenario with the name in the plan. Their default scenario was left as it is."
 
 /**
  * The plan forms: the names of their fields, the state they display, and what they ask the admin API to do.

@@ -211,7 +211,9 @@ class StoredContentTest {
         val refused = Jsoup.parse(Html.document(FailurePages(adminUrl, hasToken = false).of(refusal, true), "/x", adminUrl, null))
 
         val stated = status.select("main dl dd").map { it.wholeText() }
-        assertEquals(listOf(text, text, text, "$text/service/", "$text plain", text), stated.filterNot { it.startsWith("Read-only") })
+        val ofTheUi = setOf("Read-only", "Disabled")
+        val ofTheServer = stated.filterNot { it.substringBefore(':') in ofTheUi }
+        assertEquals(listOf(text, text, text, "$text/service/", "$text plain", text), ofTheServer)
         val foot = status.select("body > footer p").first()!!.wholeText()
         assertTrue(foot.endsWith(", version $text, in read-only mode"), foot)
         assertEquals(listOf(text), failed.select("main .problem").map { it.wholeText() })

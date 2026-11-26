@@ -64,15 +64,19 @@ internal class Section(
  * place for anything.
  */
 internal object Html {
+    /** The paths outside `/services` whose pages belong to the section of the services. */
+    private val ABOUT_SERVICES = setOf(ServicePages.PAGE, ScenarioPages.PAGE, DiagnosticsPages.PATH, SearchPages.PAGE)
+
     /** The sections of the UI, in the order of the navigation. */
     val sections: List<Section> =
         listOf(
-            Section(ServicesPages.OVERVIEW, "Services", setOf(ServicePages.PAGE, ScenarioPages.PAGE, DiagnosticsPages.PATH)),
+            Section(ServicesPages.OVERVIEW, "Services", ABOUT_SERVICES),
             Section(HistoryPages.LIST, "History", setOf(StatisticsPages.PAGE)),
             Section(PlanPages.LIST, "Plans", setOf(PlanPages.PAGE)),
             Section(TwistPages.LIST, "Twisting", setOf(TwistPages.PAGE)),
             Section(TagPages.PAGE, "Tags", setOf("/tag")),
-            Section("/system", "Server", setOf(ProxyPages.PAGE)),
+            Section(DefinitionsPages.PAGE, "Import/Export"),
+            Section(SystemPages.PAGE, "Server", setOf(ProxyPages.PAGE)),
         )
 
     /**
@@ -123,7 +127,7 @@ internal object Html {
                         if (trouble != null) {
                             p(classes = "problem") {
                                 +"$trouble "
-                                a(href = "/system") { +"More about it" }
+                                a(href = SystemPages.PAGE) { +"More about it" }
                                 +"."
                             }
                         }

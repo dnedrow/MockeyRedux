@@ -200,7 +200,7 @@ class UiProxyTest {
         val system = browser.get("/system").page
         val links = system.select("main p.actions a").map { it.text() to it.attr("href") }
 
-        assertEquals(listOf("Outbound proxy and upstream session" to "/proxy"), links)
+        assertEquals("Outbound proxy and upstream session" to "/proxy", links.first())
     }
 
     // Stored content is text

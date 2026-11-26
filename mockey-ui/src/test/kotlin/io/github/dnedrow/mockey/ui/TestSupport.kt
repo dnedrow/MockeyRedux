@@ -42,6 +42,10 @@ internal fun Browser.Response.wholeTextOf(selector: String): String {
     return found.first()!!.wholeText()
 }
 
+/** Returns the links that [selector] finds on the page of this answer, each as its text and its address. */
+internal fun Browser.Response.linksOf(selector: String): List<Pair<String, String>> =
+    page.select(selector).map { it.text() to it.attr("href") }
+
 /** Returns the token that the forms of this browser carry. It reads the token from the single form of the page at [path]. */
 internal fun Browser.token(path: String): String {
     val form = get(path).form()

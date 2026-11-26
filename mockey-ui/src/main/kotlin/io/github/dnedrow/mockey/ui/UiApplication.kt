@@ -399,6 +399,10 @@ internal class UiApplication(
                 ServicesArea,
                 ServiceArea,
                 ScenarioArea,
+                MergeArea,
+                SchemaReportArea,
+                RealUrlArea,
+                SearchArea,
                 DiagnosticsArea,
                 HistoryArea,
                 HistoryEntryArea,
@@ -406,6 +410,7 @@ internal class UiApplication(
                 PlansArea,
                 TwistsArea,
                 TagsArea,
+                DefinitionsArea,
                 ProxyArea,
                 SystemArea,
             )

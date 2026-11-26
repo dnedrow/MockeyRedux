@@ -361,7 +361,8 @@ internal object Confirmation {
     /**
      * Returns the page that asks. Its title is the question, such as whether a service is to be deleted, and
      * [consequences] say what happens then. The button of its form says [confirm], and the form is sent to
-     * [action]. The link beside it leads to [back] and changes nothing.
+     * [action]. The link beside it leads to [back] and changes nothing. [advice] is shown between the
+     * consequences and the form. A page uses it to offer something to do first, such as a download.
      */
     fun page(
         view: View,
@@ -370,9 +371,11 @@ internal object Confirmation {
         confirm: String,
         action: String,
         back: String,
+        advice: (FlowContent.() -> Unit)? = null,
     ): Page =
         Page(title) {
             consequences.forEach { p { +it } }
+            advice?.invoke(this)
             postForm(view, action) {
                 hiddenInput(name = FIELD) { value = YES }
                 p(classes = "actions") {

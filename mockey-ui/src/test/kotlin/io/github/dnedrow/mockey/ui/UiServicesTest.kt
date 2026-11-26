@@ -186,7 +186,9 @@ class UiServicesTest {
         val expected = listOf("2026-11-25 19:43:33 UTC", "2026-11-25 19:43:33 UTC", "2026-01-02 03:04:05 UTC", "yesterday", "never")
         assertEquals(expected, rows(page).map { it.lastUsed })
         assertEquals(times.take(3), page.select("main table.services time").map { it.attr("datetime") })
-        assertTrue("The server keeps these times while it runs" in page.select("main > .hint").text())
+        assertTrue("The server keeps these times in memory until it stops." in page.select("main > .hint").text())
+        val clearing = page.select("main > .hint a").map { it.text() to it.attr("href") }
+        assertEquals(listOf("Clear the last-used times" to "/system#last-used-times"), clearing)
     }
 
     /** A server without a service, and a filter that no service passes, get a page that says so and has no list. */
@@ -671,7 +673,8 @@ class UiServicesTest {
             assertEquals(tags.joinToString(" "), page.select("main form.filter [name=tag]").attr("value"), text)
             assertEquals("No service carries one of the tags ${tags.joinToString(", ")}.", counted(page), text)
             val addresses = page.select("main [href], main [action]").map { it.attr("href") + it.attr("action") }
-            assertEquals(listOf("/services", "/services", "/service/new"), addresses, text)
+            val leading = listOf("/services", "/search", "/services", "/service/new", "/services/real-urls", "/diagnostics")
+            assertEquals(leading, addresses, text)
             val elements = page.select("main *").map { it.tagName() }
             assertEquals(setOf("h1", "form", "div", "label", "input", "p", "button", "a"), elements.toSet(), text)
             assertEquals(emptyList(), Hostile.UNWRITTEN.filter { it in answer.body }, text)
@@ -698,7 +701,7 @@ class UiServicesTest {
                 .plus(setOf("aria-label", "aria-pressed", "aria-describedby", "datetime"))
 
         /** How an address of the two pages is written: an address of the UI, and after it a place of a page of the UI. */
-        val ADDRESS = Regex("/[a-z/-]*(\\?[A-Za-z0-9._~%=&-]*)?(#service-[A-Za-z0-9._~-]*)?")
+        val ADDRESS = Regex("/[a-z/-]*(\\?[A-Za-z0-9._~%=&-]*)?(#(service-[A-Za-z0-9._~-]*|last-used-times))?")
         val ANCHOR = Regex("service-[A-Za-z0-9._~-]*")
     }
 }

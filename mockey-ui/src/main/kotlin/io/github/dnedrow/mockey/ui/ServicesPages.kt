@@ -155,9 +155,12 @@ internal object ServicesPages {
         tags: List<String>,
     ): Page =
         Page("Services") {
-            getForm(OVERVIEW, classes = "filter") {
-                textField(FormState.of(TAG to tags.joinToString(" ")), TAG, "Tags", hint = FILTER_HINT)
-                submit("Filter")
+            div(classes = "tools") {
+                getForm(OVERVIEW, classes = "filter") {
+                    textField(FormState.of(TAG to tags.joinToString(" ")), TAG, "Tags", hint = FILTER_HINT)
+                    submit("Filter")
+                }
+                searchFormOf("", SearchPages.BRIEF_HINT)
             }
             p(classes = "count") {
                 +countOf(services.size, tags)
@@ -166,7 +169,11 @@ internal object ServicesPages {
                     a(href = OVERVIEW) { +"Show all services" }
                 }
             }
-            p(classes = "actions") { a(href = ServicePages.NEW) { +"New service" } }
+            p(classes = "actions") {
+                a(href = ServicePages.NEW) { +"New service" }
+                a(href = RealUrlPages.PAGE) { +"Derive real URLs" }
+                a(href = DiagnosticsPages.PATH) { +"Diagnostics" }
+            }
             if (system.tagFilter.isNotEmpty()) {
                 p(classes = "note") {
                     +"$TAG_FILTER_IS_ON "
@@ -187,7 +194,10 @@ internal object ServicesPages {
                     }
                 }
             }
-            p(classes = "hint") { +LAST_USED_HINT }
+            p(classes = "hint") {
+                +"$LAST_USED_HINT "
+                a(href = "${SystemPages.PAGE}#${SystemPages.LAST_USED_ANCHOR}") { +"Clear the last-used times" }
+            }
         }
 
     /** Returns what the form says that gave [service] another response mode, where [service] is the service as it is now. */
@@ -341,6 +351,5 @@ internal object ServicesPages {
             "carries one of these tags:"
 
     private const val LAST_USED_HINT =
-        "A service was last used when it last answered a request. " +
-            "The server keeps these times while it runs, and it can be told to forget them."
+        "A service was last used when it last answered a request. The server keeps these times in memory until it stops."
 }

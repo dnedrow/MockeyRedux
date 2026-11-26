@@ -63,6 +63,7 @@ class UiPagesTest {
                 "Mock endpoint" to "http://mockey.test:8080/service/",
                 "Tag filter" to "team-a nightly",
                 "Enabled twist configuration" to "German paths",
+                "Legacy shim" to "Disabled: the server does not answer the automation endpoints of Mockey 2.x.",
             )
         assertEquals(200, answer.status)
         assertEquals("text/html; charset=UTF-8" to "no-store", answer.header("content-type") to answer.header("cache-control"))
