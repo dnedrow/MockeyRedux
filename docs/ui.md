@@ -236,6 +236,7 @@ storage and import. The help is part of the UI, so it works without a connection
 |---|---|
 | The page of all services | Services |
 | Create a Service | Services, then "New service" |
+| The buttons that set every service to one response mode | Gone (DEV-75). The overview under Services switches the mode of one service, and a plan sets the modes of several services at once. |
 | Merge | The page of a service, then "Merge services into this one" |
 | Real URL injecting | Services, then "Derive real URLs" |
 | Proxy Settings and Reset Session | Server, then "Outbound proxy and upstream session" |

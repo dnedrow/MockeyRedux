@@ -13,10 +13,19 @@ Each row ends in one of three places:
   common start of several names, such as `automation-definitions-*`.
 - A non-goal of the design.
 
-A row that begins with **Open** has no place yet. "Open points" at the end lists them.
+A row whose last cell begins with **Open** has no place yet. The table has no such row any more, and "Open
+points" at the end says how the last ones were closed.
 
-`scripts/check-traceability.sh <legacy-checkout>` checks that the first table has one row for every servlet
-mapping of the legacy `web.xml`, and no row for a mapping that the file does not have.
+Two checks keep the table in order:
+
+- `scripts/check-traceability.sh <legacy-checkout>` compares the table with the sources of legacy. The
+  first table has one row for every servlet mapping of the legacy `web.xml`, and no row for a mapping that
+  the file does not have. The tables of the documented parameters name every parameter that the legacy API
+  documentation describes, and the table of the startup options names every option of the legacy runner.
+  The script also fails when a row is open.
+- `TraceabilityTest` in `mockey-parity-tests` runs with every build and needs no legacy checkout. It fails
+  when a row is open, when a row ends in neither a requirement, a parity case, nor a non-goal, and when the
+  table names a requirement, a parity case, or a deviation that is not there.
 
 Deviation IDs (DEV-nn) refer to `docs/deviations.md`. Unless the legacy shim is enabled, the new mock listener
 answers 404 for every legacy path other than `/service/*` and `/status` (DEV-26). The legacy pages become pages
@@ -29,7 +38,7 @@ of `mockey-ui`, which talks to the server through the admin API on the admin lis
 | `/jsonschemavalidate` | `JsonSchemaValidateServlet` | Page and endpoint that check data against a JSON Schema, with draft-03 as an option. | `service-definitions`: Response schema report, Supported schema dialects (DEV-23). `admin-ui`: Coverage of management operations. |
 | `/api/*` | `ServletContainer` with the resources of `com.mockey.api` | An unfinished REST API: it lists the services, and its update operations store nothing. | `admin-api`: Versioned base path and format, Service and scenario management. |
 | `/status` | `StatusServlet` | Says that the server runs, since when, and where its definitions are. | `server-runtime`: Liveness endpoint (DEV-28). Parity: `automation-status`. |
-| `/validateSyntax` | `SyntaxValidateServlet` | Checks that a text is a JSON Schema. No legacy page calls it. | **Open.** No requirement covers a check of the schema alone, and the design names only the sample loader as a non-goal. |
+| `/validateSyntax` | `SyntaxValidateServlet` | Checks that a text is a JSON Schema. No legacy page calls it. | Non-goal: the JSON Schema syntax check. The schema report of a service says what is wrong with a schema that cannot be used. |
 | `/servicestatschart` | `StatisticsForServiceHistoryHtml` | Page that charts the number of history entries of each service for a range of dates. | `request-history`: Per-service statistics. `admin-ui`: Coverage of management operations. |
 | `/servicestats` | `StatisticsForServiceAjaxServlet` | The same numbers as JSON or CSV. | `request-history`: Per-service statistics. `admin-api`: History access. |
 | `/loadjsonschemasamples` | `JsonSchemaLoadSamplesServlet` | Loads sample schemas into the validation page. | Non-goal: the JSON Schema sample loader. |
@@ -67,7 +76,7 @@ of `mockey-ui`, which talks to the server through the admin API on the admin lis
 | `/history` | `HistoryServlet` | Page of the history with filter tokens, and the deletion and flagging of entries. | `request-history`: Listing history, Filtering history by tokens, Deleting history, Flagging entries. `admin-ui`: Live history view. Parity: `inspection-history-messages`. |
 | `/fulfilledrequest` | `HistoryHtmlServlet` | One history entry as an HTML fragment. | `admin-api`: History access. `admin-ui`: Live history view. |
 | `/scenariolist` | `ScenarioListServlet` | The scenarios of a service as an HTML fragment. | `admin-api`: Service and scenario management. `admin-ui`: Services overview. |
-| `/setup` | `ServiceSetupServlet` | Page and endpoint that create, change, delete, and duplicate a service. | `service-definitions`: Service attributes, Service name validation, Unique mock URL pattern, A real URL belongs to one service, Service deletion, Service duplication (DEV-19). `admin-api`: Service and scenario management. |
+| `/setup` | `ServiceSetupServlet` | Page and endpoint that create, change, delete, and duplicate a service. With the parameters `all` and `responseType`, it sets the response mode of every service at once, which the page of all services offers as three buttons. | `service-definitions`: Service attributes, Service name validation, Unique mock URL pattern, A real URL belongs to one service, Service deletion, Service duplication (DEV-19). `admin-api`: Service and scenario management. The switch of every service at once is gone (DEV-75). |
 | `/scenario` | `ScenarioServlet` | Page and endpoint that create, change, and delete a scenario and designate error scenarios. | `service-definitions`: Scenario attributes, Scenario name validation, Rule sets are validated on save, Error scenario designation (DEV-18). `admin-api`: Service and scenario management. |
 | `/service/*` | `ResponseServlet` | The mock endpoint. | `request-routing`, `scenario-responses`, `upstream-proxying`, and `request-inspection`: every requirement. `server-runtime`: Default headers on mock responses. Parity: `routing-*`, `response-*`, `proxy-*`, `rule-*`, `inspection-response-unaffected`. |
 | `/upload/*` | `UploadConfigurationServlet` | Page and endpoint that import a definitions document from an uploaded file or from a URL. | `definition-storage`: Import adds new services, Import merges services with the same name, Import of settings, plans, and twist configurations, Import report, Tagging imported definitions. `legacy-compatibility`: Import of a legacy single-file export, Legacy import follows the general import rules. `admin-api`: Definition exchange and diagnostics (DEV-27). |
@@ -117,7 +126,7 @@ Legacy reads two more parameters that its documentation does not describe. Both 
 | `service_plan_name` | `legacy-compatibility`: Legacy plan endpoint. Parity: `automation-plan-set-by-name`, `automation-plan-save-existing-name`. |
 | `service_plan_tag` | `legacy-compatibility`: Legacy plan endpoint. Parity: `automation-plan-save-new`. |
 | `type` with `json` | `legacy-compatibility`: Legacy result envelope: the result is always JSON (DEV-50). Parity: `automation-plan-save-new`. |
-| `transient_state` | Accepted and ignored (DEV-22). Parity: `automation-plan-set-transient-state`. The requirement Legacy plan endpoint does not name the parameter, see "Open points". |
+| `transient_state` | `legacy-compatibility`: Legacy plan endpoint, which accepts and ignores it (DEV-22). Parity: `automation-plan-set-transient-state`. |
 | Result: `success`, `fail`, `planId`, `planName` | `legacy-compatibility`: Legacy result envelope, Legacy plan result (DEV-48). Parity: `automation-plan-*`. |
 
 Legacy reads one more parameter that its documentation does not describe: `service_ids[]`, the services of
@@ -188,13 +197,15 @@ test, and `Obsolete` for one whose subject no longer exists.
 
 ## Open points
 
-- `/validateSyntax` has no place. It checks a JSON Schema by itself, and no legacy page uses it. Either the
-  design names it as a non-goal next to the sample loader, or `service-definitions` gains a requirement for a
-  schema that cannot be used. The response schema report of task 3.7 already says what is wrong with such a
-  schema, although no requirement asks for it.
+None. Task 15.3 closed the three points that this section listed:
+
+- `/validateSyntax` checks a JSON Schema by itself, and no legacy page uses it. The design now names it as
+  a non-goal, next to the sample loader, which belongs to the same validation pages of legacy. The response
+  schema report says what is wrong with the schema of a service that cannot be used.
 - `/setup` can also set the response mode of every service at once, with the parameters `all` and
   `responseType`. The legacy pages offer that as three buttons. No requirement describes one operation for
-  all services: `admin-api`: Partial updates changes one service for each request.
-- `legacy-compatibility`: Legacy plan endpoint does not say that `/plan/setup` accepts and ignores
+  all services, and the new system has none: `admin-api`: Partial updates changes one service for each
+  request. The deviation register lists the difference as DEV-75.
+- `legacy-compatibility`: Legacy plan endpoint now says that `/plan/setup` accepts and ignores
   `transient_state`, as Legacy service configuration endpoint says for `transientState`. DEV-22 and the
-  recording `automation-plan-set-transient-state` say so.
+  recording `automation-plan-set-transient-state` said so before.

@@ -44,7 +44,7 @@ Motivation is in `proposal.md` (Why). This section records only what shapes the 
 - User accounts, roles, or multi-tenancy. A single shared admin token is the only access control.
 - Clustering or shared state between instances.
 - A single-process distribution that embeds the UI in the server.
-- Carrying over the Image Depot, the mobile-only page (`/mobi`), the in-browser debug log viewer (`/console`), and the JSON Schema sample loader.
+- Carrying over the Image Depot, the mobile-only page (`/mobi`), the in-browser debug log viewer (`/console`), the JSON Schema sample loader, and the JSON Schema syntax check (`/validateSyntax`), which no legacy page uses.
 - WAR packaging.
 
 ## Decisions

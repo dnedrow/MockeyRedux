@@ -462,6 +462,8 @@ of a migrated installation meet first:
   reads a document inside the definitions location of the server, and nothing outside that location (DEV-27).
 - The transient flags of a single service and of a single plan. Read-only mode holds for the whole server
   (DEV-22).
+- The three buttons that set the response mode of every service at once. The overview of the UI switches the
+  mode of one service, and a plan sets the modes of several services at once (DEV-75).
 - Request inspectors that are Java classes of Mockey 2.x, which it found by scanning the class path. An
   inspector is ported to the interface of the new engine, see "Porting an inspector of Mockey 2.x" in
   [inspectors.md](inspectors.md).

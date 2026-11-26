@@ -1,6 +1,6 @@
 # The integration and release checks
 
-Decided in tasks 15.1 and 15.2 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 15.1 to 15.3 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The last tasks of the change check the system as a whole: the two programs together, the build on a clean
 machine, the documents against the legacy system, and the artifacts of a release. This record says what each
@@ -127,13 +127,78 @@ Two things would need a change to the workflow, which is the owner's to decide:
   Maven Central answered the downloads with the status 429. A cache for what Gradle downloads would make
   such a failure less likely, and the job faster.
 
+## The traceability table and the deviation register
+
+Task 15.3 asks for an automated check that the traceability table has no unmapped legacy servlet or
+parameter, and that the deviation register matches the labels of the parity cases.
+
+Three checks do that. Two are tests, which run with every build and in the CI job. The third compares the
+table with the sources of Mockey 2.x, so it needs a checkout of them and is run by hand.
+
+| Check | What it holds |
+|---|---|
+| `TraceabilityTest` | No row of the table is open. Every row ends in a requirement, a parity case, or a non-goal. Every requirement, parity case, and deviation that the table names is there. |
+| `ParityReviewTest` | Every label names deviations of the register. The IDs of the register count up without a gap. Every recording that the register names is there, and the register accounts for every recording that carries the label of a deviation. |
+| `scripts/check-traceability.sh` | The table has a row for every servlet mapping, every documented parameter, and every startup option of Mockey 2.x, and no row is open. |
+
+### What the checks found
+
+**The table had three open points, and they're closed now.** Each was a question that the table had left to
+whoever owns the specifications. The answers are the ones that change nothing in the programs:
+
+- `/validateSyntax` checks a JSON Schema by itself, and no page of Mockey 2.x calls it. The design names it
+  as a non-goal now, next to the sample loader of the same validation pages.
+- `/setup` can set the response mode of every service at once, which the home page of Mockey 2.x offers as
+  three buttons. No requirement asks for such an operation, and the new system has none. The register
+  lists that as DEV-75, and the migration guide and the UI document say what takes its place.
+- The requirement for `/plan/setup` didn't say that the endpoint takes `transient_state` and ignores it.
+  The register and a recording said so, and the shim does it. The requirement says it now.
+
+**The register and the labels disagreed in five entries.** DEV-03, DEV-11, and DEV-27 didn't name every
+recording that carries their label. DEV-20 and DEV-47 stated a number of recordings that was one short. The
+register is corrected, and no label had to change.
+
+### Decisions
+
+**The register and the labels match in both directions.** A label names only deviations of the register,
+which `ParityReviewTest` has held since task 2.9. In the other direction, an entry of the register accounts
+for every recording that carries its label. It names each of them, or it names some and says how many more
+there are, or it states their number and names examples. So a recording that gets a label shows up in the
+register, and a number in the register stays true.
+
+**An entry may name a recording that doesn't carry its label.** The evidence of an entry is what shows the
+behavior of Mockey 2.x. A recording can show that while the new server answers it the same way, as
+`proxy-headers-application` does for DEV-69. The check only asks that such a recording exists.
+
+**A requirement is looked up by its name in the specifications.** The table cites a requirement as its
+capability and its name. The test reads the names from every `spec.md` below `openspec/` that's in a
+directory with the name of the capability. That holds for the specifications of this change, and for the
+ones that the change is merged into when it's archived.
+
+**The script reads the sources of Mockey 2.x, not a list of what they hold.** A servlet of Mockey 2.x
+declares the parameters of its endpoint for the API documentation, mostly by constants. The script follows
+a constant to the class that declares it: two interfaces have a constant with the same name, one for
+`transientState` and one for `transient_state`. The script reads the startup options from the calls that
+register them with the runner.
+
+**The last part of the table, "Legacy tests", isn't checked.** It maps test classes to their ports, and the
+task is about servlets and parameters.
+
+### What stays open
+
+DEV-75 records that the three buttons are gone. That's what the specifications say today, not a decision
+that they should stay gone. If they're wanted back, the UI can offer them with the operations that the
+admin API has.
+
 ## Repeating the checks
 
 ```shell
 ./gradlew check
 ./gradlew endToEndCheck
+scripts/check-traceability.sh /path/to/Mockey
 ```
 
 The first command is what the CI job runs. It includes the second one, which builds the two archives and
 runs the end-to-end check alone. The end-to-end check needs `bash`, `tar`, and `curl`. To run it again for
-archives that it has passed with, add `--rerun`.
+archives that it has passed with, add `--rerun`. The third command needs a checkout of Mockey 2.x at the
+commit `88e31ed`.

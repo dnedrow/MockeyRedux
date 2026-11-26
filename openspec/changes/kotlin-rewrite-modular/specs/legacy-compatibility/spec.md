@@ -156,7 +156,7 @@ On success, the `result` of `/config/service` SHALL have `success` with the valu
 - **THEN** the `result` has `success` equal to `updated`, `serviceName` equal to `Customers`, and `serviceResponseType` equal to `static`
 
 ### Requirement: Legacy plan endpoint
-`/plan/setup` SHALL find a plan by `plan_id` or else by `service_plan_name` and SHALL perform the given `action`: `save_plan` saves a plan for the services in `service_ids[]` with the name `service_plan_name` and the tags `service_plan_tag`, `set_plan` applies the plan, `delete_plan` deletes it, and `set_as_default_plan` designates it as default or, with `plan_id=none`, removes the designation.
+`/plan/setup` SHALL find a plan by `plan_id` or else by `service_plan_name` and SHALL perform the given `action`: `save_plan` saves a plan for the services in `service_ids[]` with the name `service_plan_name` and the tags `service_plan_tag`, `set_plan` applies the plan, `delete_plan` deletes it, and `set_as_default_plan` designates it as default or, with `plan_id=none`, removes the designation. It SHALL accept and ignore `transient_state`.
 
 #### Scenario: Apply a plan by name
 - **GIVEN** the legacy shim is enabled, and a plan named `Gold path` exists
