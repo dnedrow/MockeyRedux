@@ -59,10 +59,20 @@ tasks.test {
     )
 
     // The test of the documents runs their commands, with definitions of Mockey 2.x that the tests of the
-    // importer have. It also reads the README for the files of the program that its quick start names.
+    // importer have. It also reads the README and the release notes for the files of the program that they
+    // name.
     inputs
         .files("../docs/server.md", "../docs/migrating-from-2x.md", "../docs/admin-api.md", "../README.md")
         .withPropertyName("serverDocuments")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs
+        .files(fileTree("../docs/release-notes"))
+        .withPropertyName("releaseNotes")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    // It reads where the library is asked for by its version, which is the version of the server.
+    inputs
+        .files("../docs/library.md", "../samples/embedded/build.gradle.kts")
+        .withPropertyName("libraryCoordinates")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs
         .dir("../mockey-legacy/src/test/resources/legacy")

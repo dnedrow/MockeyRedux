@@ -1,6 +1,6 @@
 # The integration and release checks
 
-Decided in tasks 15.1 to 15.4 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 15.1 to 15.5 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The last tasks of the change check the system as a whole: the two programs together, the build on a clean
 checkout, the documents against the legacy system, the quick start on a machine that has nothing but Java,
@@ -276,11 +276,142 @@ no link with the expected text. That defect of the script is corrected.
 ### What stays open
 
 - No release is published yet, so nobody can follow the download step. Task 15.5 builds the release
-  candidate, and the check runs again with its jars.
+  candidate, and the check runs again with its jars, see "The release candidate".
 - The script takes `podman` where there's no `docker`, with the same commands. That wasn't tried, because
   the machine of the run has no engine for it.
 - The CI job doesn't run the check. A step with `./gradlew quickStartCheck` would do it, and that's a change
   to the workflow, which is the owner's to decide.
+
+## The release candidate
+
+Task 15.5 asks for the 3.0.0 release candidate, with release notes that include the deviation register, and
+for a check that the artifacts that the release notes list exist and start.
+
+The candidate is the version 3.0.0-rc.1. A release is a directory with these files:
+
+| File | What it is |
+|---|---|
+| `mockey-server-<version>-runnable.jar`, `mockey-ui-<version>-runnable.jar` | Each program as one file. |
+| `mockey-server-<version>.zip` and `.tar.gz`, `mockey-ui-<version>.zip` and `.tar.gz` | Each program as a distribution with start scripts. |
+| `SHA256SUMS` | The checksums of those six files. |
+| `RELEASE-NOTES.md` | The release notes with the deviation register. |
+
+Three Gradle tasks and a workflow make a release:
+
+- `./gradlew releaseFiles` builds the six files of the programs and collects the release in `build/release`.
+- `./gradlew releaseCheck` does the same and then checks the release.
+- `./gradlew quickStartCheck` follows the quick start of the README with the two runnable jars.
+- The workflow "Release" runs when the tag of a version is pushed. It checks the build, runs the two checks
+  above, and publishes the release on GitHub.
+
+### The release notes
+
+`docs/release-notes/3.0.0.md` holds the release notes of 3.0.0, which are the notes of its candidates too.
+They say what the release is, what it needs, which files it has, how to start, and what changes for someone
+who comes from Mockey 2.x. Their last section introduces the deviation register and ends with a line that
+stands for it. When a release is assembled, the table of `docs/deviations.md` takes the place of that line,
+with all 75 entries as the register has them.
+
+### The release check
+
+`scripts/release-check.sh` takes a release directory, and it checks what the task asks for:
+
+1. The release notes list seven files in the table of their section "The files": the six files of the
+   programs and the checksums. Each of them is in the directory, and the directory holds no other file.
+2. The release notes have every entry of the register word for word, and no entry that the register
+   doesn't have.
+3. The checksums are those of the files.
+4. Each distribution unpacks and has its start scripts for Unix and for Windows. From each of its three
+   files, each program says that it's of the version of the release. Then it starts, answers a request,
+   and stops with the status 0. The server is asked for its status and, through the admin API, for its
+   version. The UI is asked for a page, which shows the version of the UI and that of its server.
+
+### Decisions
+
+**The candidate has a version of its own.** The owner chose 3.0.0-rc.1. The programs say that version, the
+files carry it in their names, and the documents name the files by it. So nobody takes a file of the
+candidate for a file of the release. The release 3.0.0 is one more change of the version and one more
+build.
+
+**A script sets the version.** Eight files name it: the build, the README, three documents of the programs,
+the document of the library, the embedded sample, and the release notes. `scripts/set-version.sh` changes
+them together, and it changes nothing when one of them doesn't name the current version. It leaves the
+release notes of an earlier release as they are. The tests of the build hold the result: the document tests
+of the server and of the UI fail when one of those files names another version. The script changes no
+sentence. A person reads again what the README and the release notes say of the state of the project.
+
+**The register is put into the release notes when a release is assembled.** The repository has the register
+once, in `docs/deviations.md`. A second copy in the release notes would have to be kept the same by hand.
+The release check compares the assembled notes with the register, entry by entry.
+
+**The links of the release notes lead to the documents of the tag.** The page of a release doesn't resolve
+a link that's relative to a file of the repository. So the notes name each document by its URL at the tag of
+the version, which the version script keeps in step. Until the tag is pushed, those links lead nowhere.
+
+**The release check starts each program from each of its files.** That's six starts for the three forms of
+the two programs, and it takes about 25 seconds. A distribution without a start script, a jar that can't
+run, and a file of another version each fail the check. The start scripts for Windows are only looked for,
+because the check runs in a Unix shell.
+
+**The checks of a release aren't parts of `check`.** Release notes belong to a release, and a version on
+the way to a release that has no notes yet is no mistake. The workflow runs the checks when a release is
+published.
+
+**A workflow publishes the release.** The owner chose that as well. The GitHub CLI on the machine that
+built the candidate is signed in with an account that can only read the repository, so that machine can
+push a tag and can't publish a release. The workflow needs no secret of a person. It uses the token of its
+run, which its one job lets write the contents of the repository. It uses no third-party action either:
+`gh` is on the runner, and `scripts/publish-release.sh` calls it.
+
+**The workflow checks before it publishes.** It runs `./gradlew check` like the job for every push, and
+then the release check and the quick-start check. A tag that isn't `v` and the version of the build fails
+the job at its first step. So a release is published only from a commit whose build is green and whose
+files start.
+
+**A version that goes on after a hyphen becomes a pre-release.** 3.0.0-rc.1 is published as a pre-release.
+A tag such as `v3.0.0` is published as a release, because nothing in its version says otherwise. The owner
+asked for the pre-release of the candidate, and what happens for a release follows from that rule in
+`scripts/publish-release.sh`.
+
+### The run that was verified
+
+The candidate was built and checked on macOS, and the scripts were run on Linux as well:
+
+- `./gradlew releaseCheck` passed. The release notes list the seven files, the directory holds them and no
+  other, the notes have the 75 entries of the register, the checksums are right, and each of the two
+  programs starts from each of its three files as the version 3.0.0-rc.1.
+- `./gradlew quickStartCheck` passed with the two runnable jars of the candidate, which the README names
+  now.
+- In a container of Ubuntu with the tools of that system, the release check passed for the same files, and
+  the assembly wrote the same release notes and the same checksums as on macOS.
+
+25 changed copies of the release were given to the release check, such as a release without a file that
+the notes list, release notes without an entry of the register, a jar of another version, and a
+distribution without its start script. The check failed for each with a message that names what's wrong.
+The assembly refused 8 kinds of wrong input, and the version script was tried for a candidate, a release,
+and the version after a release. The script that publishes was run with a stand-in for `gh`.
+
+### Making a release
+
+1. Set the version with `scripts/set-version.sh <version>`, and read what the README and the release notes
+   say of the state of the project. The first version of a new release needs release notes of its own,
+   `docs/release-notes/<release>.md`, with the table of the files and the line that stands for the register.
+2. Run `./gradlew check releaseCheck quickStartCheck`.
+3. Commit, push, and wait until the CI job is green.
+4. Tag that commit and push the tag: `git tag -a v<version> -m "Mockey Redux <version>"`, and then
+   `git push origin v<version>`.
+5. The workflow "Release" publishes the release. Look at its page, and download a file.
+6. Set the version that comes next, so that a later build isn't taken for the release.
+
+### What stays open
+
+- After the candidate, the version of the repository is still 3.0.0-rc.1, so that the README names the
+  files that the releases page has. The next change of the version is `scripts/set-version.sh 3.0.0` for the
+  release, or the version of another candidate.
+- The library `mockey-core` isn't published to an artifact repository. The design leaves open whether it
+  is, and where.
+- The release workflow can't run before a tag is pushed. Its steps were run one by one, on macOS and on
+  Linux, and its first run is the publication of this candidate.
 
 ## Repeating the checks
 
@@ -288,6 +419,7 @@ no link with the expected text. That defect of the script is corrected.
 ./gradlew check
 ./gradlew endToEndCheck
 ./gradlew quickStartCheck
+./gradlew releaseCheck
 scripts/check-traceability.sh /path/to/Mockey
 ```
 
@@ -295,4 +427,5 @@ The first command is what the CI job runs. It includes the second one, which bui
 runs the end-to-end check alone. The end-to-end check needs `bash`, `tar`, and `curl`. To run it again for
 archives that it has passed with, add `--rerun`. The third command needs Docker or Podman with a running
 engine. The tool pulls the image when it isn't there, and `-PquickStartImage=` names another image. The
-fourth command needs a checkout of Mockey 2.x at the commit `88e31ed`.
+fourth command needs `unzip` as well, and the release notes of the release that the version leads to. The
+fifth command needs a checkout of Mockey 2.x at the commit `88e31ed`.

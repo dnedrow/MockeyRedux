@@ -7,7 +7,8 @@ exchange, so the answer of a real service can become a mock response later.
 
 Mockey Redux is a Kotlin rewrite of [Mockey](https://github.com/clafonta/Mockey). The mock engine, the admin
 API, the server, and the UI are separate modules, each with its own tests. The project is under active
-development, and version 3.0.0 will be its first release. It isn't a drop-in replacement for Mockey 2.x: the
+development, and its first release is in preparation: the [releases page][releases] has the release
+candidates. Mockey Redux isn't a drop-in replacement for Mockey 2.x. The
 [migration guide](docs/migrating-from-2x.md) describes the move, and the
 [deviation register](docs/deviations.md) lists every intended difference in behavior.
 
@@ -19,19 +20,19 @@ Mockey Redux is two programs, and each needs a Java 21 runtime and nothing else:
   what the server holds.
 - The UI, `mockey-ui`, serves the web pages that manage a server through the admin API.
 
-Each program comes as one file, a runnable jar. Download `mockey-server-3.0.0-SNAPSHOT-runnable.jar` and
-`mockey-ui-3.0.0-SNAPSHOT-runnable.jar` from the [releases page][releases] into one directory, or build them
+Each program comes as one file, a runnable jar. Download `mockey-server-3.0.0-rc.1-runnable.jar` and
+`mockey-ui-3.0.0-rc.1-runnable.jar` from the [releases page][releases] into one directory, or build them
 as "Building from the sources" describes and copy them there. Two commands start Mockey. In that directory,
 start the server:
 
 ```shell
-java -jar mockey-server-3.0.0-SNAPSHOT-runnable.jar
+java -jar mockey-server-3.0.0-rc.1-runnable.jar
 ```
 
 In a second terminal, start the UI:
 
 ```shell
-java -jar mockey-ui-3.0.0-SNAPSHOT-runnable.jar
+java -jar mockey-ui-3.0.0-rc.1-runnable.jar
 ```
 
 Each program writes its log to the terminal, and it's ready when the log says where it accepts connections.

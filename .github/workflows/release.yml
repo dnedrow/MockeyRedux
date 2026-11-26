@@ -1,0 +1,48 @@
+name: Release
+
+# Publishes a release when the tag of a version is pushed, such as v3.0.0-rc.1 for the version 3.0.0-rc.1.
+# The job checks the build as the job for every push does. Then it builds the files of the release, checks
+# that the programs start from them, follows the quick start of the README with them, and publishes them
+# with the release notes. A version that is no release, such as 3.0.0-rc.1, becomes a pre-release.
+# docs/decisions/release-checks.md says how a release is made.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      # A release is a part of the contents of the repository.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The token of the job can write. Only the step that publishes gets it, and the build does not.
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          java-version: "21"
+          distribution: "corretto"
+      - name: Check that the tag is the tag of the version
+        run: scripts/publish-release.sh --check-tag "$GITHUB_REF_NAME"
+      - name: Check
+        run: ./gradlew check --no-daemon
+      - name: Build the files of the release and check that the programs start
+        run: ./gradlew releaseCheck --no-daemon
+      - name: Follow the quick start of the README
+        run: ./gradlew quickStartCheck --no-daemon
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: scripts/publish-release.sh "$GITHUB_REF_NAME" build/release

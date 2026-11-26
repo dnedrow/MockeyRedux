@@ -65,6 +65,13 @@ tasks.register("printJavaVersion") {
     }
 }
 
+// The Java runtime that the checks of the whole build start the programs with. The start scripts look for
+// it in JAVA_HOME first.
+val javaHomeOfTheBuild =
+    javaToolchains
+        .launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+        .map { it.metadata.installationPath.asFile.absolutePath }
+
 // The end-to-end check runs the server and the UI together, each from the archive that the build delivers.
 // The tests of a module start one program, and what stands in for the other one.
 val endToEndCheck = tasks.register<Exec>("endToEndCheck") {
@@ -75,10 +82,7 @@ val endToEndCheck = tasks.register<Exec>("endToEndCheck") {
     val uiDistribution = layout.projectDirectory.file("mockey-ui/build/distributions/mockey-ui-$version.tar.gz")
     val script = layout.projectDirectory.file("scripts/end-to-end-check.sh")
     val passed = layout.buildDirectory.file("end-to-end-check/passed.txt")
-    val javaHome =
-        javaToolchains
-            .launcherFor { languageVersion = JavaLanguageVersion.of(21) }
-            .map { it.metadata.installationPath.asFile.absolutePath }
+    val javaHome = javaHomeOfTheBuild
     dependsOn(":mockey-server:distTar", ":mockey-ui:distTar")
     inputs.files(serverDistribution, uiDistribution).withPropertyName("distributions").withPathSensitivity(PathSensitivity.NONE)
     inputs.file(script).withPropertyName("script").withPathSensitivity(PathSensitivity.NONE)
@@ -93,11 +97,55 @@ val endToEndCheck = tasks.register<Exec>("endToEndCheck") {
     onlyIf("the system has a shell for the script") { !System.getProperty("os.name").startsWith("Windows") }
     commandLine("bash", script.asFile.path, serverDistribution.asFile.path, uiDistribution.asFile.path)
     doFirst {
-        // The start scripts look for the Java runtime there first.
         environment("JAVA_HOME", javaHome.get())
     }
     doLast {
         passed.get().asFile.writeText("The end-to-end check passed for the distributions of the version $version.\n")
+    }
+}
+
+// A release is the files of the two programs, the release notes with the deviation register, and the
+// checksums of the files. The release notes are those of the release that the version leads to: the notes
+// of 3.0.0 for the version 3.0.0-rc.1. The workflow .github/workflows/release.yml publishes the directory.
+val releaseDirectory = layout.buildDirectory.dir("release")
+
+val releaseFiles = tasks.register<Exec>("releaseFiles") {
+    group = "distribution"
+    description = "Collects the files of a release, with its release notes and their checksums."
+    val version = project.version.toString()
+    val notes = layout.projectDirectory.file("docs/release-notes/${version.substringBefore('-')}.md")
+    val register = layout.projectDirectory.file("docs/deviations.md")
+    val script = layout.projectDirectory.file("scripts/assemble-release.sh")
+    val files =
+        listOf("mockey-server", "mockey-ui").flatMap { program ->
+            listOf(
+                "$program/build/libs/$program-$version-runnable.jar",
+                "$program/build/distributions/$program-$version.zip",
+                "$program/build/distributions/$program-$version.tar.gz",
+            ).map { layout.projectDirectory.file(it) }
+        }
+    val directory = releaseDirectory
+    dependsOn(listOf(":mockey-server", ":mockey-ui").flatMap { listOf("$it:runnableJar", "$it:distZip", "$it:distTar") })
+    inputs.files(files).withPropertyName("files").withPathSensitivity(PathSensitivity.NONE)
+    inputs.files(notes, register, script).withPropertyName("notes").withPathSensitivity(PathSensitivity.NONE)
+    outputs.dir(directory).withPropertyName("release")
+    onlyIf("the system has a shell for the script") { !System.getProperty("os.name").startsWith("Windows") }
+    commandLine(listOf("bash", script.asFile.path, directory.get().asFile.path, notes.asFile.path) + files.map { it.asFile.path })
+}
+
+// The release check starts each program from each of its files. It keeps nothing, so it runs whenever it
+// is asked for.
+tasks.register<Exec>("releaseCheck") {
+    group = "verification"
+    description = "Checks that the files that the release notes list exist and start."
+    val script = layout.projectDirectory.file("scripts/release-check.sh")
+    val directory = releaseDirectory
+    val javaHome = javaHomeOfTheBuild
+    dependsOn(releaseFiles)
+    onlyIf("the system has a shell for the script") { !System.getProperty("os.name").startsWith("Windows") }
+    commandLine("bash", script.asFile.path, directory.get().asFile.path)
+    doFirst {
+        environment("JAVA_HOME", javaHome.get())
     }
 }
 

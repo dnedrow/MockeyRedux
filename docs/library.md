@@ -12,7 +12,7 @@ Publish the library to a local Maven repository while developing:
 ./gradlew :mockey-core:publishToMavenLocal
 ```
 
-Then add the snapshot to a Kotlin/JVM application:
+Then add it to a Kotlin/JVM application:
 
 ```kotlin
 repositories {
@@ -21,7 +21,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.dnedrow:mockey-core:3.0.0-SNAPSHOT")
+    implementation("io.github.dnedrow:mockey-core:3.0.0-rc.1")
 }
 ```
 

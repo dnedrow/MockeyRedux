@@ -365,10 +365,14 @@ class ServerCommandTest {
         assertEquals("", run.errors)
     }
 
+    /**
+     * The version is three numbers, as in `3.0.0`. A version that is no release goes on after a hyphen, as
+     * `3.0.0-rc.1` and `3.1.0-SNAPSHOT` do. That is also what `scripts/set-version.sh` takes for a version.
+     */
     @Test
     fun theVersionIsTheOneOfTheBuild() {
         assertEquals(System.getProperty("mockey.version"), ServerVersion.text)
-        assertTrue(Regex("""\d+\.\d+\.\d+(-SNAPSHOT)?""").matches(ServerVersion.text), ServerVersion.text)
+        assertTrue(Regex("""\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?""").matches(ServerVersion.text), ServerVersion.text)
     }
 
     /** Arguments or variables that the command refuses, and the option or the variable that its message has to name. */

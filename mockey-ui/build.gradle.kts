@@ -58,9 +58,9 @@ tasks.test {
     // The test of the document runs its commands, and it reads the documents that the document and the help
     // refer to.
     inputs
-        .files(fileTree("../docs") { include("*.md", "decisions/*.md") })
+        .files(fileTree("../docs") { include("*.md", "decisions/*.md", "release-notes/*.md") })
         .withPropertyName("documents")
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    // It also reads the README for the files of the program that its quick start names.
+    // It also reads the README, as it reads the release notes, for the files of the program that they name.
     inputs.file("../README.md").withPropertyName("readme").withPathSensitivity(PathSensitivity.RELATIVE)
 }

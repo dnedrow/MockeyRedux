@@ -146,7 +146,7 @@ curl -s http://localhost:8081/api/v1/system | jq .
 
 ```json
 {
-  "version": "3.0.0-SNAPSHOT",
+  "version": "3.0.0-rc.1",
   "startTime": "2026-11-25T06:27:35.314Z",
   "definitionsLocation": "/srv/mockey/mockey-definitions",
   "readOnly": true,

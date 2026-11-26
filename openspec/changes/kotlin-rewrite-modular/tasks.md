@@ -152,7 +152,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 15.2 Run all module tests, the parity suite, and the OpenAPI comparison in one CI job on a clean checkout. Verify that the job is green.
 - [x] 15.3 Check that the traceability table has no unmapped legacy servlet or parameter and that the deviation register matches the labels used by the parity cases. Verify that the automated check passes.
 - [x] 15.4 Follow the README quick start verbatim in a container that has only a Java 21 runtime. Verify that the server and UI start and that a mock request is answered.
-- [ ] 15.5 Build the 3.0.0 release candidate with release notes that include the deviation register. Verify that the artifacts listed in the release notes exist and start.
+- [x] 15.5 Build the 3.0.0 release candidate with release notes that include the deviation register. Verify that the artifacts listed in the release notes exist and start.
 
 ## Workflow follow-up
 

@@ -34,6 +34,9 @@ import kotlin.test.assertTrue
 class UiDocumentsTest {
     private val document = Path("../docs/ui.md")
     private val readme = Path("../README.md")
+
+    /** The release notes of the release that the version of the build leads to: those of 3.0.0 for 3.0.0-rc.1. */
+    private val releaseNotes = Path("../docs/release-notes/${UiVersion.text.substringBefore('-')}.md")
     private val distribution = Path(System.getProperty("mockey.distribution"))
     private val runnableJar = Path(System.getProperty("mockey.runnableJar"))
     private val started = Started()
@@ -107,12 +110,14 @@ class UiDocumentsTest {
 
     /**
      * The files of the program that the document names are the ones that the build of this version delivers.
-     * So are the ones that the README names: its quick start starts the UI from the runnable jar.
+     * So are the ones that the README names: its quick start starts the UI from the runnable jar. And so are
+     * the ones that the release notes list, once the release of this version has some.
      */
     @Test
     fun theArtifactsThatTheDocumentNamesAreTheOnesOfThisVersion() {
         assertContains(Files.readString(readme), "java -jar ${runnableJar.name}\n")
-        val named = listOf(document, readme).flatMap { ARTIFACT.findAll(Files.readString(it)).map { artifact -> artifact.value } }.toSet()
+        val documents = listOf(document, readme, releaseNotes).filter { Files.exists(it) }
+        val named = documents.flatMap { ARTIFACT.findAll(Files.readString(it)).map { artifact -> artifact.value } }.toSet()
 
         val distribution = "$PROGRAM_NAME-${UiVersion.text}"
         assertEquals(setOf("$distribution.zip", "$distribution.tar.gz", runnableJar.name), named)

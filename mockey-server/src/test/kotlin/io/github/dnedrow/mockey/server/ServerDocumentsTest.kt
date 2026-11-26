@@ -40,6 +40,9 @@ class ServerDocumentsTest {
     private val migrationDocument = Path("../docs/migrating-from-2x.md")
     private val adminApiDocument = Path("../docs/admin-api.md")
     private val readme = Path("../README.md")
+
+    /** The release notes of the release that the version of the build leads to: those of 3.0.0 for 3.0.0-rc.1. */
+    private val releaseNotes = Path("../docs/release-notes/${ServerVersion.text.substringBefore('-')}.md")
     private val legacyFixtures = Path("../mockey-legacy/src/test/resources/legacy")
     private val distribution = Path(System.getProperty("mockey.distribution"))
     private val runnableJar = Path(System.getProperty("mockey.runnableJar"))
@@ -137,18 +140,32 @@ class ServerDocumentsTest {
 
     /**
      * The files of the program that the documents name are the ones that the build of this version delivers.
-     * The README is one of the documents: its quick start starts the server from the runnable jar.
+     * The README is one of the documents: its quick start starts the server from the runnable jar. So are
+     * the release notes, once the release of this version has some: they list the files of the release.
      */
     @Test
     fun theArtifactsThatTheDocumentsNameAreTheOnesOfThisVersion() {
         assertContains(Files.readString(readme), "java -jar ${runnableJar.name}\n")
         val named =
-            listOf(serverDocument, migrationDocument, readme)
+            listOf(serverDocument, migrationDocument, readme, releaseNotes)
+                .filter { Files.exists(it) }
                 .flatMap { ARTIFACT.findAll(Files.readString(it)).map { artifact -> artifact.value }.toList() }
                 .toSet()
 
         val distribution = "$PROGRAM_NAME-${ServerVersion.text}"
         assertEquals(setOf("$distribution.zip", "$distribution.tar.gz", runnableJar.name), named)
+    }
+
+    /**
+     * The library has the version of the build as well. The document of the library and the embedded sample
+     * ask for the library by that version, so that a reader and the CI job get the one that the build publishes.
+     */
+    @Test
+    fun theLibraryThatTheDocumentsAskForIsTheOneOfThisVersion() {
+        val coordinates = "implementation(\"io.github.dnedrow:mockey-core:${ServerVersion.text}\")"
+
+        assertContains(Files.readString(Path("../docs/library.md")), coordinates)
+        assertContains(Files.readString(Path("../samples/embedded/build.gradle.kts")), coordinates)
     }
 
     /**
