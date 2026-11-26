@@ -1,6 +1,6 @@
 # The legacy shim
 
-Decided in tasks 14.1 to 14.5 of the change `kotlin-rewrite-modular`, on 2026-11-26.
+Decided in tasks 14.1 to 14.6 of the change `kotlin-rewrite-modular`, on 2026-11-26.
 
 The legacy shim answers the automation endpoints of Mockey 2.x, so that the scripts that were written for
 them keep working. It's a handler on the mock listener, and a server has it only when it's started with
@@ -20,7 +20,8 @@ endpoint answers.
 - Task 2.8 recorded how Mockey 2.x answers the requests of a script, and each recording states what the new
   server answers. 44 recordings send a request to an endpoint of the shim: 41 of the 43 `automation-*`
   recordings, and three routing recordings that read `/definitions`.
-  [recordings.md](../parity/recordings.md) describes them.
+  [recordings.md](../parity/recordings.md) describes them, and task 14.6 replays them, see "The parity
+  recordings".
 
 ## Where the shim sits
 
@@ -353,15 +354,41 @@ DEV-74 isn't about the shim alone. The specification asks it of every change in 
 that can't be stored with the status 500. The register had no entry for it. A script for Mockey 2.x meets
 the difference in the answers of the shim, so the entry comes with this task.
 
+## The parity recordings
+
+Task 14.6 replays the 44 recordings that send a request to an endpoint of the shim. The replay starts the
+server of such a recording with `--legacy-shim`, and it puts the document that the initialization cases
+load into the definitions location as `suite-a.xml`. [recordings.md](../parity/recordings.md) describes the
+replay.
+
+**No difference had to be fixed.** The server answered each of the 44 recordings as its label says, from
+initial definitions and from the definitions that the import command stored. The tests of tasks 14.1 to
+14.4 compare the answers of the shim with what the same recordings state. The replay confirms them over
+HTTP, with the server that the program starts.
+
+**Every other recording is still replayed without the shim.** That's the server that the program starts by
+default, and task 11.8 replayed them against it. One more replay gives every server the shim, and all 267
+recordings are answered as before. So the shim changes no answer to a request that isn't for it.
+
+**Two of the 44 recordings can't tell a server with the shim from one without.** Another replay gives no
+server the shim, and 42 of the 44 recordings are answered otherwise. The other two state an answer of the
+mock endpoint that comes out the same when the requests before it did nothing:
+`automation-home-init-filter-tag` and `automation-plan-saved-plan-applies`. The test names them, so a change
+to the recordings or to the shim shows there. Tests of the shim cover what these two are about:
+`ShimHomeTest` shows that an init with a tag filter loads the document and hides the service without the
+tag, and `ShimPlansTest` shows that a saved plan puts its services back into the state that they had.
+
 ## Repeating the tests
 
 ```shell
 ./gradlew :mockey-server:test --tests '*Shim*Test' --tests '*MockeyServerTest' --tests '*ServerProgramTest'
 ./gradlew :mockey-server:test --tests '*ServerDocumentsTest'
+./gradlew :mockey-parity-tests:test --tests '*NewServerParityTest'
 ```
 
 The second command runs the commands of the documents. It needs `curl` and `jq`, and the ports 8080, 8081,
-and 8090 free.
+and 8090 free. The third command replays the parity recordings, and it needs the ports 18091 to 18093 free
+for its stubs.
 
 `LegacyShimTest` sends requests to a listener that runs the module of the mock listener, with the shim and
 without it. `ShimFixture` defines the services of the parity fixture `automation.xml`, and the test compares

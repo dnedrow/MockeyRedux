@@ -13,7 +13,7 @@ import java.net.URI
  * until the process is told to end.
  *
  * [enableTwist] and [useOutboundProxy] change what the program has no setting for. They stand in for the
- * admin API, which changes it in a running server, until the server has one.
+ * admin API, which changes it in a running server.
  */
 public class ServerUnderTest private constructor(
     private val server: MockeyServer,

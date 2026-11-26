@@ -122,7 +122,7 @@ A request that uses a legacy number as an identifier finds nothing on the new se
 services of a plan. The specifications do not say what saving a plan for unknown services answers, so these
 recordings state only the result envelope.
 
-## Replaying against the new server (task 11.8)
+## Replaying against the new server (tasks 11.8 and 14.6)
 
 `NewServerParityTest` replays the recordings against the new server with every run of the tests of
 `mockey-parity-tests`, so it needs no legacy Mockey. A recording that is labeled `same` has to be answered as
@@ -148,27 +148,52 @@ every recording once for each of two ways:
 The settings that a fixture cannot carry are applied as `LegacyGroupRecorder` applies them to legacy. The tag
 filter is a setting of the program (`--tag-filter`). The enabled twist configuration of the group
 `routing-twist` and the credentials of the group `proxy-outbound-credentials` are set in the running server.
-The program has no setting for them, and the server has no admin API yet, so `ServerUnderTest` sets them in
-the engine of the server. Once the admin API can set them, the test should use it.
+The program has no setting for them, so `ServerUnderTest` sets them in the engine of the server, as the
+admin API does for a server that runs.
 
 The stub upstream and the two stub outbound proxies run during the replay, on the ports 18091 to 18093 that
 the fixtures name. Run the replay alone with
 `./gradlew :mockey-parity-tests:test --tests '*NewServerParityTest'`.
 
-The result of the first run: the server answered each of the 223 recordings that it can answer as the label
-says, in both ways, so no difference had to be fixed. Of these recordings 30 are `same` and 193 name
-deviations.
+The result of the first run, which task 11.8 made without the legacy shim: the server answered each of the
+223 recordings that need no shim as the label says, in both ways, so no difference had to be fixed. Of these
+recordings 30 are `same` and 193 name deviations.
 
-44 recordings are not replayed yet. Each of them sends a request to one of the legacy automation endpoints
-`/config/service`, `/plan/setup`, `/definitions`, and `/home`, which the server answers only through the
-legacy shim (`legacy-compatibility`: The legacy shim is opt-in). The shim comes with the tasks of group 14,
-and task 14.6 replays these recordings against a server with the shim enabled. They are 41 of the 43
-`automation-*` recordings and the three routing recordings that read `/definitions` to see which services a
-request left behind: `routing-unknown-target-registered`, `routing-unknown-target-with-escape-registered`,
-and `routing-tag-hidden-absolute-registered`. The other two automation recordings are replayed:
-`automation-status`, and `automation-config-second-path`, whose path gets the status 404 with and without the
-shim (DEV-26). `NewServerParityTest.theRecordingsThatAreNotReplayedAreTheOnesThatNeedTheLegacyShim` names the
-44, so that no recording drops out of the replay unseen.
+### The recordings that need the legacy shim (task 14.6)
+
+44 recordings send a request to one of the legacy automation endpoints `/config/service`, `/plan/setup`,
+`/definitions`, and `/home`, which the server answers only through the legacy shim (`legacy-compatibility`:
+The legacy shim is opt-in). They are 41 of the 43 `automation-*` recordings and the three routing recordings
+that read `/definitions` to see which services a request left behind: `routing-unknown-target-registered`,
+`routing-unknown-target-with-escape-registered`, and `routing-tag-hidden-absolute-registered`.
+`NewServerParityTest.theRecordingsThatNeedTheLegacyShimAreTheOnesThatAddressItsEndpoints` names the 44.
+
+The replay starts the server of such a recording with `--legacy-shim`, and the server of every other
+recording without it, as the program starts a server by default. So the suite replays all 267 recordings.
+The other two automation recordings are among the ones without the shim: `automation-status`, and
+`automation-config-second-path`, whose path gets the status 404 (DEV-26).
+
+The initialization cases load the document `suite-a.xml`. Legacy looked for it in its working directory. The
+shim reads a document inside the definitions location only (DEV-27), so the replay puts
+`parity-fixtures/automation-init.xml` into the definitions location of the group under that name.
+
+The result of the first run with the shim: the server answered each of the 44 recordings as the label says,
+in both ways, so no difference had to be fixed. Of these recordings 6 are `same` and 38 name deviations.
+That was to be expected, because the tests of the shim compare its answers with what these recordings state,
+see `docs/decisions/legacy-shim.md`.
+
+Two more replays say what the recordings show about the shim:
+
+- With the shim in every server, all 267 recordings are answered as their labels say. So the shim changes no
+  answer to a request that is not for one of its endpoints, and `/service_scenario` gets the status 404 with
+  the shim as well.
+- Without the shim in any server, 42 of the 44 recordings are answered otherwise, so their replay is about
+  the shim. The other two cannot tell. Each states an answer of the mock endpoint that a server also gives
+  when the requests before it did nothing. For `automation-home-init-filter-tag`, a service of the document
+  that the tag filter hides gets the same answer as a service that was never loaded. For
+  `automation-plan-saved-plan-applies`, the plan is not saved, because the request names its service by a
+  number of legacy (DEV-20). So the service keeps the scenario of the request before, which is also the one
+  that the fixture gives it.
 
 ## Stub upstream and outbound proxy
 

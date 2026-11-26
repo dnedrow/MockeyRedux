@@ -16,6 +16,21 @@ internal enum class FixtureLoading {
     IMPORT_COMMAND,
 }
 
+/** Which servers of a replay have the legacy shim, which answers the automation endpoints of legacy. */
+internal enum class ShimUse {
+    /**
+     * The server of a case that sends a request to an endpoint of the shim. Every other server is without the
+     * shim, as the program starts a server by default.
+     */
+    WHERE_A_CASE_NEEDS_IT,
+
+    /** Every server. The shim is to change no answer to a request that isn't for one of its endpoints. */
+    EVERYWHERE,
+
+    /** No server, which shows what becomes of the cases that need the shim. */
+    NOWHERE,
+}
+
 /**
  * Replays the recordings of case groups against the new server, as [LegacyGroupRecorder] replays them against
  * legacy.
@@ -27,25 +42,34 @@ internal enum class FixtureLoading {
  *
  * The settings of a group that its fixture cannot carry are applied as they are for legacy. The tag filter is a
  * setting of the program. The enabled twist configuration and the credentials of the outbound proxy are set in
- * the running server, through [ServerUnderTest] until the admin API sets them.
+ * the running server through [ServerUnderTest], which stands in for the admin API there.
  *
- * A case that [needsLegacyShim] is not replayed.
+ * A case that [needsLegacyShim] sends a request to an automation endpoint of legacy, which a server answers
+ * only with its legacy shim. [shim] says which servers have the shim.
  */
 internal class NewServerReplay(
     private val resources: Path,
     private val loading: FixtureLoading,
+    private val shim: ShimUse = ShimUse.WHERE_A_CASE_NEEDS_IT,
     private val replayer: ParityReplayer = ParityReplayer(),
 ) {
-    /** Replays the recording of every case of [groups] that the server can answer, and returns the results, the differences included. */
-    fun replay(groups: Collection<ParityCaseGroup>): List<ReplayResult> {
+    /**
+     * Replays the recording of every case of [groups] that [selected] takes, which is every case unless it
+     * is given, and returns the results, the differences included.
+     */
+    fun replay(
+        groups: Collection<ParityCaseGroup>,
+        selected: (ParityCase) -> Boolean = { true },
+    ): List<ReplayResult> {
         val work = Files.createTempDirectory("mockey-parity-")
         try {
             return groups.flatMap { group ->
-                val replayed = group.cases.filterValues { !needsLegacyShim(it) }.keys
+                val replayed = group.cases.filterValues(selected)
                 if (replayed.isEmpty()) return@flatMap emptyList()
                 val arguments = serverArguments(group, Files.createDirectory(work.resolve(group.name)))
-                replayed.map { name ->
-                    start(group, arguments).use { server -> replayer.replay(recording(name), server.mockUrl, ParityServer.NEW) }
+                replayed.map { (name, case) ->
+                    val server = start(group, arguments + shimArguments(case))
+                    server.use { replayer.replay(recording(name), it.mockUrl, ParityServer.NEW) }
                 }
             }
         } finally {
@@ -53,16 +77,34 @@ internal class NewServerReplay(
         }
     }
 
+    /** The argument that gives the server of [case] the legacy shim, where that server is to have the shim. */
+    fun shimArguments(case: ParityCase): List<String> {
+        val enabled =
+            when (shim) {
+                ShimUse.WHERE_A_CASE_NEEDS_IT -> needsLegacyShim(case)
+                ShimUse.EVERYWHERE -> true
+                ShimUse.NOWHERE -> false
+            }
+        return if (enabled) listOf("--legacy-shim") else emptyList()
+    }
+
     private fun recording(name: String): Path = resources.resolve("parity/$name")
 
     /**
      * The arguments that start a server for a case of [group]. Its definitions location is [definitions], an
      * empty directory, which the import command fills where the fixture is [loading] through it.
+     *
+     * Where a case of the group initializes its server from the document [AutomationCases.INIT_DOCUMENT], the
+     * definitions location holds that document as well. Legacy looked for the document in its working
+     * directory. The legacy shim reads a document inside the definitions location only (DEV-27).
      */
     private fun serverArguments(
         group: ParityCaseGroup,
         definitions: Path,
     ): List<String> {
+        if (group.cases.values.any(::namesTheInitDocument)) {
+            Files.copy(resources.resolve(AutomationCases.INIT_FIXTURE), definitions.resolve(AutomationCases.INIT_DOCUMENT))
+        }
         val fixture = resources.resolve(group.fixturePath).toString()
         val fixtureArguments =
             when (loading) {
@@ -104,10 +146,15 @@ internal class NewServerReplay(
 
         /**
          * Whether [case] sends a request to an endpoint of the legacy shim, be it the recorded request or one
-         * before it. The server has no such shim yet, so it cannot answer the case as its recording states.
+         * before it. A server without the shim answers such a request with the status 404 and does nothing
+         * for it.
          */
         fun needsLegacyShim(case: ParityCase): Boolean =
             (case.before + case.request).any { it.target.substringBefore('?') in legacyShimEndpoints }
+
+        /** Whether a request of [case] names the document that the initialization cases load. */
+        private fun namesTheInitDocument(case: ParityCase): Boolean =
+            (case.before + case.request).any { AutomationCases.INIT_DOCUMENT in it.target }
 
         /**
          * The listeners of a server under test. The mock listener is on `127.0.0.1`, as legacy was when the cases
