@@ -1,7 +1,7 @@
 # The stack of the web UI
 
 Decided in task 13.1 of the change `kotlin-rewrite-modular`, on 2026-11-25. The section "The script" was
-added in task 13.12, on 2026-11-26.
+added in task 13.12, and the section "How the UI is delivered" in task 13.13, both on 2026-11-26.
 
 `mockey-ui` is a Ktor application on Netty, as the server is, and it uses the routing of Ktor, which the
 server does not. It writes its pages with kotlinx.html, and it talks to the admin API with the HTTP client
@@ -306,6 +306,37 @@ it's the list to go through again after htmx is updated:
 - The UI asks the server for nothing before a page is loaded, so it starts whether or not the server runs.
 - The UI warns in its log when it listens on an address that other machines reach.
 
+## How the UI is delivered
+
+Task 13.13 packages the UI as the server is packaged, which is what design decision 18 asks for.
+
+- The module applies the convention plugin `mockey.application`. The build delivers a distribution as
+  `mockey-ui-<version>.zip` and `mockey-ui-<version>.tar.gz`, with the start scripts `bin/mockey-ui` and
+  `bin\mockey-ui.bat`, and a runnable jar, `mockey-ui-<version>-runnable.jar`.
+- The distribution holds the jar of the UI, the jar of `mockey-api`, and the libraries of both. It holds
+  nothing of the engine, of the importer, or of the server program, because the UI depends on none of them.
+- The files of the pages are resources of the jar of the UI: the stylesheet, the icon, the script, and the
+  license of the script. [third-party.md](../third-party.md) names the script.
+- Neither form holds a native library, so the UI runs on a Java 21 runtime alone, as the server does.
+- [ui.md](../ui.md) is the document for whoever runs the UI. It has the settings, the server that the UI
+  manages, the pages, and the section "Who can reach the UI", which is the note on exposing the UI that the
+  design asks for.
+
+`UiDistributionTest` starts the program from the start script and from the runnable jar, in an environment
+that holds nothing but the path. The UI shows the overview and every page of the help, with the files that
+the pages refer to, and it ends with the status 0 on `SIGTERM`. `UiDocumentsTest` runs the commands of
+`docs/ui.md` as they're written, and it holds the settings table of the document against the help of the
+program.
+
+In both tests, the server is a stand-in, because `mockey-ui` must not depend on the server module, not even
+for its tests. For the task, the two programs ran together once by hand: the UI from its built distribution
+against the server from its built distribution. A script loaded the overview, the first page of the help,
+the 18 topics, every page that a topic links to, and the three files. All 79 checks passed. Task 15.1 turns
+such a run into a check of the build.
+
+One thing came up that the task doesn't cover. An idle UI takes 5 seconds to stop, because Netty waits for
+the grace period even when no request is in progress. `docs/ui.md` says so.
+
 ## What every answer carries
 
 - `Content-Security-Policy`: a browser loads stylesheets, scripts, images, and fonts for a page from the UI
@@ -331,4 +362,5 @@ the pages themselves.
 ## Repeating the tests
 
 Run `./gradlew :mockey-ui:test`. The tests start the UI on a port that the system picks, with a stand-in for
-the admin API beside it, and read the pages over HTTP.
+the admin API beside it, and read the pages over HTTP. `UiDistributionTest` and `UiDocumentsTest` start the
+program as the build delivers it. `UiDocumentsTest` needs the ports 8081 and 8082 free, and it needs `curl`.

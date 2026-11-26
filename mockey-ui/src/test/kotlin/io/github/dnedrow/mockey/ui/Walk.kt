@@ -22,6 +22,7 @@ internal fun Journey.walkTheWholeUi() {
     historyFrom(overview)
     definitionsFrom(overview)
     serverFrom(overview)
+    helpFrom(overview)
 }
 
 private fun Journey.overviewOf(overview: Browser.Response) {
@@ -177,6 +178,13 @@ private fun Journey.definitionsFrom(overview: Browser.Response) {
     step("the form that imports a document") {
         val document = Browser.Chosen("definitions.json", """{"formatVersion":1}""".toByteArray())
         submit(definitions.formTo("/definitions/import"), mapOf("tags" to "imported"), mapOf("document" to document))
+    }
+}
+
+private fun Journey.helpFrom(overview: Browser.Response) {
+    val topics = step("the help") { follow(overview, "nav a[href=/help]") }
+    step("the topics of the help") {
+        for (link in topics.page.select("main dl.topics a")) follow(topics, "main dl.topics a[href=${link.attr("href")}]")
     }
 }
 

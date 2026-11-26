@@ -1,6 +1,6 @@
 # The pages of the web UI
 
-Decided in tasks 13.5 to 13.12 of the change `kotlin-rewrite-modular`, on 2026-11-25 and 2026-11-26.
+Decided in tasks 13.5 to 13.13 of the change `kotlin-rewrite-modular`, on 2026-11-25 and 2026-11-26.
 
 This record says how the pages of the UI show what a server holds, page by page. What all pages have in common
 is in [ui-stack.md](ui-stack.md), and what their forms are made of is in [ui-forms.md](ui-forms.md).
@@ -1040,8 +1040,9 @@ offers every management operation of the admin API. One test class does both, `U
   submits a form that one of its pages shows. Anything else fails the test, and so does an answer that isn't
   a page or a file.
 - The walk leaves nothing out. The test asks Ktor for the routes of the UI and compares them with the walk:
-  it opened each of the 42 addresses for pages and files, and it submitted a form to each of the 40
-  addresses that take one. It also submitted every form that one of its pages showed.
+  it opened each of the 61 addresses for pages and files, and it submitted a form to each of the 40
+  addresses that take one. It also submitted every form that one of its pages showed. Of the 61 addresses,
+  19 are the pages of the help, which task 13.13 added.
 - A stand-in for the server records which operations of the admin API each step of the walk reaches. It
   also checks every request against the description of the admin API, as in all tests of the UI.
 - A separate test goes through the scenario "Core flow with scripting disabled" and checks the result that
@@ -1082,6 +1083,105 @@ and it compares the answers with what the page of a service and the page for tag
 - The walk submits each form once, with input that the server accepts. Rejected forms are covered by the
   tests of each page.
 
+## The help
+
+Task 13.13 adds the built-in help. The page at `/help` says what Mockey is for and lists the topics, and
+each of the 18 topics has a page of its own at `/help/<name>`. The navigation of every page leads to the
+help.
+
+### Requirements
+
+- The help explains services, scenarios, response modes, match criteria, request rules, error scenarios,
+  plans, twisting, tags, storage, and import (`admin-ui`: Built-in help).
+- The help is available without network access beyond the UI (the scenario "Help is reachable offline").
+- Task 13.13 asks for help pages that are written from the help topics of Mockey 2.x and updated for the
+  new behavior.
+
+### One page for each topic
+
+| Way | What speaks for it | What speaks against it |
+|---|---|---|
+| 1. One page with every topic, as in Mockey 2.x. | The browser searches the whole help at once. | The help has about 5,300 words, which makes a long page. A link to a topic needs a place in the page. |
+| 2. A page that lists the topics, and a page for each topic. | A topic has an address, and its page is short. Each page links to the pages of the UI that its topic is about, and to the topics that continue from it. | The browser searches one topic at a time. |
+| 3. The documents of `docs/`, turned into pages. | The help and the documents have one source. | The UI needs a library that reads Markdown, or the build needs a step that does. The documents are written for someone who runs the programs, and the help is for someone who uses the pages. |
+
+Way 2. The list on the first page has a sentence about each topic, so that a reader finds the right one
+without opening them all.
+
+### The topics
+
+Each topic of Mockey 2.x has a page of this help, and each page of this help covers a topic or a part of a
+topic of Mockey 2.x. `UiHelpTest` holds this table.
+
+| Topic of Mockey 2.x | Page of this help |
+|---|---|
+| Big Picture | The first page, `/help` |
+| Storage | `storage` |
+| Mock Service | `services` |
+| Service Plan | `plans` |
+| Mock Service Scenario | `scenarios`. Its parts have pages of their own: "Match Argument" became `response-modes` and `match-criteria`, "Tags" became `tags`, and "Error Handling" became `error-scenarios`. |
+| Twisting | `twisting` |
+| Get Started - Record Stuff | `recording` |
+| Flush | `storage`, where it's the reset |
+| Export/Upload | `import` |
+| URL Injection | `real-urls` |
+| Merge Services | `merging` |
+| Initialization | `automation` |
+| Good Things to Test | `ideas` |
+| URL Config Recommendations | `clients` |
+| Robots | `automation` |
+| Service Request Validation Rules | `request-rules` |
+| Getting the Right Scenario | `match-criteria` |
+| Response JSON Schema | `schema` |
+| Status | `automation` |
+| Start Up Configurations | `automation` |
+
+The help says how this server behaves, which differs from Mockey 2.x in places:
+
+- Storage. The transient flag is read-only mode, which is the default and holds for the whole server
+  (DEV-22). The help says what a reload and a reset do, and what is never stored.
+- Match criteria. Where two scenarios match with the same score, the name decides. The help of Mockey 2.x
+  says that there's no guarantee.
+- Request rules. The help describes the evaluation of this server, in which a required rule fails when its
+  parameter or header is missing (DEV-15).
+- Initialization. A running server reads a document only from an upload. A file or a URL is a source at
+  startup and for the import command (DEV-27).
+- Merging. The other services are deleted only when no scenario was skipped (DEV-29).
+- Status. The address `/status` says that the server runs and since when, and no longer where the
+  definitions are (DEV-28).
+- Robots. The help names the admin API. The automation endpoints of Mockey 2.x come with group 14 of the
+  tasks, and the help says nothing about them yet.
+- The help of Mockey 2.x has no topic for the Image Depot, the debug console, or the page for mobile
+  devices, and this version has none of the three. So this help doesn't mention them.
+
+### The texts
+
+- The texts are in `HelpTopics.kt`. A topic has a name for its address, a title, a summary of one sentence,
+  the pages of the UI that it's about, the topics that continue from it, and its content.
+- The content is written with three helpers. `prose` takes a text of paragraphs and lists, in which
+  backticks mark code. `example` shows a text as it is, such as a rule set. `rows` writes a table.
+- The helpers write through kotlinx.html like every other page, so a text can't hold markup. The pages of
+  the help use only elements that the crawl allows for any page.
+- An example keeps its lines. No line of an example is longer than 72 characters, which fits the width of the
+  help. A narrower window scrolls the example sideways, and not the page.
+- The help uses the words of the pages: "mock URL pattern", "real URL", "response mode", and so on. The
+  texts are for someone who uses the pages. The documents in `docs/` go further, and the first page of the
+  help names four of them.
+
+### When the server is in trouble
+
+- The help needs nothing from the server. Its pages are shown whatever the server says, with a line that
+  says what's wrong, as the page of a report is.
+- The UI still asks the server for its status, because the footer of every page names the server. So a page
+  of the help takes as long as any other page when the server doesn't answer.
+
+### What the help doesn't have
+
+- The other pages don't link to their topics. The navigation leads to the help from every page, and a topic
+  leads to the pages that it's about.
+- The help has no search of its own. The first page lists every topic with a sentence about it.
+- The help comes in English only, like the rest of the UI.
+
 ## A look in a browser
 
 The tests read the pages without a browser. The overview was looked at once in a browser, which is no test and
@@ -1113,6 +1213,11 @@ is not repeated by one:
 - In a long list, a script that was added to a copy of the page measured where things are after the browser
   was sent to the row of a service: the line of the page stayed at the top of the window, and the row began
   below it.
+- For task 13.13, Chrome displayed the first page of the help and every topic at widths of 1,280 and 420
+  pixels. The UI ran from its built distribution, with the server from its built distribution beside it. At
+  the narrow width, no page scrolls sideways, and four examples scroll within their boxes. For the 19
+  pages, Chrome asked the UI for the pages, the stylesheet, and the script, and it asked no other place for
+  anything.
 
 ## Repeating the tests
 
@@ -1127,4 +1232,5 @@ and `UiStatisticsTest` cover the history and the statistics. `UiDefinitionsTest`
 page on, also with a server that states content that is written to be read as markup. `UiCoverageTest` walks
 through the whole UI without scripting and holds the coverage list, and `JourneyTest` checks the rules of
 such a walk. `UiEnhancementTest` sends the requests of the script, puts the answers into the pages, and takes
-the same walk a second time with the script.
+the same walk a second time with the script. `UiHelpTest` reads the pages of the help, with the server and
+without it.

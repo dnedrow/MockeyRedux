@@ -79,6 +79,7 @@ internal object Html {
             Section(TagPages.PAGE, "Tags", setOf("/tag")),
             Section(DefinitionsPages.PAGE, "Import/Export"),
             Section(SystemPages.PAGE, "Server", setOf(ProxyPages.PAGE)),
+            Section(HelpPages.INDEX, "Help"),
         )
 
     /**

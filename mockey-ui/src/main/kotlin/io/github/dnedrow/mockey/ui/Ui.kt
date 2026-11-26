@@ -6,7 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import kotlin.time.Duration.Companion.seconds
 
 /** The time that requests in progress get to finish in when the UI is told to stop. */
-private val SHUTDOWN_GRACE_PERIOD = 5.seconds
+internal val SHUTDOWN_GRACE_PERIOD = 5.seconds
 
 /**
  * Runs the UI program with [settings]: it starts the UI, serves until the system tells the process to end,

@@ -201,8 +201,8 @@ class UiCoverageTest {
         /** The number of operations that the description of the admin API names. */
         const val OPERATIONS = 61
 
-        /** The number of routes of the UI that answer a request for a page or a file. */
-        const val PAGES = 42
+        /** The number of routes of the UI that answer a request for a page or a file. 19 of them are the pages of the help. */
+        const val PAGES = 61
 
         /** The number of routes of the UI that take a form, and the number of forms that ask for a page. */
         const val FORMS = 40

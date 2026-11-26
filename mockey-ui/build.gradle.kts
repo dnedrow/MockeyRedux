@@ -43,4 +43,22 @@ tasks.test {
 
     // A test reads the sources of the UI for what writes markup as it is given.
     inputs.dir("src/main/kotlin").withPropertyName("mainSources").withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // The tests of the distribution start the program from what the build delivers.
+    val distribution = tasks.installDist.map { it.destinationDir }
+    val runnableJar = tasks.named<Jar>("runnableJar").flatMap { it.archiveFile }
+    inputs.files(tasks.installDist).withPropertyName("distribution").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(runnableJar).withPropertyName("runnableJar").withPathSensitivity(PathSensitivity.NONE)
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf("-Dmockey.distribution=${distribution.get()}", "-Dmockey.runnableJar=${runnableJar.get().asFile}")
+        },
+    )
+
+    // The test of the document runs its commands, and it reads the documents that the document and the help
+    // refer to.
+    inputs
+        .files(fileTree("../docs") { include("*.md", "decisions/*.md") })
+        .withPropertyName("documents")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

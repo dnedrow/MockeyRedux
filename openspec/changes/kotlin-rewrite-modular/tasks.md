@@ -135,7 +135,7 @@ Tasks 1.1 and 1.2 create the new repository and move this change into it. Every 
 - [x] 13.10 Implement the definitions and system pages: import with tags and report, export, merge, bulk derivation, schema report, diagnostics, search, status, read-only switch, reload, reset, and last-used times. Verify with tests that submit each form and check the admin API calls.
 - [x] 13.11 Add a no-script coverage test that drives every form over plain HTTP and checks that each admin API management operation is reachable from the UI. Verify that the coverage list has no gaps.
 - [x] 13.12 Add the optional scripting enhancement: vendor the script, and return fragments for in-place updates of overview switches, history refresh, and validation feedback. Verify with tests that enhanced requests receive fragments and leave the same server state, and that no page refers to another origin.
-- [ ] 13.13 Write the built-in help pages from the legacy help topics, updated for the new behavior, and `docs/ui.md` with the note on exposing the UI. Package the UI as a distribution and a runnable jar. Verify by starting the UI from the built distribution against a running server and loading the overview and help pages.
+- [x] 13.13 Write the built-in help pages from the legacy help topics, updated for the new behavior, and `docs/ui.md` with the note on exposing the UI. Package the UI as a distribution and a runnable jar. Verify by starting the UI from the built distribution against a running server and loading the overview and help pages.
 
 ## 14. Legacy shim (spec: legacy-compatibility)
 

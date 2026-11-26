@@ -52,6 +52,15 @@ internal interface Ui {
     )
 
     /**
+     * Answers the request of [call] with [page], which needs nothing of the server. The UI shows it whatever
+     * the server says, and says what is the matter with the server where something is.
+     */
+    suspend fun showAnyway(
+        call: ApplicationCall,
+        page: Page,
+    )
+
+    /**
      * Does what a form asks for: [act] gets what the form holds, asks the server to do it, and says what
      * came of it, see [Outcome]. The form is one that the UI took, see [FormTokens].
      *
@@ -362,13 +371,15 @@ internal class UiApplication(
         }
     }
 
-    /**
-     * Answers with the page of the report [id]. The UI keeps the report itself, so it shows it whatever the
-     * server says, and says what is the matter with the server where something is.
-     */
+    /** Answers with the page of the report [id]. The UI keeps the report itself, so it shows it whatever the server says. */
     private suspend fun showReport(
         call: ApplicationCall,
         id: String,
+    ) = showAnyway(call, reports.find(id) ?: REPORT_GONE)
+
+    override suspend fun showAnyway(
+        call: ApplicationCall,
+        page: Page,
     ) {
         val trouble =
             try {
@@ -377,7 +388,7 @@ internal class UiApplication(
             } catch (failure: ApiFailure) {
                 failures.inASentence(failure)
             }
-        respond(call, reports.find(id) ?: REPORT_GONE, trouble)
+        respond(call, page, trouble)
     }
 
     /**
@@ -466,6 +477,7 @@ internal class UiApplication(
                 DefinitionsArea,
                 ProxyArea,
                 SystemArea,
+                HelpArea,
             )
 
         private val log = LoggerFactory.getLogger(UiApplication::class.java)

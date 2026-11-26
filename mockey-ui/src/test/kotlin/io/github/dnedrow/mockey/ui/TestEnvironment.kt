@@ -1,6 +1,10 @@
 package io.github.dnedrow.mockey.ui
 
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import kotlin.test.assertTrue
 
 /** What a test asks of the machine that it runs on. */
@@ -23,4 +27,16 @@ internal object TestEnvironment {
         if (everyTestRuns) assertTrue(available, "This machine has to have $what.")
         assumeTrue(available, "This machine does not have $what.")
     }
+
+    /** Returns whether a socket can be bound to [host] and [port] now. */
+    fun isFree(
+        host: String,
+        port: Int,
+    ): Boolean =
+        try {
+            ServerSocket().use { it.bind(InetSocketAddress(InetAddress.getByName(host), port)) }
+            true
+        } catch (_: IOException) {
+            false
+        }
 }

@@ -207,13 +207,17 @@ class UiFailurePagesTest {
 
         for ((answer, reason) in cases) {
             api.on("GET", "system") { answer }
-            for (path in Html.sections.map { it.path }) {
+            // The help needs nothing from the server. It's shown anyway, with a line that says what's wrong.
+            for (path in Html.sections.map { it.path } - HelpPages.INDEX) {
                 val page = said(browser.get(path))
                 assertEquals(502 to "The server is not compatible with this UI", page.status to page.title, path)
                 assertEquals(listOf("$reason $needed"), page.problems, path)
                 assertEquals("Server at ${api.url}" to false, page.foot to page.showsData, path)
                 assertEquals(listOf("Load this page again -> ''"), page.again)
             }
+            val help = said(browser.get(HelpPages.INDEX))
+            assertEquals(200 to "Help", help.status to help.title)
+            assertEquals(listOf("The server at ${api.url} is not compatible with this UI. More about it."), help.problems)
         }
         api.on("GET", "system") { json(FakeAdminApi.SYSTEM) }
         assertShowsTheServer(browser.get("/system"))

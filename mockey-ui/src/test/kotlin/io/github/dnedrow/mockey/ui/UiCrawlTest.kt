@@ -56,7 +56,8 @@ class UiCrawlTest {
         val ofEntry = listOf("/history/entry", "/history/replay", "/history/scenario").map { "$it?id=7" }
         val ofStatistics = listOf("/statistics", "/statistics/download?format=csv", "/statistics/download?format=json")
         val ofHistory = lists + reloading + deletions + ofEntry + ofStatistics
-        val reached = general + ofServices + ofScenarios + ofNewScenarios + ofPlans + ofTwists + ofTags + ofHistory
+        val ofHelp = listOf("/help") + HelpTopics.all.map { "/help/${it.name}" }
+        val reached = general + ofServices + ofScenarios + ofNewScenarios + ofPlans + ofTwists + ofTags + ofHistory + ofHelp
         assertEquals(reached, found.pages.keys)
         val downloads = ofStatistics.drop(1) + ofDefinitions.last()
         assertEquals(downloads.toSet(), found.pages.filterValues(Hostile::isDownload).keys)
@@ -120,7 +121,8 @@ class UiCrawlTest {
             val general = setOf("/", "/services", "/services/real-urls", "/diagnostics") + ofTheServer
             val ofEntry = setOf("/history/entry", "/history/replay", "/history/scenario")
             val ofHistory = setOf("/history", "/history/delete", "/statistics", "/statistics/download") + ofEntry
-            assertEquals(general + ofService + ofScenario + ofPlan + ofRouting + ofHistory, reached, text)
+            val ofHelp = setOf("/help") + HelpTopics.all.map { "/help/${it.name}" }
+            assertEquals(general + ofService + ofScenario + ofPlan + ofRouting + ofHistory + ofHelp, reached, text)
             for ((address, answer) in found.pages - "/") {
                 assertEquals(OK, answer.status, "$text at $address")
                 // A download isn't read as a page, so it can hold content exactly as the server states it.

@@ -7,10 +7,10 @@ defined for that URL, or it forwards the request to the real service and passes 
 The server has two listeners. The mock listener serves the mock traffic and `/status`. The admin listener
 serves the admin API, which states what the server holds and is to change what the server does.
 
-This document describes the server as it is now. The web UI is not part of the server yet. The admin API
-states and changes what the server holds: the services with their scenarios, the plans, the twist
-configurations, the tag filter, the tags, the outbound proxy, the history, and the definitions as a whole.
-[admin-api.md](admin-api.md) describes it.
+The server has no web pages. The web UI is a program of its own, `mockey-ui`, which manages a server through
+the admin API. [ui.md](ui.md) describes it. The admin API states and changes what the server holds: the
+services with their scenarios, the plans, the twist configurations, the tag filter, the tags, the outbound
+proxy, the history, and the definitions as a whole. [admin-api.md](admin-api.md) describes it.
 
 ## Running the server
 

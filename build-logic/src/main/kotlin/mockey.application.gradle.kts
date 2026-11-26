@@ -97,6 +97,18 @@ tasks.assemble {
     dependsOn(runnableJar)
 }
 
+// The tests of an application run the commands of its document, which start the program on its default
+// ports. Gradle runs the test tasks of several modules at the same time, and the server and the UI have the
+// port of the admin listener in common. So the test task of an application holds the ports while it runs,
+// and the test task of the other application waits for them.
+val defaultPorts = gradle.sharedServices.registerIfAbsent("mockeyDefaultPorts", DefaultPorts::class) {
+    maxParallelUsages = 1
+}
+
+tasks.withType<Test>().configureEach {
+    usesService(defaultPorts)
+}
+
 tasks.distTar {
     compression = Compression.GZIP
     archiveExtension = "tar.gz"
