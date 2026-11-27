@@ -416,26 +416,54 @@ After that, the published release was checked as a reader gets it:
 - The checksums of the published files are those of the files that were built on macOS before the tag. The
   runner and that machine built the same files, byte for byte.
 
+### The second candidate
+
+The owner tried the first candidate on a network that inspects TLS traffic. There the server answered a
+request for an `https` target with the status 502 and the words of the Java runtime,
+`PKIX path building failed`, which don't say what to do. Since the commit `464d25b`, that answer also says
+that the trust store of the runtime needs the root certificate of the issuer, and the server document has
+the section "The certificate of a real service". [upstream-client.md](upstream-client.md) records that
+change. The owner asked for a second candidate with it.
+
+The second candidate is the version 3.0.0-rc.2. It was made by the steps of "Making a release" below:
+
+- `scripts/set-version.sh 3.0.0-rc.2` changed the version in the eight files.
+- Two things in the release notes were written by hand, because the script changes no sentence. The notes
+  say that this is the second candidate, and their new section "What changed since the first candidate"
+  describes the hint and links to the new section of the server document. Both are about a candidate, so
+  they change again when the notes become those of the release.
+- The README needed no change. It says that the releases page has the release candidates.
+- `./gradlew check releaseCheck quickStartCheck` passed on macOS. While it ran, a server and a UI of the
+  owner held the default ports, so the five tests that need those ports were skipped there: the four that
+  run the commands of the documents, and the one that starts the server with its defaults. The CI job runs
+  them, and the tag is pushed only after that job is green.
+
+Nothing but the hint is different in the two programs and in the library. The other commits since the first
+candidate change tests, the traceability check, documents, and the files of OpenSpec.
+
 ### Making a release
 
 1. Set the version with `scripts/set-version.sh <version>`, and read what the README and the release notes
    say of the state of the project. The first version of a new release needs release notes of its own,
    `docs/release-notes/<release>.md`, with the table of the files and the line that stands for the register.
+   For another candidate of a release, the notes say which candidate it is and what changed since the one
+   before it.
 2. Run `./gradlew check releaseCheck quickStartCheck`.
 3. Commit, push, and wait until the CI job is green.
 4. Tag that commit and push the tag: `git tag -a v<version> -m "Mockey Redux <version>"`, and then
    `git push origin v<version>`.
 5. The workflow "Release" publishes the release. Look at its page, and download a file.
-6. Set the version that comes next, so that a later build isn't taken for the release.
+6. After a release, set the version that comes next, so that a later build isn't taken for the release.
+   After a candidate, the version stays, so that the README names files that the releases page has.
 
 ### What stays open
 
-- After the candidate, the version of the repository is still 3.0.0-rc.1, so that the README names the
+- The version of the repository is that of the latest candidate, 3.0.0-rc.2, so that the README names
   files that the releases page has. The next change of the version is `scripts/set-version.sh 3.0.0` for the
   release, or the version of another candidate.
 - The library `mockey-core` isn't published to an artifact repository. The design leaves open whether it
   is, and where.
-- What the trial of the candidate finds decides what comes next: another candidate, or the release.
+- What the trial of the second candidate finds decides what comes next: another candidate, or the release.
 
 ## Repeating the checks
 
