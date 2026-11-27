@@ -1,11 +1,17 @@
 package io.github.dnedrow.mockey.server
 
 import com.sun.net.httpserver.HttpServer
+import com.sun.net.httpserver.HttpsConfigurator
+import com.sun.net.httpserver.HttpsServer
 import io.github.dnedrow.mockey.server.TestDefinitions.orders
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.KeyStore
+import java.util.concurrent.TimeUnit
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
 import kotlin.io.path.Path
 import kotlin.io.path.name
 import kotlin.test.AfterTest
@@ -65,15 +71,24 @@ class ServerDocumentsTest {
         val lastLine: Int,
     )
 
+    /**
+     * One section of the server document is about a real service whose certificate the Java runtime does not
+     * trust. While the commands run, such a real service answers at `https://localhost:8443`, and the reader
+     * has its certificate as the file `company-root.pem`.
+     */
     @Test
     fun everyCommandOfTheServerDocumentRunsAsItIsWritten() {
         needsTheDefaultPorts()
+        TestEnvironment.needs(
+            TestEnvironment.isFree("127.0.0.1", HTTPS_PORT),
+            "the port $HTTPS_PORT free, for what stands in for a real service that speaks TLS",
+        )
         Files.writeString(directory.resolve("definitions.json"), TestDefinitions.document { orders() })
         Files.copy(runnableJar, directory.resolve(runnableJar.name))
 
-        val commands = runCommandsOf(serverDocument)
+        val commands = runningARealServiceWithTls(directory.resolve("company-root.pem")) { runCommandsOf(serverDocument) }
 
-        assertEquals(Commands(blocks = 19, servers = 13, compared = 5), commands)
+        assertEquals(Commands(blocks = 25, servers = 15, compared = 7), commands)
     }
 
     /**
@@ -303,10 +318,47 @@ class ServerDocumentsTest {
         commands: () -> T,
     ): T {
         val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), LEGACY_PORT), 0)
-        server.createContext("/export") { exchange ->
-            exchange.responseHeaders.add("Content-Type", "text/xml;charset=utf-8")
-            exchange.sendResponseHeaders(HTTP_OK, export.size.toLong())
-            exchange.responseBody.use { it.write(export) }
+        return running(server, "/export", "text/xml;charset=utf-8", export, commands)
+    }
+
+    /**
+     * Runs [commands] while a server on the port [HTTPS_PORT] stands in for a real service that speaks TLS,
+     * and answers at the path `/orders`. Its certificate names `localhost`, and the server signed it itself,
+     * so a runtime trusts it only after the certificate is added to a trust store. The certificate is written
+     * to [certificate] in the PEM format.
+     *
+     * The `keytool` of the JDK that runs this test makes the key for each run, so that the repository holds
+     * no key.
+     */
+    private fun <T> runningARealServiceWithTls(
+        certificate: Path,
+        commands: () -> T,
+    ): T {
+        val keys = scratch.resolve("real-service.p12")
+        val inTheKeyStore = listOf("-alias", "service", "-keystore", "$keys", "-storepass", KEY_PASSWORD)
+        val key = listOf("-keyalg", "EC", "-groupname", "secp256r1", "-validity", "2", "-storetype", "PKCS12")
+        keytool(listOf("-genkeypair", "-dname", "CN=localhost", "-ext", "SAN=dns:localhost,ip:127.0.0.1") + key + inTheKeyStore)
+        keytool(listOf("-exportcert", "-rfc", "-file", "$certificate") + inTheKeyStore)
+        val password = KEY_PASSWORD.toCharArray()
+        val store = Files.newInputStream(keys).use { stored -> KeyStore.getInstance("PKCS12").apply { load(stored, password) } }
+        val ofTheService = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply { init(store, password) }
+        val server = HttpsServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), HTTPS_PORT), 0)
+        server.httpsConfigurator = HttpsConfigurator(SSLContext.getInstance("TLS").apply { init(ofTheService.keyManagers, null, null) })
+        return running(server, "/orders", "text/plain", "orders of the real service\n".toByteArray(), commands)
+    }
+
+    /** Runs [commands] while [server] answers at [path] with [body], and stops the server after them. */
+    private fun <T> running(
+        server: HttpServer,
+        path: String,
+        contentType: String,
+        body: ByteArray,
+        commands: () -> T,
+    ): T {
+        server.createContext(path) { exchange ->
+            exchange.responseHeaders.add("Content-Type", contentType)
+            exchange.sendResponseHeaders(HTTP_OK, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
         }
         server.start()
         try {
@@ -314,6 +366,18 @@ class ServerDocumentsTest {
         } finally {
             server.stop(0)
         }
+    }
+
+    /**
+     * Runs the `keytool` of the JDK that runs this test with [arguments], and expects it to succeed. The tool
+     * gets no input, so one that asks a question ends instead of waiting for an answer.
+     */
+    private fun keytool(arguments: List<String>) {
+        val tool = Path(System.getProperty("java.home"), "bin", "keytool")
+        val process = ProcessBuilder(listOf("$tool") + arguments).redirectErrorStream(true).start()
+        process.outputStream.close()
+        val output = process.inputStream.bufferedReader().readText()
+        check(process.waitFor(KEYTOOL_SECONDS, TimeUnit.SECONDS) && process.exitValue() == 0) { "keytool failed: $output" }
     }
 
     private fun needsTheDefaultPorts() {
@@ -343,6 +407,11 @@ class ServerDocumentsTest {
 
         /** The port of the Mockey 2.x that the migration document imports from while it runs. */
         const val LEGACY_PORT = 8090
+
+        /** The port of the real service that speaks TLS, which the server document forwards a request to. */
+        const val HTTPS_PORT = 8443
+        const val KEY_PASSWORD = "the-key-of-a-test"
+        const val KEYTOOL_SECONDS = 60L
         const val HTTP_OK = 200
 
         val windows = System.getProperty("os.name").startsWith("Windows")

@@ -3,10 +3,12 @@ package io.github.dnedrow.mockey.core.upstream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
+import java.security.cert.Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 /**
  * The key material of the stubs that speak TLS: one certificate for `127.0.0.1` and `localhost` that the stub
@@ -37,11 +39,23 @@ internal object StubTls {
     }
 
     /** What a client needs to trust the certificate of the stubs, and nothing but that certificate. */
-    val trusting: SSLContext by lazy {
+    val trusting: SSLContext by lazy { trustingOnly(keyStore.getCertificate(ALIAS)) }
+
+    /**
+     * An SSL context of a client's own that does not trust the certificate of the stubs. It trusts a single
+     * certificate, which is one of the authorities that the runtime trusts.
+     */
+    val trustingAnother: SSLContext by lazy {
+        val ofTheRuntime = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(null as KeyStore?) }
+        val trusted = ofTheRuntime.trustManagers.filterIsInstance<X509TrustManager>().flatMap { it.acceptedIssuers.toList() }
+        trustingOnly(trusted.first())
+    }
+
+    private fun trustingOnly(certificate: Certificate): SSLContext {
         val anchors = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
-        anchors.setCertificateEntry(ALIAS, keyStore.getCertificate(ALIAS))
+        anchors.setCertificateEntry(ALIAS, certificate)
         val trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(anchors) }
-        SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }
+        return SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }
     }
 
     private fun runKeytool(file: Path) {

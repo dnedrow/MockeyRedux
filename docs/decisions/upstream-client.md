@@ -133,6 +133,17 @@ The response:
 - The adapter ends an exchange when the coroutine that waits for it is canceled. The core uses that for the
   response timeout.
 
+A certificate that is not accepted:
+
+- The adapter reports it as an upstream failure before any part of the request is sent, and the failure ends
+  with the words of the JDK. When the JDK found no path from the certificate to a trusted one, the failure
+  also says that the trust store of the runtime needs the root certificate of the issuer. That is the case
+  on a network that inspects TLS traffic, where every `https` target fails, and for a real service with a
+  certificate from the certificate authority of a company. "The certificate of a real service" in
+  [server.md](../server.md) shows what to do about it.
+- A certificate for another host and an expired certificate get no such sentence, because the trust store
+  has nothing to do with them.
+
 ## What the core does above the port
 
 The port stands for one exchange: a request goes out, and its answer comes back. The upstream session and

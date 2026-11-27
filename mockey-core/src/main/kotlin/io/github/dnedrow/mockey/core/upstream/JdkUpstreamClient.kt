@@ -17,6 +17,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpConnectTimeoutException
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.security.cert.CertPathBuilderException
 import java.security.cert.CertificateException
 import java.util.Base64
 import java.util.concurrent.CancellationException
@@ -52,7 +53,8 @@ import kotlin.time.toJavaDuration
  *
  * A connection has to come about within [connectTimeout], which covers the handshake of a secure connection.
  * [sslContext] is what the client trusts the certificates of real services with. Without one, that is the
- * trust store of the runtime.
+ * trust store of the runtime. A certificate that is not accepted is a failure, and [certificateReason] puts
+ * the reason into words.
  */
 internal class JdkUpstreamClient(
     private val connectTimeout: Duration = DEFAULT_CONNECT_TIMEOUT,
@@ -184,7 +186,7 @@ internal class JdkUpstreamClient(
             closed -> "the upstream client was closed."
             failure is HttpConnectTimeoutException -> "no connection was made$toProxy within ${inWords(connectTimeout)}."
             failure is ConnectException -> "no connection could be made$toProxy."
-            failure is SSLException && failure.isAboutCertificate() -> "its certificate was not accepted. $message".trim()
+            failure is SSLException && failure.isAboutCertificate() -> certificateReason(failure, byTheRuntime = sslContext == null)
             failure is SSLException -> "the secure connection could not be set up. $message".trim()
             else -> failure.message?.let { "$it." } ?: "${failure.javaClass.simpleName}."
         }
@@ -237,6 +239,29 @@ internal class JdkUpstreamClient(
         fun SSLException.isAboutCertificate(): Boolean = generateSequence<Throwable>(this) { it.cause }.any { it is CertificateException }
     }
 }
+
+/**
+ * Returns why the certificate of a real service was not accepted: a sentence that says so, followed by the
+ * message of [failure], which is in the words of the runtime.
+ *
+ * When no path leads from the certificate to a trusted one, the issuer is the cause. That happens to every
+ * `https` target on a network that inspects TLS traffic, and to a real service whose certificate comes from
+ * the certificate authority of a company. If the trust store of the Java runtime made the decision, which
+ * [byTheRuntime] says, the reason also names what that trust store needs. A certificate for another host and
+ * an expired certificate have nothing to do with the trust store, so they get no such hint.
+ */
+internal fun certificateReason(
+    failure: SSLException,
+    byTheRuntime: Boolean,
+): String {
+    val issuerIsUnknown = generateSequence<Throwable>(failure) { it.cause }.any { it is CertPathBuilderException }
+    val hint = if (byTheRuntime && issuerIsUnknown) UNKNOWN_ISSUER_HINT else ""
+    return listOf("its certificate was not accepted.", hint, failure.message.orEmpty()).filter { it.isNotEmpty() }.joinToString(" ")
+}
+
+private const val UNKNOWN_ISSUER_HINT =
+    "The Java runtime does not trust the issuer of the certificate. If the issuer is the certificate authority of a company, " +
+        "or a proxy that inspects TLS traffic, the trust store of the runtime needs the root certificate of that issuer."
 
 /**
  * Returns [url] as a URI. [url] is a URL, or a reference to one as a `Location` header holds it, such as a

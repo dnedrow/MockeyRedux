@@ -173,7 +173,11 @@ mockey-ui --admin-url http://192.0.2.10:8081
 The admin listener has no TLS, so the token and everything that the pages show cross the network as plain
 text. On a network that isn't trusted, run the UI on the machine of the server. The alternative is a reverse
 proxy with TLS in front of the admin listener, with its `https` URL in `--admin-url`. The UI verifies the
-certificate of such a proxy against the trust store of its Java runtime.
+certificate of such a proxy against the trust store of its Java runtime. If the certificate comes from the
+certificate authority of a company, that trust store needs the root certificate of the authority. Without
+it, every page says that the server cannot be reached, and the reason on the page includes
+`PKIX path building failed`. "The certificate of a real service" in [server.md](server.md) shows how to make
+such a trust store, and the UI takes the two properties in `MOCKEY_UI_OPTS`.
 
 The UI connects to the server directly. If the network only lets requests out through a proxy, pass the
 proxy properties of Java to the runtime of the UI in the variable `MOCKEY_UI_OPTS`, such as

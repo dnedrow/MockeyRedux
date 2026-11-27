@@ -202,6 +202,103 @@ caches (`Cache-Control`, `Pragma`, and `Expires`), and `Last-Modified` with the 
 [rules.md](rules.md) describes the request rules that pick a scenario, and [inspectors.md](inspectors.md)
 the request inspectors.
 
+### The certificate of a real service
+
+Before the server sends a request to an `https` target, it checks the certificate of the real service
+against the trust store of its Java runtime. The certificate has to name the host of the target, it has to
+be valid at that time, and an authority that the runtime trusts has to have issued it. The server has no
+setting that switches this check off. A real service whose certificate fails the check gets no part of the
+request. The client then gets the answer for a real service that fails: the error scenario of the service,
+or else the universal error scenario, or else the status 502 with a JSON object whose member `fail` says
+what happened.
+
+By default, the trust store of a Java runtime is the file `lib/security/cacerts` in the directory of that
+runtime, and not the certificate store of the operating system. So a real service can work in a browser and
+fail here. Two cases are common:
+
+- The network inspects TLS traffic. A proxy of the network then answers in place of every site, with
+  certificates that it issues under a root certificate of its own.
+- The real service has a certificate from the certificate authority of a company.
+
+In both cases, `fail` says that the certificate was not accepted, and that the Java runtime does not trust
+the issuer of the certificate. It ends with the words of the runtime for that, which include
+`PKIX path building failed`. Here the real service at `https://localhost:8443` has such a certificate:
+
+```shell
+mockey-server
+```
+
+```shell
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/service/https://localhost:8443/orders
+```
+
+```text
+502
+```
+
+The command `keytool` of the Java runtime shows who issued the certificate. It prints the certificates that
+a real service presents, each with its owner and its issuer. The issuer of the last one is the authority
+that the runtime does not know:
+
+```shell
+keytool -printcert -sslserver localhost:8443
+```
+
+The runtime needs the root certificate of that authority as a file, in the PEM or the DER format. Here the
+file is `company-root.pem`. Whoever runs the network or the certificate authority has the certificate. A
+computer that the company manages has it as well, in the certificate store of its operating system. On
+macOS, that store is the System keychain, and the command
+`security find-certificate -c "Example Root CA" -p /Library/Keychains/System.keychain` prints the
+certificate with the name `Example Root CA` in the PEM format.
+
+The following commands copy the trust store that the runtime comes with, and add the certificate to the
+copy. The variable `JAVA_HOME` names the directory of the runtime here. Without that variable, the command
+`java -XshowSettings:properties -version` prints the directory as `java.home`. The password of the trust
+store that a runtime comes with is `changeit`:
+
+```shell
+cp "$JAVA_HOME/lib/security/cacerts" truststore
+chmod u+w truststore
+keytool -importcert -noprompt -alias company-root -file company-root.pem \
+  -keystore truststore -storepass changeit
+```
+
+Two system properties of Java make the runtime use that trust store. The start script takes them from the
+variable `MOCKEY_SERVER_OPTS`. With the runnable jar, they are arguments of `java` that come before `-jar`:
+
+```shell
+export MOCKEY_SERVER_OPTS="-Djavax.net.ssl.trustStore=truststore -Djavax.net.ssl.trustStorePassword=changeit"
+mockey-server
+```
+
+Now the server forwards the request, and the real service answers:
+
+```shell
+curl http://localhost:8080/service/https://localhost:8443/orders
+```
+
+```text
+orders of the real service
+```
+
+The runtime looks for the file `truststore` in the directory in which the server starts, so a server that
+starts in another directory needs the whole path of the file. The trust store applies to every `https`
+connection of the server, including one to a URL of `--initial-definitions` or of the command
+`import-legacy`.
+
+There are two other ways to the same end:
+
+- The option `-cacerts` of `keytool`, in place of `-keystore truststore`, adds the certificate to the trust
+  store of the runtime itself. Every program that runs on that runtime then trusts the authority, and the
+  server needs no property. The command needs the right to write to the directory of the runtime. An update
+  of the runtime can replace the trust store, and the certificate then has to be added again.
+- On macOS, the properties `-Djavax.net.ssl.trustStoreType=KeychainStore` and
+  `-Djavax.net.ssl.trustStore=NONE` make the keychain the trust store, and no file is needed. The runtime
+  then trusts the certificates that are marked as trusted in the keychain, such as the ones that a company
+  adds. It no longer trusts the authorities that it comes with, so a real service whose certificate comes
+  from a public authority then fails instead. On a network that inspects TLS traffic, that is every site
+  that the inspection leaves out.
+
 ## Status
 
 `/status` on the mock listener answers a request of every method with the status 200 and a JSON object of two
