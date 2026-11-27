@@ -435,11 +435,35 @@ The second candidate is the version 3.0.0-rc.2. It was made by the steps of "Mak
 - The README needed no change. It says that the releases page has the release candidates.
 - `./gradlew check releaseCheck quickStartCheck` passed on macOS. While it ran, a server and a UI of the
   owner held the default ports, so the five tests that need those ports were skipped there: the four that
-  run the commands of the documents, and the one that starts the server with its defaults. The CI job runs
-  them, and the tag is pushed only after that job is green.
+  run the commands of the documents, and the one that starts the server with its defaults. The CI job of
+  the commit ran them, and it was green before the tag was pushed.
 
 Nothing but the hint is different in the two programs and in the library. The other commits since the first
 candidate change tests, the traceability check, documents, and the files of OpenSpec.
+
+The tag `v3.0.0-rc.2` is on the commit `12e16d0`.
+[The run 45931593437](https://github.com/dnedrow/MockeyRedux/actions/runs/45931593437) of the workflow
+"Release" passed at the first attempt, in under 14 minutes. It checked the build with its 2525 tests, ran
+the release check and the quick-start check, and published the pre-release
+[Mockey Redux 3.0.0-rc.2](https://github.com/dnedrow/MockeyRedux/releases/tag/v3.0.0-rc.2) with the seven
+files.
+
+A tag of that name had been pushed once before, for the commit `464d25b`, whose version was still
+3.0.0-rc.1. [The run 45928039400](https://github.com/dnedrow/MockeyRedux/actions/runs/45928039400) failed
+at its first step, which holds the tag against the version, and it published nothing. That tag was removed,
+and the tag of the candidate is a new one. So the order of the steps matters: the version comes first, and
+the tag comes last.
+
+The published release was checked as the first one was:
+
+- The seven files were downloaded from the page of the release, without signing in.
+- The release check passed for the downloaded files, with the release notes of the page, and the quick-start
+  check passed with the two downloaded jars.
+- Every link of the release notes leads to a page that's there, and the link to the new section of the
+  server document leads to that section.
+- The checksums of the published files are those of the files that were built on macOS before the tag.
+- The server of the published runnable jar was started on a Java runtime that doesn't have the root
+  certificate of the network. It answered a request for an `https` target with the status 502 and the hint.
 
 ### Making a release
 
