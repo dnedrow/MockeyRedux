@@ -22,8 +22,9 @@ object Traceability {
      *
      * - No row is marked as open.
      * - Every row ends in a requirement of the specifications, in a parity case, or in a non-goal.
-     * - Every requirement that the table cites is a requirement of the capability that it's cited for. The
-     *   capabilities are the directories of the `spec.md` files below [specifications].
+     * - Every requirement that the table cites is a requirement of the capability that it's cited for.
+     *   [specifications] is the directory of the main specifications, which has a directory for each
+     *   capability.
      * - Every parity case that the table names is a recording in [recordings], the start of the names of
      *   several recordings, or a group of cases with a fixture in [fixtures].
      * - Every deviation that the table names is one of [registeredDeviations].
@@ -47,18 +48,20 @@ object Traceability {
     }
 
     /**
-     * Returns the names of the requirements of every capability below [root]. A capability is a directory
-     * with a file `spec.md`, and a requirement is a heading of that file. A capability that several files
-     * describe, as a change and the specifications that it was merged into do, has the requirements of all.
+     * Returns the names of the requirements of every capability in [specifications], the directory of the
+     * main specifications. A capability is a directory there that has a file `spec.md`, and a requirement is
+     * a heading of that file.
+     *
+     * No other file is read, not even a `spec.md` that lies deeper. A change has delta specifications of its
+     * own, and an archived change keeps them as they were. A requirement that such a change once added can be
+     * renamed or removed by a later one, so only the main specifications say which requirements there are.
      */
-    fun requirementsIn(root: Path): Map<String, Set<String>> =
-        Files.walk(root).use { paths ->
-            paths
-                .filter { it.name == SPECIFICATION && it.isRegularFile() }
-                .toList()
-                .groupBy({ it.parent.name }, { file -> Files.readAllLines(file).mapNotNull(::requirementOf) })
-                .mapValues { (_, names) -> names.flatten().toSet() }
-        }
+    fun requirementsIn(specifications: Path): Map<String, Set<String>> =
+        specifications
+            .listDirectoryEntries()
+            .map { it.resolve(SPECIFICATION) }
+            .filter { it.isRegularFile() }
+            .associate { it.parent.name to Files.readAllLines(it).mapNotNull(::requirementOf).toSet() }
 
     private fun requirementOf(line: String): String? = line.takeIf { it.startsWith(REQUIREMENT) }?.removePrefix(REQUIREMENT)?.trim()
 

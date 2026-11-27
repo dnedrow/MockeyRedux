@@ -7,8 +7,8 @@ test classes of legacy Mockey to their ports.
 
 Each row ends in one of three places:
 
-- A requirement of the specifications, written as the capability and the name of the requirement, such as
-  `server-runtime`: Liveness endpoint.
+- A requirement of the specifications in `openspec/specs`, written as the capability and the name of the
+  requirement, such as `server-runtime`: Liveness endpoint.
 - A parity case, by the name of its recording in `mockey-parity-tests/src/test/resources/parity`, or by the
   common start of several names, such as `automation-definitions-*`.
 - A non-goal of the design.

@@ -11,12 +11,17 @@ import kotlin.test.assertEquals
  * register.
  */
 class TraceabilityTest {
+    /**
+     * The requirements are those of the main specifications in `openspec/specs`. No change is read. An
+     * archived change keeps the requirements that it once added, also when a later change renames or removes
+     * them. If it were read, the table could cite a requirement that is gone, and this test would not notice.
+     */
     @Test
     fun theTableMapsEveryRowToAHomeThatIsThere() {
         val problems =
             Traceability.problems(
                 table = Path.of("../docs/parity/traceability.md"),
-                specifications = Path.of("../openspec"),
+                specifications = Path.of("../openspec/specs"),
                 recordings = Path.of("src/test/resources/parity"),
                 fixtures = Path.of("src/test/resources/parity-fixtures"),
                 registeredDeviations = ParityReview.registeredDeviations(Path.of("../docs/deviations.md")),
@@ -91,13 +96,26 @@ class TraceabilityTest {
         )
     }
 
-    /** The requirements of a capability are the ones of every specification of it, of a change and of what it was merged into. */
+    /** A capability is a directory of the main specifications with a `spec.md`, and its requirements are the ones of that file. */
     @Test
     fun readsTheRequirementsOfEveryCapability() {
         val ofTheFirst = setOf("One requirement", "Another requirement", "A name", "A name, with commas, in it", "Merged requirement")
         val expected = mapOf("first-capability" to ofTheFirst, "second-capability" to setOf("Third requirement"))
 
         assertEquals(expected, Traceability.requirementsIn(specifications()))
+    }
+
+    /**
+     * The directory above the main specifications holds the changes as well, each with delta specifications
+     * of its own. Its directories are no capabilities, because none of them has a `spec.md`, and nothing
+     * deeper is read. So a check that is given this directory finds no requirement at all, instead of taking
+     * the requirements of an archived change for those of today.
+     */
+    @Test
+    fun theDirectoryAboveTheSpecificationsHasNoCapability() {
+        val project = specifications().parent
+
+        assertEquals(emptyMap(), Traceability.requirementsIn(project))
     }
 
     /** Writes a table with [lines] and returns it. */
@@ -119,27 +137,35 @@ class TraceabilityTest {
     }
 
     /**
-     * Writes the specifications of two capabilities and returns their root. One capability is specified in a
-     * change and in what the change was merged into.
+     * Writes what OpenSpec keeps of a project, and returns the directory of its main specifications, which
+     * are those of two capabilities. Beside that directory, an archived change has a delta specification.
      */
     private fun specifications(): Path {
-        val root = Files.createTempDirectory("mockey-specifications-")
-        val change = "changes/some-change/specs"
-        val first = root.resolve("$change/first-capability/spec.md")
-        write(first, "One requirement", "Another requirement", "A name", "A name, with commas, in it")
-        write(root.resolve("$change/second-capability/spec.md"), "Third requirement")
-        write(root.resolve("specs/first-capability/spec.md"), "One requirement", "Merged requirement")
-        Files.writeString(root.resolve("$change/first-capability/notes.md"), "### Requirement: No requirement\n")
-        return root
+        val project = Files.createTempDirectory("mockey-openspec-")
+        val specifications = project.resolve("specs")
+        val first = specifications.resolve("first-capability/spec.md")
+        write(first, "One requirement", "Another requirement", "A name", "A name, with commas, in it", "Merged requirement")
+        write(specifications.resolve("second-capability/spec.md"), "Third requirement")
+        // What is no specification: another file of a capability, and a file beside the capabilities.
+        Files.writeString(specifications.resolve("first-capability/notes.md"), "### Requirement: No requirement\n")
+        Files.writeString(specifications.resolve(".gitkeep"), "")
+        val archived = project.resolve("changes/archive/2026-01-01-some-change/specs/first-capability/spec.md")
+        write(archived, "Archived requirement", section = "ADDED Requirements")
+        return specifications
     }
 
+    /**
+     * Writes [specification] with [requirements] in the section [section]. A delta specification names its
+     * section by what it does with the requirements, as in `ADDED Requirements`.
+     */
     private fun write(
         specification: Path,
         vararg requirements: String,
+        section: String = "Requirements",
     ) {
         Files.createDirectories(specification.parent)
         val text = requirements.joinToString("\n\n", transform = ::requirement)
-        Files.writeString(specification, "## ADDED Requirements\n\n$text\n")
+        Files.writeString(specification, "## $section\n\n$text\n")
     }
 
     /** Returns the text of a requirement with the name [name], as a specification writes it. */

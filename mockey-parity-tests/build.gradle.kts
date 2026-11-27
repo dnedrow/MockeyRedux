@@ -13,13 +13,13 @@ tasks.withType<Test>().configureEach {
     }
 
     // The tests hold the deviation register and the traceability table against the recordings and against
-    // the specifications, so they run again when one of those documents changes.
+    // the main specifications, so they run again when one of those documents changes.
     inputs
         .files("../docs/deviations.md", "../docs/parity/traceability.md")
         .withPropertyName("parityDocuments")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs
-        .files(fileTree("../openspec") { include("**/specs/*/spec.md") })
+        .files(fileTree("../openspec/specs") { include("*/spec.md") })
         .withPropertyName("specifications")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }

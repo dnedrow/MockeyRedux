@@ -170,10 +170,14 @@ register, and a number in the register stays true.
 behavior of Mockey 2.x. A recording can show that while the new server answers it the same way, as
 `proxy-headers-application` does for DEV-69. The check only asks that such a recording exists.
 
-**A requirement is looked up by its name in the specifications.** The table cites a requirement as its
-capability and its name. The test reads the names from every `spec.md` below `openspec/` that's in a
-directory with the name of the capability. That holds for the specifications of this change, and for the
-ones that the change is merged into when it's archived.
+**A requirement is looked up by its name in the main specifications.** The table cites a requirement as its
+capability and its name. The test reads the names from `openspec/specs`, where each capability has a
+directory with its `spec.md`, and from nowhere else. While the change was in progress, its delta
+specifications were the only specifications that the project had, so the test read every `spec.md` below
+`openspec/`. When the change was archived, its requirements went into the main specifications, and the
+owner pointed the test at those alone. The archive keeps the delta specifications as they were, so a
+requirement that a later change renames or removes would still be found there. A requirement that a later
+change adds can be cited in the table once that change is synced to the main specifications.
 
 **The script reads the sources of Mockey 2.x, not a list of what they hold.** A servlet of Mockey 2.x
 declares the parameters of its endpoint for the API documentation, mostly by constants. The script follows
