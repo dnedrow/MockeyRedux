@@ -465,6 +465,22 @@ The published release was checked as the first one was:
 - The server of the published runnable jar was started on a Java runtime that doesn't have the root
   certificate of the network. It answered a request for an `https` target with the status 502 and the hint.
 
+### The third candidate
+
+The third candidate is version 3.0.0-rc.3. It was made by the steps of "Making a release":
+
+- `scripts/set-version.sh 3.0.0-rc.3` changed the version in the eight files.
+- The release notes say that saved definitions files are now indented with two spaces, and that two new
+  tutorials show how to create a service from the command line and the UI.
+- The initial CI run failed when Maven Central returned a 429 rate-limit response. The checks passed on
+  the retriggered run 46101888058 before the tag was pushed.
+
+The tag `v3.0.0-rc.3` is on the commit `34451d8`.
+[The run 46103083765](https://github.com/dnedrow/MockeyRedux/actions/runs/46103083765) of the workflow
+"Release" passed in about 15 minutes and published the pre-release
+[Mockey Redux 3.0.0-rc.3](https://github.com/dnedrow/MockeyRedux/releases/tag/v3.0.0-rc.3) with the seven
+files.
+
 ### Making a release
 
 1. Set the version with `scripts/set-version.sh <version>`, and read what the README and the release notes
