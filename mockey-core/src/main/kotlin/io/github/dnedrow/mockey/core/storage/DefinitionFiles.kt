@@ -7,6 +7,7 @@ import io.github.dnedrow.mockey.core.model.Definitions
 import io.github.dnedrow.mockey.core.model.Scenario
 import io.github.dnedrow.mockey.core.model.Service
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -39,7 +40,7 @@ internal class FileFault(
  * The texts of the definition files, and how they are read.
  *
  * Every file is a JSON object in the form in which the definitions are serialized: the members are in the
- * order of the model, a member that has its default value is left out, and the text is indented by four
+ * order of the model, a member that has its default value is left out, and the text is indented by two
  * spaces and ends with a line feed. The same definitions therefore always give the same text.
  *
  * - A document holds the format version and all definitions. It is what an export gives and an import takes.
@@ -59,7 +60,12 @@ internal object DefinitionFiles {
     private const val SCENARIOS = "scenarios"
     private const val BODY = "responseBody"
 
-    private val format = Json { prettyPrint = true }
+    @OptIn(ExperimentalSerializationApi::class)
+    private val format =
+        Json {
+            prettyPrint = true
+            prettyPrintIndent = "  "
+        }
 
     /**
      * Returns the text of the document that holds all of [definitions]: the format version, and after it the

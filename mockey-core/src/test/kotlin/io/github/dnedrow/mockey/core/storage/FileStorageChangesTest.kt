@@ -455,7 +455,7 @@ class FileStorageChangesTest {
             storage.save(storage.load())
 
             assertEquals(listOf("STAGE mockey.json", "MOVE mockey.json"), steps)
-            assertEquals("{\n    \"formatVersion\": 1\n}\n", textOf(root, "mockey.json"))
+            assertEquals("{\n  \"formatVersion\": 1\n}\n", textOf(root, "mockey.json"))
             assertEquals(before, treeOf(root) - "mockey.json")
         }
 }

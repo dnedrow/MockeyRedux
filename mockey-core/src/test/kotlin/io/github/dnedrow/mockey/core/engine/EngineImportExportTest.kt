@@ -41,41 +41,41 @@ class EngineImportExportTest {
     private val smallDocument =
         """
         {
-            "formatVersion": 1,
-            "services": [
+          "formatVersion": 1,
+          "services": [
+            {
+              "id": "svc-orders",
+              "name": "Orders",
+              "mockUrl": "orders",
+              "scenarios": [
                 {
-                    "id": "svc-orders",
-                    "name": "Orders",
-                    "mockUrl": "orders",
-                    "scenarios": [
-                        {
-                            "id": "scn-ok",
-                            "name": "ok",
-                            "responseBody": "fine"
-                        }
-                    ],
-                    "defaultScenarioId": "scn-ok"
+                  "id": "scn-ok",
+                  "name": "ok",
+                  "responseBody": "fine"
                 }
-            ],
-            "plans": [
-                {
-                    "id": "plan-static",
-                    "name": "All static",
-                    "items": [
-                        {
-                            "serviceName": "Orders",
-                            "scenarioName": "ok",
-                            "responseMode": "static"
-                        }
-                    ]
-                }
-            ],
-            "settings": {
-                "outboundProxy": {
-                    "url": "http://proxy.example.com:3128",
-                    "enabled": true
-                }
+              ],
+              "defaultScenarioId": "scn-ok"
             }
+          ],
+          "plans": [
+            {
+              "id": "plan-static",
+              "name": "All static",
+              "items": [
+                {
+                  "serviceName": "Orders",
+                  "scenarioName": "ok",
+                  "responseMode": "static"
+                }
+              ]
+            }
+          ],
+          "settings": {
+            "outboundProxy": {
+              "url": "http://proxy.example.com:3128",
+              "enabled": true
+            }
+          }
         }
 
         """.trimIndent()
@@ -96,7 +96,7 @@ class EngineImportExportTest {
 
     @Test
     fun anEngineWithoutDefinitionsExportsADocumentWithTheFormatVersion() {
-        assertEquals("{\n    \"formatVersion\": 1\n}\n", engineOf().exportDefinitions())
+        assertEquals("{\n  \"formatVersion\": 1\n}\n", engineOf().exportDefinitions())
     }
 
     // Import

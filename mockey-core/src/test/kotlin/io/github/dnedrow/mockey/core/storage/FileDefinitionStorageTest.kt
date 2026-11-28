@@ -54,52 +54,52 @@ class FileDefinitionStorageTest {
         val expected =
             """
             {
-                "formatVersion": 1,
-                "plans": [
+              "formatVersion": 1,
+              "plans": [
+                {
+                  "id": "plan-gold",
+                  "name": "Gold path",
+                  "description": "Everything gold",
+                  "tags": [
+                    "demo"
+                  ],
+                  "items": [
                     {
-                        "id": "plan-gold",
-                        "name": "Gold path",
-                        "description": "Everything gold",
-                        "tags": [
-                            "demo"
-                        ],
-                        "items": [
-                            {
-                                "serviceName": "Customers",
-                                "scenarioName": "gold customer",
-                                "responseMode": "static",
-                                "delayMillis": 250
-                            },
-                            {
-                                "serviceName": "Orders"
-                            }
-                        ]
-                    }
-                ],
-                "twists": [
+                      "serviceName": "Customers",
+                      "scenarioName": "gold customer",
+                      "responseMode": "static",
+                      "delayMillis": 250
+                    },
                     {
-                        "id": "twist-qa2",
-                        "name": "to-qa2",
-                        "pairs": [
-                            {
-                                "origination": "qa1",
-                                "destination": "qa2"
-                            }
-                        ]
+                      "serviceName": "Orders"
                     }
-                ],
-                "settings": {
-                    "enabledTwistId": "twist-qa2",
-                    "outboundProxy": {
-                        "url": "http://proxy.example.com:3128",
-                        "enabled": true
-                    },
-                    "universalErrorScenario": {
-                        "serviceId": "svc-customers",
-                        "scenarioId": "scn-error"
-                    },
-                    "defaultPlanId": "plan-gold"
+                  ]
                 }
+              ],
+              "twists": [
+                {
+                  "id": "twist-qa2",
+                  "name": "to-qa2",
+                  "pairs": [
+                    {
+                      "origination": "qa1",
+                      "destination": "qa2"
+                    }
+                  ]
+                }
+              ],
+              "settings": {
+                "enabledTwistId": "twist-qa2",
+                "outboundProxy": {
+                  "url": "http://proxy.example.com:3128",
+                  "enabled": true
+                },
+                "universalErrorScenario": {
+                  "serviceId": "svc-customers",
+                  "scenarioId": "scn-error"
+                },
+                "defaultPlanId": "plan-gold"
+              }
             }
 
             """.trimIndent()
@@ -113,38 +113,38 @@ class FileDefinitionStorageTest {
         val customers =
             """
             {
-                "id": "svc-customers",
-                "name": "Customers",
-                "mockUrl": "customer/{id}",
-                "description": "Customer directory",
-                "realUrls": [
-                    "http://qa1.example.com/customers/{id}",
-                    "http://qa2.example.com/customers/{id}"
-                ],
-                "defaultRealUrlIndex": 1,
-                "responseMode": "dynamic",
-                "delayMillis": 100,
-                "tags": [
-                    "crm"
-                ],
-                "defaultScenarioId": "scn-gold",
-                "errorScenarioId": "scn-error",
-                "requestRules": "{\"headers\":[]}",
-                "requestRulesEnabled": true,
-                "inspectorName": "session-check",
-                "responseSchema": "{\"type\":\"object\"}",
-                "responseSchemaEnabled": true,
-                "position": 0
+              "id": "svc-customers",
+              "name": "Customers",
+              "mockUrl": "customer/{id}",
+              "description": "Customer directory",
+              "realUrls": [
+                "http://qa1.example.com/customers/{id}",
+                "http://qa2.example.com/customers/{id}"
+              ],
+              "defaultRealUrlIndex": 1,
+              "responseMode": "dynamic",
+              "delayMillis": 100,
+              "tags": [
+                "crm"
+              ],
+              "defaultScenarioId": "scn-gold",
+              "errorScenarioId": "scn-error",
+              "requestRules": "{\"headers\":[]}",
+              "requestRulesEnabled": true,
+              "inspectorName": "session-check",
+              "responseSchema": "{\"type\":\"object\"}",
+              "responseSchemaEnabled": true,
+              "position": 0
             }
 
             """.trimIndent()
         val orders =
             """
             {
-                "id": "svc-orders",
-                "name": "Orders",
-                "mockUrl": "http://api.example.com/orders",
-                "position": 1
+              "id": "svc-orders",
+              "name": "Orders",
+              "mockUrl": "http://api.example.com/orders",
+              "position": 1
             }
 
             """.trimIndent()
@@ -159,34 +159,34 @@ class FileDefinitionStorageTest {
         val gold =
             """
             {
-                "id": "scn-gold",
-                "name": "gold customer",
-                "statusCode": 201,
-                "headers": [
-                    {
-                        "name": "Set-Cookie",
-                        "value": "a=1"
-                    },
-                    {
-                        "name": "Content-Type",
-                        "value": "application/json"
-                    },
-                    {
-                        "name": "Set-Cookie",
-                        "value": "b=2"
-                    }
-                ],
-                "matchCriterion": {
-                    "type": "text",
-                    "text": "ABC123"
+              "id": "scn-gold",
+              "name": "gold customer",
+              "statusCode": 201,
+              "headers": [
+                {
+                  "name": "Set-Cookie",
+                  "value": "a=1"
                 },
-                "methodRestriction": "POST",
-                "delayMillis": 500,
-                "tags": [
-                    "regression",
-                    "smoke"
-                ],
-                "position": 0
+                {
+                  "name": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "name": "Set-Cookie",
+                  "value": "b=2"
+                }
+              ],
+              "matchCriterion": {
+                "type": "text",
+                "text": "ABC123"
+              },
+              "methodRestriction": "POST",
+              "delayMillis": 500,
+              "tags": [
+                "regression",
+                "smoke"
+              ],
+              "position": 0
             }
 
             """.trimIndent()
@@ -202,13 +202,13 @@ class FileDefinitionStorageTest {
         val byRules =
             """
             {
-                "id": "scn-rules",
-                "name": "By rules",
-                "matchCriterion": {
-                    "type": "rules",
-                    "source": "{\"url\":[]}"
-                },
-                "position": 1
+              "id": "scn-rules",
+              "name": "By rules",
+              "matchCriterion": {
+                "type": "rules",
+                "source": "{\"url\":[]}"
+              },
+              "position": 1
             }
 
             """.trimIndent()
