@@ -482,12 +482,12 @@ The published release was checked as the first one was:
 
 ### What stays open
 
-- The version of the repository is that of the latest candidate, 3.0.0-rc.2, so that the README names
+- The version of the repository is that of the latest candidate, 3.0.0-rc.3, so that the README names
   files that the releases page has. The next change of the version is `scripts/set-version.sh 3.0.0` for the
   release, or the version of another candidate.
 - The library `mockey-core` isn't published to an artifact repository. The design leaves open whether it
   is, and where.
-- What the trial of the second candidate finds decides what comes next: another candidate, or the release.
+- What the trial of the third candidate finds decides what comes next: another candidate, or the release.
 
 ## Repeating the checks
 

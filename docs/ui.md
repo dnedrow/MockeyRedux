@@ -20,10 +20,10 @@ That has a few consequences:
 
 The UI needs a Java 21 runtime and nothing else. Like the server, it comes in two forms:
 
-- A distribution, `mockey-ui-3.0.0-rc.2.zip` or `mockey-ui-3.0.0-rc.2.tar.gz`. Unpacked, it has the
+- A distribution, `mockey-ui-3.0.0-rc.3.zip` or `mockey-ui-3.0.0-rc.3.tar.gz`. Unpacked, it has the
   start scripts `bin/mockey-ui` for Unix and `bin\mockey-ui.bat` for Windows, and the libraries of the program
   in `lib`.
-- A runnable jar, `mockey-ui-3.0.0-rc.2-runnable.jar`, which is one file with the program and its
+- A runnable jar, `mockey-ui-3.0.0-rc.3-runnable.jar`, which is one file with the program and its
   libraries.
 
 A build of the sources writes the distribution to `mockey-ui/build/distributions` and the runnable jar to
@@ -62,14 +62,14 @@ The status is 200 when the UI reaches the server. Otherwise, it's 502, and the p
 "When something is wrong with the server".
 
 The runnable jar takes the same arguments as the start script. Every command in this document works with
-`java -jar mockey-ui-3.0.0-rc.2-runnable.jar` in place of `mockey-ui`:
+`java -jar mockey-ui-3.0.0-rc.3-runnable.jar` in place of `mockey-ui`:
 
 ```shell
-java -jar mockey-ui-3.0.0-rc.2-runnable.jar --version
+java -jar mockey-ui-3.0.0-rc.3-runnable.jar --version
 ```
 
 ```text
-mockey-ui version 3.0.0-rc.2
+mockey-ui version 3.0.0-rc.3
 ```
 
 The program ends with the status 0 after the UI has shut down cleanly, see "Stopping", and after it has

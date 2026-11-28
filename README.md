@@ -20,19 +20,19 @@ Mockey Redux is two programs, and each needs a Java 21 runtime and nothing else:
   what the server holds.
 - The UI, `mockey-ui`, serves the web pages that manage a server through the admin API.
 
-Each program comes as one file, a runnable jar. Download `mockey-server-3.0.0-rc.2-runnable.jar` and
-`mockey-ui-3.0.0-rc.2-runnable.jar` from the [releases page][releases] into one directory, or build them
+Each program comes as one file, a runnable jar. Download `mockey-server-3.0.0-rc.3-runnable.jar` and
+`mockey-ui-3.0.0-rc.3-runnable.jar` from the [releases page][releases] into one directory, or build them
 as "Building from the sources" describes and copy them there. Two commands start Mockey. In that directory,
 start the server:
 
 ```shell
-java -jar mockey-server-3.0.0-rc.2-runnable.jar
+java -jar mockey-server-3.0.0-rc.3-runnable.jar
 ```
 
 In a second terminal, start the UI:
 
 ```shell
-java -jar mockey-ui-3.0.0-rc.2-runnable.jar
+java -jar mockey-ui-3.0.0-rc.3-runnable.jar
 ```
 
 Each program writes its log to the terminal, and it's ready when the log says where it accepts connections.

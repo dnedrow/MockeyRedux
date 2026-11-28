@@ -21,7 +21,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.dnedrow:mockey-core:3.0.0-rc.2")
+    implementation("io.github.dnedrow:mockey-core:3.0.0-rc.3")
 }
 ```
 

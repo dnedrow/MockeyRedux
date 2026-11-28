@@ -17,10 +17,10 @@ proxy, the history, and the definitions as a whole. [admin-api.md](admin-api.md)
 
 The server needs a Java 21 runtime and nothing else. It comes in two forms:
 
-- A distribution, `mockey-server-3.0.0-rc.2.zip` or `mockey-server-3.0.0-rc.2.tar.gz`. Unpacked, it has
+- A distribution, `mockey-server-3.0.0-rc.3.zip` or `mockey-server-3.0.0-rc.3.tar.gz`. Unpacked, it has
   the start scripts `bin/mockey-server` for Unix and `bin\mockey-server.bat` for Windows, and the libraries of
   the program in `lib`.
-- A runnable jar, `mockey-server-3.0.0-rc.2-runnable.jar`, which is one file with the program and its
+- A runnable jar, `mockey-server-3.0.0-rc.3-runnable.jar`, which is one file with the program and its
   libraries.
 
 A build of the sources writes the distribution to `mockey-server/build/distributions` and the runnable jar to
@@ -50,14 +50,14 @@ curl http://localhost:8080/status
 ```
 
 The runnable jar takes the same arguments as the start script. Every command of this document works with
-`java -jar mockey-server-3.0.0-rc.2-runnable.jar` in the place of `mockey-server`:
+`java -jar mockey-server-3.0.0-rc.3-runnable.jar` in the place of `mockey-server`:
 
 ```shell
-java -jar mockey-server-3.0.0-rc.2-runnable.jar --version
+java -jar mockey-server-3.0.0-rc.3-runnable.jar --version
 ```
 
 ```text
-mockey-server version 3.0.0-rc.2
+mockey-server version 3.0.0-rc.3
 ```
 
 The program ends with the status 0 when the server has stopped in order, see "Stopping", and after it has
