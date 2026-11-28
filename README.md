@@ -22,8 +22,32 @@ Mockey Redux is two programs, and each needs a Java 21 runtime and nothing else:
 
 Each program comes as one file, a runnable jar. Download `mockey-server-3.0.0-rc.3-runnable.jar` and
 `mockey-ui-3.0.0-rc.3-runnable.jar` from the [releases page][releases] into one directory, or build them
-as "Building from the sources" describes and copy them there. Two commands start Mockey. In that directory,
-start the server:
+as "Building from the sources" describes and copy them there.
+
+On macOS, a browser marks each file that it downloads with the extended attribute `com.apple.quarantine`,
+and macOS can block or warn about a quarantined file when a program opens it. Jars that you build yourself
+don't carry the flag. To see whether a downloaded jar has it, list its extended attributes in the directory
+that holds the jars:
+
+```shell
+xattr -l mockey-server-3.0.0-rc.3-runnable.jar
+```
+
+If the list includes `com.apple.quarantine`, remove the flag from both jars:
+
+```shell
+xattr -d com.apple.quarantine mockey-server-3.0.0-rc.3-runnable.jar mockey-ui-3.0.0-rc.3-runnable.jar
+```
+
+`xattr` prints `No such xattr: com.apple.quarantine` for a jar that doesn't have the flag, which is harmless.
+Only remove the flag from files that came from the [releases page][releases], and compare each file with
+`SHA256SUMS` from the same release first if you want to be sure that the download is intact:
+
+```shell
+shasum -a 256 -c SHA256SUMS --ignore-missing
+```
+
+Two commands start Mockey. In that directory, start the server:
 
 ```shell
 java -jar mockey-server-3.0.0-rc.3-runnable.jar
