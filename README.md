@@ -97,6 +97,7 @@ Two defaults are worth knowing about:
 | [docs/library.md](docs/library.md) | Embedding the mock engine in a JVM application or in its tests. |
 | [docs/migrating-from-2x.md](docs/migrating-from-2x.md) | Moving from Mockey 2.x: definitions, startup options, and scripts. |
 | [docs/deviations.md](docs/deviations.md) | Every intended difference from the behavior of Mockey 2.x. |
+| [docs/tutorials/README.md](docs/tutorials/README.md) | Step-by-step tutorials for creating a service from the command line and the UI. |
 
 The directory `docs/decisions` holds the records of the design decisions. The directory `docs/parity`
 describes how the behavior of Mockey 2.x was recorded and how the new system is compared with it.
